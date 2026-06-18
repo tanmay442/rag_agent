@@ -92,11 +92,21 @@ vi.mock('@/lib/llm/client', () => ({
   getEmbeddingModel: () => ({ modelId: 'text-embedding-004' }),
 }));
 vi.mock('pdf-parse', () => ({
-  __esModule: true,
-  default: vi.fn(async (buf: Buffer) => ({
-    text: `EXTRACTED:${buf.toString('utf8')}`,
-    numpages: 1,
-  })),
+  PDFParse: class {
+    constructor({ data }: { data: Uint8Array }) {
+      this.data = data;
+    }
+    async getText() {
+      const text = new TextDecoder('utf-8').decode(this.data);
+      return {
+        pages: [{ num: 1, text: `EXTRACTED:${text}` }],
+        text: `EXTRACTED:${text}`,
+        total: 1,
+      };
+    }
+    async destroy() {}
+    data: Uint8Array;
+  },
 }));
 vi.mock('ai', async () => {
   const actual = await vi.importActual<typeof import('ai')>('ai');

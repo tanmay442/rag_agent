@@ -1,0 +1,49 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 518 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Acme Corp Employee Handbook) Tj
+0 -20 Td
+(Chapter 1: Dental Plan) Tj
+0 -20 Td
+(All full-time employees are eligible for the dental plan, which covers) Tj
+0 -20 Td
+(two cleanings per calendar year at no cost. Orthodontic work is) Tj
+0 -20 Td
+(covered at 50 percent after a 12 month waiting period.) Tj
+0 -40 Td
+(Chapter 2: Submitting Claims) Tj
+0 -20 Td
+(Claims can be submitted via the HR portal at https://hr.example.com.) Tj
+0 -20 Td
+(Please allow 7-10 business days for reimbursement.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000810 00000 n 
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+880
+%%EOF

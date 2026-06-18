@@ -1,7 +1,5 @@
 import { createHash } from 'node:crypto';
-// @ts-expect-error - pdf-parse lacks first-class type definitions for default
-// export under @types/pdf-parse's `export =` shape; the runtime is fine.
-import pdf from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { embed } from 'ai';
 import { eq } from 'drizzle-orm';
@@ -25,8 +23,13 @@ function sha256(buf: Buffer): string {
 }
 
 export async function extractText(buffer: Buffer): Promise<string> {
-  const result = await pdf(buffer);
-  return result.text as string;
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  try {
+    const result = await parser.getText();
+    return result.text;
+  } finally {
+    await parser.destroy();
+  }
 }
 
 export async function chunkText(text: string): Promise<string[]> {
