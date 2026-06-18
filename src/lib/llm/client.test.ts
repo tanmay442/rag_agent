@@ -9,7 +9,7 @@ describe('llm factory', () => {
     expect(model).toBeDefined();
     expect((model as EmbeddingModelV3).specificationVersion).toBe('v3');
     expect((model as EmbeddingModelV3).provider).toBe('google.generative-ai');
-    expect((model as EmbeddingModelV3).modelId).toBe('text-embedding-004');
+    expect((model as EmbeddingModelV3).modelId).toBe('gemini-embedding-001');
   });
 
   it('getChatModel returns a LanguageModelV3', () => {

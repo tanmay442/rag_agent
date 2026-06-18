@@ -2,11 +2,13 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import type { EmbeddingModelV3, LanguageModelV3 } from '@ai-sdk/provider';
 
-// Hybrid LLM factory: free Google AI Studio handles vector embeddings
-// (text-embedding-004, 768 dims) and our custom OpenAI-compatible endpoint
-// handles chat synthesis + tool execution.
+// Hybrid LLM factory: Google AI Studio handles vector embeddings and our
+// custom OpenAI-compatible endpoint handles chat synthesis + tool execution.
 
-// Google AI Studio: free tier for embeddings.
+// Embedding model — Google's current `gemini-embedding-001` supports
+// configurable output dimensions, so we pin it to 768 to match the
+// pgvector column. We also pass `RETRIEVAL_*` task types so similarity
+// scores are tuned for our RAG use case.
 export function getEmbeddingModel(): EmbeddingModelV3 {
   const apiKey = process.env.AI_STUDIO_KEY;
   if (!apiKey) {
@@ -15,9 +17,15 @@ export function getEmbeddingModel(): EmbeddingModelV3 {
     );
   }
   const google = createGoogleGenerativeAI({ apiKey });
-  // Cast: model id is a free-form string in v6; the runtime accepts any.
-  return google.textEmbedding('text-embedding-004') as EmbeddingModelV3;
+  // Cast: the SDK types the model id narrowly, but the runtime accepts
+  // any string the upstream API recognises. We then layer provider
+  // options to pin the output dimensionality and task type.
+  return google.textEmbedding('gemini-embedding-001') as EmbeddingModelV3;
 }
+
+export const EMBEDDING_OPTIONS = {
+  outputDimensionality: 768,
+} as const;
 
 // Custom OpenAI-compatible endpoint (e.g., the "GPT-5.3" proxy). The model
 // id is read from LLM_MODEL and falls back to 'custom-chat-model'.

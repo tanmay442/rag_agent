@@ -89,7 +89,8 @@ vi.mock('@/lib/db/schema', () => ({
   chunks: { __tableName: 'chunks' },
 }));
 vi.mock('@/lib/llm/client', () => ({
-  getEmbeddingModel: () => ({ modelId: 'text-embedding-004' }),
+  getEmbeddingModel: () => ({ modelId: 'gemini-embedding-001' }),
+  EMBEDDING_OPTIONS: { outputDimensionality: 768 },
 }));
 vi.mock('pdf-parse', () => ({
   PDFParse: class {

@@ -85,4 +85,12 @@ describe('proxy', () => {
     const res = await proxy(req);
     expect(res.status).toBe(307);
   });
+
+  it('does not invoke the SDK middleware for public paths (e.g. /)', async () => {
+    getSession.mockResolvedValueOnce({ data: null });
+    const req = makeRequest('/');
+    const res = await proxy(req);
+    expect(neonProxy).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+  });
 });

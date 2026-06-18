@@ -1,7 +1,7 @@
 import { embed } from 'ai';
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
-import { getEmbeddingModel } from '@/lib/llm/client';
+import { getEmbeddingModel, EMBEDDING_OPTIONS } from '@/lib/llm/client';
 
 export interface RetrievedChunk {
   content: string;
@@ -19,6 +19,7 @@ export async function searchChunks(
   const { embedding } = await embed({
     model: getEmbeddingModel(),
     value: query,
+    providerOptions: { google: EMBEDDING_OPTIONS },
   });
   const vectorLiteral = `[${embedding.join(',')}]`;
 

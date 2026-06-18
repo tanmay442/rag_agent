@@ -5,7 +5,7 @@ import { embed } from 'ai';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documents, chunks } from '@/lib/db/schema';
-import { getEmbeddingModel } from '@/lib/llm/client';
+import { getEmbeddingModel, EMBEDDING_OPTIONS } from '@/lib/llm/client';
 
 const splitter = new RecursiveCharacterTextSplitter({
   chunkSize: 150,
@@ -41,7 +41,11 @@ export async function embedChunks(texts: string[]): Promise<number[][]> {
   const out: number[][] = [];
   // Sequential to keep things simple. Could batch via embedMany in a future pass.
   for (const value of texts) {
-    const { embedding } = await embed({ model, value });
+    const { embedding } = await embed({
+      model,
+      value,
+      providerOptions: { google: EMBEDDING_OPTIONS },
+    });
     out.push(embedding);
   }
   return out;

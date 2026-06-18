@@ -8,8 +8,14 @@ import { auth } from '@/lib/auth/server';
 const neonProxy = auth.middleware({ loginUrl: '/login' });
 
 const ADMIN_PATH = /^\/admin(?:\/|$)/;
+const PUBLIC_PATHS = new Set<string>(['/']);
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // 0. Public paths skip auth entirely.
+  if (PUBLIC_PATHS.has(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   // 1. Let the SDK do its session-refresh + redirect-when-anonymous work.
   const res = await neonProxy(request);
   if (res.status >= 300 && res.status < 400) {
