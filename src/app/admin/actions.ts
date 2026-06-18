@@ -2,7 +2,9 @@
 
 import { forbidden } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { sql } from 'drizzle-orm';
 import { getSession } from '@/lib/auth/server';
+import { db } from '@/lib/db/client';
 import { ingestFile } from '@/lib/rag/ingest';
 
 export interface UploadState {
@@ -12,14 +14,25 @@ export interface UploadState {
   fileName?: string;
 }
 
-export async function uploadPdfAction(
-  _prev: UploadState,
-  formData: FormData,
-): Promise<UploadState> {
+export interface RoleState {
+  error?: string;
+  updatedUserId?: string;
+  newRole?: 'admin' | 'user';
+}
+
+async function requireAdminOrThrow() {
   const session = await getSession();
   if (!session || session.user.role !== 'admin') {
     forbidden();
   }
+  return session;
+}
+
+export async function uploadPdfAction(
+  _prev: UploadState,
+  formData: FormData,
+): Promise<UploadState> {
+  const session = await requireAdminOrThrow();
   const file = formData.get('file');
   if (!(file instanceof File)) {
     return { error: 'No PDF uploaded.' };
@@ -44,4 +57,22 @@ export async function uploadPdfAction(
     console.error('uploadPdfAction failed', err);
     return { error: (err as Error).message ?? 'Upload failed.' };
   }
+}
+
+export async function setRoleAction(
+  _prev: RoleState,
+  formData: FormData,
+): Promise<RoleState> {
+  await requireAdminOrThrow();
+  const userId = String(formData.get('userId') ?? '').trim();
+  const role = String(formData.get('role') ?? '').trim();
+  if (!userId) return { error: 'userId is required' };
+  if (role !== 'admin' && role !== 'user') {
+    return { error: 'role must be "admin" or "user"' };
+  }
+  await db.execute(
+    sql`UPDATE neon_auth.user SET role = ${role} WHERE id = ${userId}`,
+  );
+  revalidatePath('/admin/users');
+  return { updatedUserId: userId, newRole: role };
 }

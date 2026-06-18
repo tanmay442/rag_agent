@@ -14,6 +14,10 @@ vi.mock('@/lib/rag/ingest', () => ({
   ingestFile: ingestFileMock,
 }));
 
+vi.mock('@/lib/db/client', () => ({
+  db: { execute: vi.fn() },
+}));
+
 vi.mock('next/navigation', () => ({
   forbidden: forbiddenMock,
 }));
@@ -22,7 +26,7 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { uploadPdfAction } from './actions';
+import { uploadPdfAction, setRoleAction } from './actions';
 
 beforeEach(() => {
   getSessionMock.mockReset();
@@ -119,3 +123,41 @@ describe('uploadPdfAction', () => {
     expect(state.error).toMatch(/db down/i);
   });
 });
+
+describe('setRoleAction', () => {
+  it('rejects non-admin sessions by calling forbidden()', async () => {
+    getSessionMock.mockResolvedValueOnce({
+      user: { id: 'u1', email: 'u@b.test', name: 'U', role: 'user' },
+      session: { id: 's1', userId: 'u1', expiresAt: '2030' },
+    });
+    const form = new FormData();
+    form.set('userId', 'someone');
+    form.set('role', 'admin');
+    await expect(setRoleAction({}, form)).rejects.toThrow('NEXT_FORBIDDEN');
+    expect(forbiddenMock).toHaveBeenCalled();
+  });
+
+  it('returns an error when userId is missing', async () => {
+    getSessionMock.mockResolvedValueOnce({
+      user: { id: 'a', email: 'a@b.test', name: 'A', role: 'admin' },
+      session: { id: 's', userId: 'a', expiresAt: '2030' },
+    });
+    const form = new FormData();
+    form.set('role', 'admin');
+    const state = await setRoleAction({}, form);
+    expect(state.error).toMatch(/userId/i);
+  });
+
+  it('returns an error when role is invalid', async () => {
+    getSessionMock.mockResolvedValueOnce({
+      user: { id: 'a', email: 'a@b.test', name: 'A', role: 'admin' },
+      session: { id: 's', userId: 'a', expiresAt: '2030' },
+    });
+    const form = new FormData();
+    form.set('userId', 'u');
+    form.set('role', 'superuser');
+    const state = await setRoleAction({}, form);
+    expect(state.error).toMatch(/admin.*user/);
+  });
+});
+
