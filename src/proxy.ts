@@ -8,7 +8,7 @@ import { auth } from '@/lib/auth/server';
 const neonProxy = auth.middleware({ loginUrl: '/login' });
 
 const ADMIN_PATH = /^\/admin(?:\/|$)/;
-const PUBLIC_PATHS = new Set<string>(['/']);
+const PUBLIC_PATHS = new Set<string>(['/', '/login', '/signup']);
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   // 0. Public paths skip auth entirely.
