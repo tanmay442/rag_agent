@@ -120,3 +120,16 @@ scripts/
 ├── setup-test-db.ts                      # Per-run Neon branch
 └── teardown-test-db.ts                   # Branch cleanup
 ```
+
+### CI
+
+`pnpm test:ci` runs the full pipeline:
+
+1. `pnpm setup-test-db` — provision a `dev-test` Neon branch (skipped when
+   `NEON_API_KEY` is not set)
+2. `vitest run --reporter=dot` — unit + integration suite
+3. `playwright test` — E2E smoke against a fresh dev server
+4. `pnpm teardown-test-db` — delete the `dev-test` branch
+
+Set `SKIP_E2E_SETUP=1` to skip the branch provisioning step in
+environments where the DB is already seeded.
