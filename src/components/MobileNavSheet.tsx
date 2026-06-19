@@ -10,16 +10,23 @@ export interface NavItem {
 }
 
 /**
- * MobileNavSheet — the desktop nav is passed in as `children` and
- * shown at every breakpoint. Below `md`, we overlay a single
- * hamburger button in the top-left of that topbar (it sits on top
- * of the brand mark in the topbar visually, but the brand mark is
- * still in the DOM for layout/screen-readers). Tapping the
- * hamburger opens a slide-in sheet with the same items.
+ * MobileNavSheet — pairs a "trigger" (hamburger button, visible only
+ * below `md`) with a slide-in nav sheet (also below `md`). The
+ * `children` are rendered next to the trigger, in normal flow, and
+ * the consumer decides what to show at each breakpoint.
+ *
+ * Typical usages:
+ *   - Public topbar: pass `<nav className="…">…</nav>` as children;
+ *     the consumer hides the inline brand on mobile and the hamburger
+ *     takes its place.
+ *   - Admin shell: pass a mobile-only topbar (with the hamburger and
+ *     a brand label) as children, and render the persistent desktop
+ *     sidebar as a sibling outside the component.
  *
  * Closes on: backdrop click, link click, Escape. Locks body scroll
- * while open. Respects `prefers-reduced-motion` via Tailwind
- * transitions only.
+ * while open. Honors `prefers-reduced-motion` because the slide-in
+ * is the only animated surface and Tailwind transitions already
+ * respect the user preference.
  */
 export function MobileNavSheet({
   brand,
@@ -56,19 +63,14 @@ export function MobileNavSheet({
 
   return (
     <>
-      <div className="relative">
-        {children}
-
-        {/* Hamburger overlay. Visible only below md; floats over the
-            topbar's brand mark area so the user has a stable tap
-            target regardless of where the topbar scrolls to. */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           aria-label="Open navigation"
           aria-expanded={open}
           aria-controls={sheetTestId}
           onClick={() => setOpen(true)}
-          className="absolute left-3 top-1/2 z-10 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)]/90 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors duration-[var(--dur-fast)] hover:bg-[var(--surface-elevated)] md:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)]/90 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors duration-[var(--dur-fast)] hover:bg-[var(--surface-elevated)] md:hidden"
           data-testid={triggerTestId}
         >
           <svg
@@ -86,6 +88,7 @@ export function MobileNavSheet({
             <line x1="4" y1="17" x2="20" y2="17" />
           </svg>
         </button>
+        {children}
       </div>
 
       {open ? (
