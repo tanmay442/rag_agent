@@ -104,4 +104,19 @@ describe('ChatInterface', () => {
     expect(input).toBeDisabled();
     expect(screen.getByTestId('chat-send')).toBeDisabled();
   });
+
+  it('renders the messages container as the vertically scrollable region of the chat frame', () => {
+    setupChat();
+    render(<ChatInterface />);
+    // The container is the only element with `chat-messages`. It
+    // must use `flex-1` + `min-h-0` so the surrounding flex column
+    // gives it the remaining viewport height (and overflow-y-auto
+    // kicks in when the thread is long). We assert on the className
+    // rather than computing layout because jsdom does not lay out.
+    const container = screen.getByTestId('chat-messages');
+    const cls = container.className;
+    expect(cls).toContain('flex-1');
+    expect(cls).toContain('min-h-0');
+    expect(cls).toContain('overflow-y-auto');
+  });
 });
