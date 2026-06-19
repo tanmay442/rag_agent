@@ -47,11 +47,6 @@ export async function Navigation() {
             </button>
           </SignInButton>
         )}
-        {user ? (
-          <span className="text-xs text-zinc-500" data-testid="nav-user-name">
-            {user.firstName ?? user.fullName ?? user.username}
-          </span>
-        ) : null}
       </div>
     </nav>
   );

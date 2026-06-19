@@ -28,8 +28,26 @@ export function ChatInterface() {
         data-testid="chat-messages"
       >
         {messages.length === 0 && (
-          <div className="text-sm text-zinc-500">
-            Ask a question about the company documentation to get started.
+          <div
+            className="flex flex-col gap-3 text-sm text-zinc-700 dark:text-zinc-300"
+            data-testid="chat-intro"
+          >
+            <div className="rounded bg-zinc-50 p-3 text-sm dark:bg-zinc-900">
+              <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                Hi! I&apos;m the support assistant for the school.
+              </p>
+              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                I can answer questions about school policies, schedules, fees,
+                exams, transport, the parent portal, and co-curricular
+                activities. I&apos;ll search the official documentation and
+                show you the sources I used.
+              </p>
+              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                If I can&apos;t find an answer, just say{' '}
+                <em>open a ticket</em> or <em>talk to a human</em> and I&apos;ll
+                file one for you.
+              </p>
+            </div>
           </div>
         )}
         {messages.map((m) => (
