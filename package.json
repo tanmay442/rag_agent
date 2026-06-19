@@ -18,7 +18,8 @@
     "seed": "tsx scripts/seed-docs.ts",
     "setup-test-db": "tsx scripts/setup-test-db.ts",
     "teardown-test-db": "tsx scripts/teardown-test-db.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "setup": "tsx scripts/setup.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.83",

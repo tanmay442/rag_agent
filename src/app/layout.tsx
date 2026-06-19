@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Navigation } from "@/components/Navigation";
+import { appConfig } from "@/lib/config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RAG Support",
-  description: "Serverless AI customer support agent with RAG citations.",
+  title: appConfig.branding.title,
+  description: appConfig.branding.description,
 };
 
 export default function RootLayout({

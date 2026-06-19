@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { SignInButton } from '@clerk/nextjs';
 import { auth } from '@clerk/nextjs/server';
+import { appConfig } from '@/lib/config';
 
 export default async function Home() {
   const { userId } = await auth();
@@ -37,16 +38,15 @@ export default async function Home() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
           </span>
-          Serverless · Cited · Escalation-ready
+          Cited · Tool-driven · Escalation-ready
         </span>
 
         <h1 className="text-balance text-4xl font-semibold tracking-tight text-[var(--foreground)] sm:text-[3.25rem] sm:leading-[1.05]">
-          Serverless AI customer support.
+          {`AI customer support for ${appConfig.orgName}.`}
         </h1>
 
         <p className="max-w-2xl text-pretty text-base leading-relaxed text-[var(--foreground-muted)] sm:text-lg">
-          Ask questions about company documentation, get cited answers, and
-          escalate to a human with one click.
+          {`Ask questions about ${appConfig.orgName} documentation, get cited answers, and escalate to a human with one click.`}
         </p>
 
         <div className="flex flex-wrap gap-3">
