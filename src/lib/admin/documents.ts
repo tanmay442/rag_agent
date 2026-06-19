@@ -36,33 +36,47 @@ export async function listDocuments(
     ? and(deletedFilter, searchFilter)
     : (searchFilter ?? deletedFilter);
 
-  const rows = await db
-    .select({
-      id: documents.id,
-      fileName: documents.fileName,
-      fileHash: documents.fileHash,
-      uploadedBy: documents.uploadedBy,
-      uploadedAt: documents.uploadedAt,
-      blob: documents.blob,
-      deletedAt: documents.deletedAt,
-      uploaderName: users.name,
-      chunkCount: sql<number>`(
-        SELECT count(*)::int FROM ${chunks} WHERE ${chunks.documentId} = ${documents.id}
-      )`.as('chunk_count'),
-    })
-    .from(documents)
-    .leftJoin(users, eq(users.clerkUserId, documents.uploadedBy))
-    .where(where)
-    .orderBy(desc(documents.uploadedAt))
-    .limit(limit)
-    .offset(offset);
+  const [rows, totalRow, chunkRows] = await Promise.all([
+    db
+      .select({
+        id: documents.id,
+        fileName: documents.fileName,
+        fileHash: documents.fileHash,
+        uploadedBy: documents.uploadedBy,
+        uploadedAt: documents.uploadedAt,
+        blob: documents.blob,
+        deletedAt: documents.deletedAt,
+        uploaderName: users.name,
+      })
+      .from(documents)
+      .leftJoin(users, eq(users.clerkUserId, documents.uploadedBy))
+      .where(where)
+      .orderBy(desc(documents.uploadedAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(documents)
+      .where(where),
+    db
+      .select({
+        documentId: chunks.documentId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(chunks)
+      .groupBy(chunks.documentId),
+  ]);
 
-  const totalRow = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(documents)
-    .where(where);
+  const chunkCountById = new Map<number, number>();
+  for (const r of chunkRows) {
+    chunkCountById.set(r.documentId, r.count);
+  }
+  const documentsWithCount = rows.map((r) => ({
+    ...r,
+    chunkCount: chunkCountById.get(r.id) ?? 0,
+  }));
   return {
-    documents: rows as ListDocumentsResult['documents'],
+    documents: documentsWithCount as ListDocumentsResult['documents'],
     total: totalRow[0]?.count ?? 0,
   };
 }
