@@ -63,6 +63,9 @@ export async function uploadPdfAction(
   if (!file.name.toLowerCase().endsWith('.pdf')) {
     return { error: 'Only PDF files are supported.' };
   }
+  if (file.size > 20 * 1024 * 1024) {
+    return { error: 'File too large (max 20 MB).' };
+  }
   const buffer = Buffer.from(await file.arrayBuffer());
   try {
     const result = await uploadPdf({
@@ -101,6 +104,9 @@ export async function replacePdfAction(
   const file = formData.get('file');
   if (!(file instanceof File)) {
     return { error: 'No PDF uploaded.' };
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    return { error: 'File too large (max 20 MB).' };
   }
   const buffer = Buffer.from(await file.arrayBuffer());
   try {

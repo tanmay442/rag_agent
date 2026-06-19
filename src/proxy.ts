@@ -60,9 +60,6 @@ export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     const { userId, sessionClaims } = await auth.protect();
     if (isAdminRoute(req)) {
-      if (!userId) {
-        return NextResponse.redirect(new URL('/sign-in', req.url));
-      }
       const role = await resolveRole(userId, sessionClaims);
       if (role !== 'admin') {
         return NextResponse.redirect(new URL('/chat', req.url));

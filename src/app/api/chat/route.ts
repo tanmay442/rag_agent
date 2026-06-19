@@ -279,22 +279,38 @@ export async function POST(req: Request) {
             realName = 'Unknown';
             realEmail = '';
           }
-          const [latest] = await db
-            .select({ ticketId: tickets.ticketId })
-            .from(tickets)
-            .orderBy(desc(tickets.id))
-            .limit(1);
-          const nextNum = latest
-            ? parseInt(latest.ticketId.split('-')[1] ?? '0', 10) + 1
-            : 1001;
-          const ticketId = `TKT-${nextNum}`;
-          await db.insert(tickets).values({
-            ticketId,
-            userId,
-            name: realName,
-            email: realEmail,
-            issue,
-          });
+          // Generate a unique ticket ID with retry on collision.
+          let ticketId = '';
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const [latest] = await db
+              .select({ ticketId: tickets.ticketId })
+              .from(tickets)
+              .orderBy(desc(tickets.id))
+              .limit(1);
+            const nextNum = latest
+              ? parseInt(latest.ticketId.split('-')[1] ?? '0', 10) + 1
+              : 1001;
+            ticketId = `TKT-${nextNum}`;
+            try {
+              await db.insert(tickets).values({
+                ticketId,
+                userId,
+                name: realName,
+                email: realEmail,
+                issue,
+              });
+              break;
+            } catch (err: unknown) {
+              if (
+                attempt < 4 &&
+                err instanceof Error &&
+                err.message.includes('unique')
+              ) {
+                continue;
+              }
+              throw err;
+            }
+          }
           return { ticketId, status: 'created' };
         },
       }),

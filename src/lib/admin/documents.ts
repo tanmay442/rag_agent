@@ -36,7 +36,7 @@ export async function listDocuments(
     ? and(deletedFilter, searchFilter)
     : (searchFilter ?? deletedFilter);
 
-  const [rows, totalRow, chunkRows] = await Promise.all([
+  const [rows, totalRow] = await Promise.all([
     db
       .select({
         id: documents.id,
@@ -58,14 +58,19 @@ export async function listDocuments(
       .select({ count: sql<number>`count(*)::int` })
       .from(documents)
       .where(where),
-    db
-      .select({
-        documentId: chunks.documentId,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(chunks)
-      .groupBy(chunks.documentId),
   ]);
+
+  const docIds = rows.map((r) => r.id);
+  const chunkRows = docIds.length > 0
+    ? await db
+        .select({
+          documentId: chunks.documentId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(chunks)
+        .where(sql`${chunks.documentId} IN ${sql.join(docIds.map((id) => sql`${id}`), sql`, `)}`)
+        .groupBy(chunks.documentId)
+    : [];
 
   const chunkCountById = new Map<number, number>();
   for (const r of chunkRows) {
@@ -138,11 +143,13 @@ export async function replacePdf(input: ReplaceInput): Promise<UploadResult> {
     .update(documents)
     .set({ blob: input.buffer })
     .where(eq(documents.id, result.documentId));
-  await logDocumentEvent({
-    action: 'replace',
-    documentId: result.documentId,
-    actorId: input.actorId,
-  });
+  if (result.status !== 'unchanged') {
+    await logDocumentEvent({
+      action: 'replace',
+      documentId: result.documentId,
+      actorId: input.actorId,
+    });
+  }
   return {
     documentId: result.documentId,
     status: result.status,
@@ -154,10 +161,14 @@ export async function softDeleteDocument(
   documentId: number,
   actorId: string,
 ): Promise<void> {
-  await db
+  const [updated] = await db
     .update(documents)
     .set({ deletedAt: new Date() })
-    .where(eq(documents.id, documentId));
+    .where(eq(documents.id, documentId))
+    .returning();
+  if (!updated) {
+    throw new Error(`Document not found: ${documentId}`);
+  }
   await logDocumentEvent({
     action: 'delete',
     documentId,

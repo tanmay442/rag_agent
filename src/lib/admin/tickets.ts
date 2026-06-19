@@ -83,15 +83,23 @@ export interface UpdateTicketResult {
   ticket?: Ticket;
 }
 
-// Disallow transitioning from `closed` back to `created` or `in_progress`.
-// Once closed, a ticket must stay closed.
+// Allowed status transitions. Once closed, a ticket must stay closed.
+// created -> in_progress, closed
+// in_progress -> closed, created (regression)
+const VALID_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
+  created: ['in_progress', 'closed'],
+  in_progress: ['closed', 'created'],
+  closed: [],
+};
+
 function isValidStatusTransition(
   from: string,
   to: string,
 ): boolean {
   if (from === to) return true;
-  if (from === 'closed') return false;
-  return true;
+  const allowed = VALID_TRANSITIONS[from as TicketStatus];
+  if (!allowed) return false;
+  return (allowed as readonly string[]).includes(to);
 }
 
 export async function updateTicket(
