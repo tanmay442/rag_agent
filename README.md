@@ -195,6 +195,14 @@ boots the dev server and runs `pnpm setup-test-db` as a global setup.
 
 ## Architecture
 
+<p align="center">
+  <a href="public/SysArch.png">
+    <img src="public/SysArch.png" alt="RAG Support Agent — System Architecture" width="100%" />
+  </a>
+</p>
+
+> End-to-end view: the four lanes (Client → Edge/Proxy → Next.js Server → Neon Postgres) and the cross-lane flows (request, data/SQL, UI message stream, auth/JWT) that connect them. See the full breakdown below.
+
 ```
 src/
 ├── app/
