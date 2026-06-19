@@ -12,7 +12,7 @@ import { recountAllChunksAction } from '../actions';
 // triggers a full re-render of the documents table.
 export function RecountAllButton() {
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const router = useRouter();
   const params = useSearchParams();
   return (

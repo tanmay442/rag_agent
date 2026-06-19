@@ -63,20 +63,28 @@ export function ChatInterface() {
   }, [input]);
 
   // Auto-scroll the messages container to the bottom on every change
-  // using requestAnimationFrame to capture the correct scrollHeight after layout paints.
+  // using requestAnimationFrame to capture the correct scrollHeight
+  // after layout paints. The callback re-reads the ref so a
+  // detached node (e.g. after test teardown) is a no-op rather
+  // than a TypeError.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const el = messagesScrollRef.current;
-    if (!el) return;
-
+    let frameId = 0;
     const handleScroll = () => {
+      const el = messagesScrollRef.current;
+      // Detached nodes (e.g. between tests, after teardown) may
+      // not implement scrollTo in jsdom. The triple guard
+      // (instance + connected + function-present) keeps this a
+      // no-op in every case instead of throwing.
+      if (!(el instanceof HTMLElement)) return;
+      if (!el.isConnected) return;
+      if (typeof el.scrollTo !== 'function') return;
       el.scrollTo({
         top: el.scrollHeight,
         behavior: status === 'streaming' ? 'auto' : 'smooth',
       });
     };
-
-    const frameId = requestAnimationFrame(handleScroll);
+    frameId = requestAnimationFrame(handleScroll);
     return () => cancelAnimationFrame(frameId);
   }, [messages, status]);
 
