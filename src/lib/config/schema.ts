@@ -15,45 +15,76 @@ export const outOfScopeTopicSchema = z.object({
 export type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
 
 export const appConfigSchema = z.object({
-  orgName: z.string().min(1).default('Gardenia Public School'),
-  orgShortName: z.string().min(1).default('RAG Support'),
-  audience: z.string().min(1).default('parents and students'),
+  orgName: z.string().min(1).default('Pulsar Analytics'),
+  orgShortName: z.string().min(1).default('Pulsar Support'),
+  audience: z
+    .string()
+    .min(1)
+    .default('Pulsar Analytics customers and prospects'),
   agentPersona: z
     .object({
       name: z.string().min(1).optional(),
       tone: toneSchema.default('friendly'),
     })
-    .default({ tone: 'friendly' }),
+    .default({ name: 'Astra', tone: 'friendly' }),
   customInstructions: z.string().optional(),
   outOfScopeTopics: z
     .array(outOfScopeTopicSchema)
     .default([
       {
+        topic: 'security-incident reporting',
+        handling:
+          'Decline to troubleshoot. Tell the user you are opening a `security-incident` ticket so a security engineer can contact them within 1 business hour. Do not ask for credentials, account details, or any sensitive information in the chat.',
+      },
+      {
+        topic: 'account-takeover claims',
+        handling:
+          'Decline to investigate. Open a `security-incident` ticket immediately. Do not discuss account state, last-login times, or any account data in the chat.',
+      },
+      {
+        topic: 'refund or chargeback negotiation',
+        handling:
+          'Decline to negotiate. Open a `billing-dispute` ticket so a billing specialist can review the account. The bot must not promise credits, refunds, or waivers of any kind.',
+      },
+      {
+        topic: 'custom contract terms / DPAs / legal review',
+        handling:
+          'Decline to draft, interpret, or commit to any custom contractual language. Open a `legal-request` ticket and tell the user a contracts specialist will respond within 2 business days.',
+      },
+      {
         topic: 'medical',
         handling:
-          'Decline politely and suggest they contact the school nurse or their family doctor directly.',
+          'Decline politely and suggest they contact a qualified medical professional directly.',
       },
       {
         topic: 'legal',
         handling:
-          'Decline politely and suggest they contact the appropriate office (front desk, principal) directly.',
+          'Decline politely and suggest they consult a qualified lawyer directly.',
+      },
+      {
+        topic: 'personal advice',
+        handling:
+          'Decline politely. This assistant is for Pulsar product support only.',
       },
     ]),
   adminEmails: z.array(z.string().email()).default([]),
   branding: z
     .object({
-      title: z.string().min(1).default('RAG Support'),
+      title: z.string().min(1).default('Pulsar Support'),
       description: z
         .string()
         .min(1)
-        .default('Serverless AI customer support agent with RAG citations.'),
+        .default(
+          'AI customer support agent for Pulsar Analytics, with grounded citations.',
+        ),
     })
     .default({
-      title: 'RAG Support',
-      description: 'Serverless AI customer support agent with RAG citations.',
+      title: 'Pulsar Support',
+      description:
+        'AI customer support agent for Pulsar Analytics, with grounded citations.',
     }),
   seedDocsDir: z.string().min(1).default('./documents'),
-  prefetchFirstTurn: z.boolean().default(true),
+  prefetchFirstTurn: z.boolean().default(false),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;

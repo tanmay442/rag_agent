@@ -16,19 +16,19 @@ import type { AppConfig } from '../src/lib/config/schema';
 const config: AppConfig = {
   // The full name of the org the agent represents. Used in the
   // system prompt and the landing page hero.
-  orgName: 'Gardenia Public School',
+  orgName: 'Pulsar Analytics',
 
   // Short brand shown in the top nav and mobile sheet.
-  orgShortName: 'RAG Support',
+  orgShortName: 'Pulsar Support',
 
   // Who the agent is talking to. Phrased as a noun phrase; the
   // system prompt builds "help <audience> find answers ...".
-  audience: 'parents and students',
+  audience: 'Pulsar Analytics customers and prospects',
 
   // Persona. `name` is optional; if set, the agent introduces itself
   // by name on the first reply. `tone` controls length and warmth.
   agentPersona: {
-    name: undefined,
+    name: 'Astra',
     tone: 'friendly',
   },
 
@@ -38,18 +38,45 @@ const config: AppConfig = {
   customInstructions: undefined,
 
   // Topics the agent should refuse to answer and how to redirect.
-  // The defaults (medical, legal) are good safety nets; add more
-  // for your deployment (e.g. "fee negotiation", "staff discipline").
+  // The defaults cover the categories of request a customer-support
+  // agent for a BI/dashboard SaaS cannot safely handle. Each rule
+  // tells the bot to decline AND open a support ticket rather than
+  // improvise.
   outOfScopeTopics: [
+    {
+      topic: 'security-incident reporting',
+      handling:
+        'Decline to troubleshoot. Tell the user you are opening a `security-incident` ticket so a security engineer can contact them within 1 business hour. Do not ask for credentials, account details, or any sensitive information in the chat.',
+    },
+    {
+      topic: 'account-takeover claims',
+      handling:
+        'Decline to investigate. Open a `security-incident` ticket immediately. Do not discuss account state, last-login times, or any account data in the chat.',
+    },
+    {
+      topic: 'refund or chargeback negotiation',
+      handling:
+        'Decline to negotiate. Open a `billing-dispute` ticket so a billing specialist can review the account. The bot must not promise credits, refunds, or waivers of any kind.',
+    },
+    {
+      topic: 'custom contract terms / DPAs / legal review',
+      handling:
+        'Decline to draft, interpret, or commit to any custom contractual language. Open a `legal-request` ticket and tell the user a contracts specialist will respond within 2 business days.',
+    },
     {
       topic: 'medical',
       handling:
-        'Decline politely and suggest they contact the school nurse or their family doctor directly.',
+        'Decline politely and suggest they contact a qualified medical professional directly.',
     },
     {
       topic: 'legal',
       handling:
-        'Decline politely and suggest they contact the appropriate office (front desk, principal) directly.',
+        'Decline politely and suggest they consult a qualified lawyer directly.',
+    },
+    {
+      topic: 'personal advice',
+      handling:
+        'Decline politely. This assistant is for Pulsar product support only.',
     },
   ],
 
@@ -62,8 +89,8 @@ const config: AppConfig = {
 
   // Browser tab title + meta description.
   branding: {
-    title: 'RAG Support',
-    description: 'Serverless AI customer support agent with RAG citations.',
+    title: 'Pulsar Support',
+    description: 'AI customer support agent for Pulsar Analytics, with grounded citations.',
   },
 
   // Where the setup CLI drops seed PDFs and where `pnpm seed`
@@ -75,7 +102,7 @@ const config: AppConfig = {
   // has grounded context even if it does not call the search tool
   // itself. Set false to disable the pre-fetch and rely on the
   // model to call the tool every turn.
-  prefetchFirstTurn: true,
+  prefetchFirstTurn: false,
 };
 
 export default config;

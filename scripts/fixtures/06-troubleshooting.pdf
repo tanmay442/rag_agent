@@ -1,0 +1,99 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2076 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - Troubleshooting Guide) Tj
+0 -20 Td
+(Version 1.8 - May 2026) Tj
+0 -40 Td
+(1. Common errors) Tj
+0 -20 Td
+(Dashboard shows "stale": the underlying data source has not) Tj
+0 -20 Td
+(refreshed. Open the dashboard, click the data-source name in the) Tj
+0 -20 Td
+(footer, and choose Refresh now. See the data-and-integrations) Tj
+0 -20 Td
+(guide for refresh cadence defaults.) Tj
+0 -40 Td
+(Query failed with 429: the workspace is rate-limited. Wait for) Tj
+0 -20 Td
+(the time indicated in the Retry-After header (usually 30 to 60) Tj
+0 -20 Td
+(seconds) and retry. If you repeatedly hit 429, contact support to) Tj
+0 -20 Td
+(raise your workspace quota.) Tj
+0 -40 Td
+(Sign-in loop: your session cookie is stale. Sign out from the) Tj
+0 -20 Td
+(account menu, then sign back in. If the loop persists, clear the) Tj
+0 -20 Td
+(browser cookies for app.pulsaranalytics.io and try again.) Tj
+0 -40 Td
+(2. Status page) Tj
+0 -20 Td
+(Live system status is at status.pulsaranalytics.io. Pulsar posts) Tj
+0 -20 Td
+(incidents, planned maintenance, and historical uptime there.) Tj
+0 -20 Td
+(Subscribe with email or Slack to receive notifications.) Tj
+0 -40 Td
+(3. Diagnostic info) Tj
+0 -20 Td
+(When you contact support, please include your workspace id) Tj
+0 -20 Td
+(found in Settings > General, your account email, the time of the) Tj
+0 -20 Td
+(issue (with timezone), and a screenshot of the error toast.) Tj
+0 -40 Td
+(4. Support contact) Tj
+0 -20 Td
+(Starter: community forum only.) Tj
+0 -20 Td
+(Team: email support, 1 business day response.) Tj
+0 -20 Td
+(Business: priority email, 4 business hour response.) Tj
+0 -20 Td
+(Enterprise: dedicated CSM, 1 business hour response, 24x7) Tj
+0 -20 Td
+(for severity 1 incidents).) Tj
+0 -40 Td
+(5. Reporting a security issue) Tj
+0 -20 Td
+(Email security@pulsaranalytics.io or use the in-app Report a) Tj
+0 -20 Td
+(security issue link from the help menu. Pulsar's security team) Tj
+0 -20 Td
+(acknowledges within 1 business hour and aims to remediate) Tj
+0 -20 Td
+(within 24 hours for high-severity findings.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000002372 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2445
+%%EOF

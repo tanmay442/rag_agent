@@ -1,0 +1,95 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1973 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - REST API Reference) Tj
+0 -20 Td
+(Version 2026-05) Tj
+0 -40 Td
+(1. Authentication) Tj
+0 -20 Td
+(All requests authenticate with a bearer token issued from) Tj
+0 -20 Td
+(Workspace > Settings > API tokens. Tokens are scoped to a) Tj
+0 -20 Td
+(single workspace and inherit the issuing user's role. Pass the) Tj
+0 -20 Td
+(token in the Authorization header: Authorization: Bearer <token>.) Tj
+0 -40 Td
+(2. Rate limits) Tj
+0 -20 Td
+(The default rate limit is 60 requests per minute per token) Tj
+0 -20 Td
+(across the REST API and 600 requests per minute per workspace) Tj
+0 -20 Td
+(across all tokens. The /v1/query endpoint is capped at 10) Tj
+0 -20 Td
+(requests per minute per token. Rate-limited responses return) Tj
+0 -20 Td
+(HTTP 429 with a Retry-After header in seconds.) Tj
+0 -40 Td
+(3. Endpoints) Tj
+0 -20 Td
+(GET /v1/dashboards - list dashboards in the workspace.) Tj
+0 -20 Td
+(POST /v1/dashboards - create a new dashboard from a JSON spec.) Tj
+0 -20 Td
+(GET /v1/dashboards/{id} - retrieve a dashboard by id.) Tj
+0 -20 Td
+(PATCH /v1/dashboards/{id} - update title, layout, or filters.) Tj
+0 -20 Td
+(POST /v1/query - run an ad-hoc SQL query against the workspace's) Tj
+0 -20 Td
+(data sources; returns up to 10 000 rows.) Tj
+0 -40 Td
+(4. Webhooks) Tj
+0 -20 Td
+(Pulsar emits webhooks for the following events: dashboard) Tj
+0 -20 Td
+(published, dashboard shared, query failed, data source health) Tj
+0 -20 Td
+(degraded, and member invited. Configure webhook URLs in) Tj
+0 -20 Td
+(Workspace > Settings > Webhooks. Pulsar signs each delivery) Tj
+0 -20 Td
+(with HMAC-SHA256; verify the X-Pulsar-Signature header.) Tj
+0 -40 Td
+(5. SDKs) Tj
+0 -20 Td
+(Official SDKs are available for TypeScript, Python, and Go.) Tj
+0 -20 Td
+(All three expose the same surface: dashboards.list, dashboards) Tj
+0 -20 Td
+(.create, query.run. The SDKs retry idempotent requests up to) Tj
+0 -20 Td
+(three times with exponential backoff on 5xx responses.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000002269 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2342
+%%EOF

@@ -1,0 +1,103 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2296 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - Account and Security) Tj
+0 -20 Td
+(Member-facing - Effective May 2026) Tj
+0 -40 Td
+(1. Change your password) Tj
+0 -20 Td
+(Open Settings > Security > Password. Enter your current password) Tj
+0 -20 Td
+(and then a new password of at least 12 characters. Pulsar) Tj
+0 -20 Td
+(enforces one uppercase, one lowercase, one digit, and one symbol.) Tj
+0 -20 Td
+(After saving, all other sessions are signed out automatically.) Tj
+0 -40 Td
+(2. Two-factor authentication) Tj
+0 -20 Td
+(Settings > Security > Two-factor authentication. Pulsar supports) Tj
+0 -20 Td
+(TOTP authenticator apps (Google Authenticator, 1Password, Authy)) Tj
+0 -20 Td
+(and hardware keys (FIDO2 / WebAuthn). Once enabled, sign-in) Tj
+0 -20 Td
+(requires both your password and a 6-digit code from your device.) Tj
+0 -40 Td
+(3. Session management) Tj
+0 -20 Td
+(Settings > Security > Active sessions lists every device and) Tj
+0 -20 Td
+(browser where you are signed in, with the IP, location, and last) Tj
+0 -20 Td
+(active time. Click Sign out to end any individual session, or) Tj
+0 -20 Td
+(Sign out everywhere to end all sessions except this one.) Tj
+0 -40 Td
+(4. API tokens) Tj
+0 -20 Td
+(Settings > Security > API tokens. Create a token with a name and) Tj
+0 -20 Td
+(scope (read-only, read-write, or admin). Pulsar shows the token) Tj
+0 -20 Td
+(value once at creation; copy and store it securely. Revoke a) Tj
+0 -20 Td
+(token at any time from the same page.) Tj
+0 -40 Td
+(5. Lost 2FA device) Tj
+0 -20 Td
+(If you lose the device that holds your 2FA codes, you can use a) Tj
+0 -20 Td
+(saved recovery code to sign in. Each member gets ten recovery) Tj
+0 -20 Td
+(codes at 2FA setup; each code works once. If you have used all) Tj
+0 -20 Td
+(of your recovery codes, contact support and a security engineer) Tj
+0 -20 Td
+(will verify your identity and reset 2FA on the workspace within) Tj
+0 -20 Td
+(1 business hour. The bot will open a security ticket for you) Tj
+0 -20 Td
+(automatically.) Tj
+0 -40 Td
+(6. IP allow-list) Tj
+0 -20 Td
+(Business and Enterprise admins can restrict workspace access) Tj
+0 -20 Td
+(to a list of IP ranges from Settings > Security > IP allow-list.) Tj
+0 -20 Td
+(Changes take effect within 5 minutes; members outside the list) Tj
+0 -20 Td
+(see a 403 error on sign-in.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000002592 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2665
+%%EOF

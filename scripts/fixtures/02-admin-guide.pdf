@@ -1,0 +1,87 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1638 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - Workspace Admin Guide) Tj
+0 -20 Td
+(Effective from May 2026) Tj
+0 -40 Td
+(1. Workspace settings) Tj
+0 -20 Td
+(Workspace > Settings is where admins change the workspace) Tj
+0 -20 Td
+(name, logo, default timezone, and billing contact. Changes) Tj
+0 -20 Td
+(propagate to all members within a minute.) Tj
+0 -40 Td
+(2. Roles and permissions) Tj
+0 -20 Td
+(Pulsar has three roles: Viewer (read-only dashboards),) Tj
+0 -20 Td
+(Editor (create and edit dashboards, cannot manage members)) Tj
+0 -20 Td
+(and Admin (full workspace control, including billing). Custom) Tj
+0 -20 Td
+(roles with granular permissions are available on the Enterprise) Tj
+0 -20 Td
+(plan only.) Tj
+0 -40 Td
+(3. Audit log) Tj
+0 -20 Td
+(Workspace > Audit log records every admin and editor action:) Tj
+0 -20 Td
+(member invites, role changes, dashboard publications, data) Tj
+0 -20 Td
+(source additions, and query exports. Entries are retained for) Tj
+0 -20 Td
+(90 days on Starter/Team and 365 days on Business/Enterprise.) Tj
+0 -40 Td
+(4. Data sources) Tj
+0 -20 Td
+(Workspace > Data sources lets admins connect, test, and remove) Tj
+0 -20 Td
+(data warehouse connections. Pulsar stores credentials encrypted) Tj
+0 -20 Td
+(at rest with envelope encryption; admins can rotate the workspace) Tj
+0 -20 Td
+(master key from the same page.) Tj
+0 -40 Td
+(5. Account recovery) Tj
+0 -20 Td
+(Admins can transfer workspace ownership to another member from) Tj
+0 -20 Td
+(Workspace > Settings > Ownership. The new owner must accept the) Tj
+0 -20 Td
+(transfer within 7 days, after which the original owner loses admin) Tj
+0 -20 Td
+(privileges.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000001934 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2007
+%%EOF

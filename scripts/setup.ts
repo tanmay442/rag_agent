@@ -1,4 +1,6 @@
-// Interactive first-time setup for a deployment of the RAG Support
+// Interactive first-time setup for a deployment of the Pulsar
+// Analytics customer-support agent (or any deployment of the same
+// RAG Support Agent code, simply re-skinned via the prompts below).
 // Agent. Walks the user through org details, agent persona, custom
 // instructions, admin emails, and a folder of seed PDFs. Writes
 // config/app.config.ts, upserts ADMIN_EMAILS in .env.local, copies
@@ -277,7 +279,7 @@ async function main(): Promise<void> {
   const defaults = await loadCurrentDefaults();
   let config: AppConfig = defaults;
 
-  console.log('\n\x1b[1mRAG Support Agent — first-time setup\x1b[0m');
+  console.log('\n\x1b[1mPulsar Analytics — first-time support agent setup\x1b[0m');
   console.log('Press Enter to keep the current value shown in [brackets].\n');
 
   const banner = (s: string) => console.log(`\n\x1b[1m${s}\x1b[0m`);
@@ -286,7 +288,7 @@ async function main(): Promise<void> {
   banner('Organisation');
   config.orgName = await ask(rl, 'Company / org name', config.orgName);
   config.orgShortName = await ask(rl, 'Short name (nav brand)', config.orgShortName);
-  config.audience = await ask(rl, 'Who does the agent talk to? (e.g. "parents and students")', config.audience);
+  config.audience = await ask(rl, 'Who does the agent talk to? (e.g. "Pulsar Analytics customers and prospects")', config.audience);
 
   banner('Agent persona');
   const personaNameInput = await ask(rl, 'Agent name (optional, blank for none)', config.agentPersona.name ?? '');

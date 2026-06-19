@@ -4,20 +4,30 @@ test.describe('Chat RAG and admin flow', () => {
   test('asks a question, sees a citation, escalates to a ticket', async ({ page }) => {
     await page.goto('/chat');
 
-    // Ask a question that the seeded student-portal handbook answers.
-    await page.fill('[data-testid="chat-input"]', 'What time does school start?');
+    // Ask a question that the Pulsar docs answer directly. With
+    // `prefetchFirstTurn = false` the model calls
+    // `searchDocumentation` itself, the result is returned, and the
+    // citation card surfaces under the same `chat-citation`
+    // testid.
+    await page.fill('[data-testid="chat-input"]', 'How do I change my password?');
     await page.click('[data-testid="chat-send"]');
 
-    // Citation should appear.
+    // Citation should appear. The account-and-security fixture
+    // covers password reset under Settings > Security.
     const citation = page.locator('[data-testid="chat-citation"]').first();
     await expect(citation).toBeVisible({ timeout: 20_000 });
-    await expect(citation).toContainText(/similarity/i);
+    await expect(citation).toContainText(/similarity|match/i);
 
-    // Ask an off-topic question twice to provoke the ticket escalation.
-    await page.fill('[data-testid="chat-input"]', 'Tell me about the weather on Mars.');
+    // The conversation text should mention the path to the password
+    // settings page. The LLM paraphrases the snippet, so we assert
+    // a substring that survives rephrasing.
+    await expect(page.locator('body')).toContainText(/Settings.*Security/, { timeout: 20_000 });
+
+    // Ask an out-of-scope question (security incident) to provoke
+    // the ticket flow. The bot must decline and open a ticket.
+    await page.fill('[data-testid="chat-input"]', 'I think my account has been hacked.');
     await page.click('[data-testid="chat-send"]');
-    await page.waitForTimeout(2_000);
-    await page.fill('[data-testid="chat-input"]', 'No really, I need a human.');
+    await page.fill('[data-testid="chat-input"]', 'Please open a ticket and have someone call me.');
     await page.click('[data-testid="chat-send"]');
 
     // Tool output surfaces the ticket id. We assert the page contains a

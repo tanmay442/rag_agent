@@ -52,7 +52,7 @@ describe('ChatInterface', () => {
     const intro = screen.getByTestId('chat-intro');
     expect(intro).toBeInTheDocument();
     expect(
-      within(intro).getByText(/support assistant for the school/i),
+      within(intro).getByText(/support assistant/i),
     ).toBeInTheDocument();
     expect(
       within(intro).getByText(/file a support ticket/i),
