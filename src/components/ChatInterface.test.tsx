@@ -42,12 +42,17 @@ beforeEach(() => {
 });
 
 describe('ChatInterface', () => {
-  it('renders an empty state when there are no messages', () => {
+  it('renders a welcome intro when there are no messages', () => {
     setupChat();
     render(<ChatInterface />);
+    // The intro card explains what the agent can do and how to open a
+    // ticket. We assert on the data-testid + a stable phrase instead
+    // of the full sentence, so rewordings don't break the test.
+    expect(screen.getByTestId('chat-intro')).toBeInTheDocument();
     expect(
-      screen.getByText(/Ask a question about the company documentation/i),
+      screen.getByText(/support assistant for the school/i),
     ).toBeInTheDocument();
+    expect(screen.getByText(/open a ticket/i)).toBeInTheDocument();
   });
 
   it('renders citation cards for data-citation parts', () => {
