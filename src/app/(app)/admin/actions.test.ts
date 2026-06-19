@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { sessionMock, requireAdminMock } = vi.hoisted(() => ({
-  sessionMock: vi.fn(),
+const { requireAdminMock } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
 }));
 

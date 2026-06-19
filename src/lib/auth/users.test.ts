@@ -77,7 +77,7 @@ vi.mock('@/lib/db/client', () => {
           imageUrl?: string | null;
           role: 'admin' | 'user';
         }) => ({
-          onConflictDoUpdate: (_opts: unknown) => ({
+          onConflictDoUpdate: (): unknown => ({
             returning: async () => {
               const existing = usersTable.find(
                 (u) => u.clerkUserId === v.clerkUserId,

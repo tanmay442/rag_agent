@@ -19,11 +19,6 @@ afterEach(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-function writePdfLike(name: string, body = '%PDF-1.4\nfake'): string {
-  const p = join(work, name);
-  writeFileSync(p, body);
-  return p;
-}
 
 describe('copyPdfsFromDir', () => {
   it('copies only .pdf files into the destination', () => {

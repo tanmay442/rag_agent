@@ -1,5 +1,5 @@
 import 'server-only';
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documents, chunks, tickets, users } from '@/lib/db/schema';
 import { getTopQueries } from '@/lib/auth/query-stats';

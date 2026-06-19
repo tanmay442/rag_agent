@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documentAudit, ticketAudit, users } from '@/lib/db/schema';
 
