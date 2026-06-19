@@ -92,7 +92,7 @@ vi.mock('@/lib/llm/client', () => ({
   getEmbeddingModel: () => ({ modelId: 'gemini-embedding-001' }),
   EMBEDDING_OPTIONS: { outputDimensionality: 768 },
 }));
-vi.mock('pdf-parse', () => ({
+vi.mock('pdf-parse/lib/pdf-parse.js', () => ({
   default: async (data: Uint8Array) => {
     const text = new TextDecoder('utf-8').decode(data);
     return {

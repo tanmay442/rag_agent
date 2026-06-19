@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import pdfParse from 'pdf-parse';
+// Import the lib entry directly: pdf-parse's `index.js` has a debug
+// branch that tries to read a bundled test PDF
+// (`./test/data/05-versions-space.pdf`) at module-eval time when
+// `!module.parent`. Vercel's Turbopack runtime doesn't always
+// preserve `module.parent` the way Node does, so that branch
+// fires during the build's page-data collection and crashes the
+// deploy. The implementation lives in `lib/pdf-parse.js`.
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { embed } from 'ai';
 import { eq } from 'drizzle-orm';
