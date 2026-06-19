@@ -111,15 +111,18 @@ export default async function TicketsPage({
         </button>
       </form>
       <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm" data-testid="tickets-table">
+        <table
+          className="w-full table-fixed text-sm"
+          data-testid="tickets-table"
+        >
           <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500 dark:bg-zinc-900">
             <tr>
-              <th className="px-3 py-2">Ticket</th>
-              <th className="px-3 py-2">User</th>
+              <th className="w-24 px-3 py-2">Ticket</th>
+              <th className="w-44 px-3 py-2">User</th>
               <th className="px-3 py-2">Issue</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Assignee</th>
-              <th className="px-3 py-2 text-right">Created</th>
+              <th className="w-28 px-3 py-2">Status</th>
+              <th className="w-40 px-3 py-2">Assignee</th>
+              <th className="w-32 px-3 py-2 text-right">Created</th>
             </tr>
           </thead>
           <tbody>
@@ -152,8 +155,8 @@ export default async function TicketsPage({
                     </Link>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex flex-col">
-                      <span>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">
                         {(() => {
                           // If the stored name looks like a placeholder
                           // (e.g. 'User' from the LLM-fabricated row) and
@@ -175,7 +178,7 @@ export default async function TicketsPage({
                           return t.name;
                         })()}
                       </span>
-                      <span className="text-xs text-zinc-500">
+                      <span className="truncate text-xs text-zinc-500">
                         {(() => {
                           const looksLikeClerkId = t.userId.startsWith('user_');
                           if (
@@ -203,11 +206,14 @@ export default async function TicketsPage({
                       {t.status}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="truncate px-3 py-2 text-xs" title={t.assignedTo ?? undefined}>
                     {t.assignedTo ?? '—'}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-zinc-500">
-                    {t.createdAt.toISOString()}
+                  <td
+                    className="whitespace-nowrap px-3 py-2 text-right text-xs text-zinc-500"
+                    title={t.createdAt.toISOString()}
+                  >
+                    {t.createdAt.toISOString().slice(0, 16).replace('T', ' ')}
                   </td>
                 </tr>
               ))
