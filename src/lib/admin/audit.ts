@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, ilike, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documentAudit, ticketAudit, users } from '@/lib/db/schema';
 
@@ -116,7 +116,7 @@ export async function listAudit(
         name: users.name,
       })
       .from(users)
-      .where(sql`${users.clerkUserId} = ANY(${actorIds})`);
+      .where(inArray(users.clerkUserId, actorIds));
     for (const r of actorRows) {
       actorMap.set(r.clerkUserId, r.name);
     }
