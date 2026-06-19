@@ -1,19 +1,23 @@
 # RAG Support Agent
 
 Serverless AI customer support agent built on Next.js 16, the Vercel AI SDK
-v6, Drizzle ORM, and Neon (Postgres + Auth). Users ask questions in a chat UI
-and receive cited answers drawn from uploaded PDF documentation; when the
-agent cannot find a match, it offers to open a support ticket.
+v6, and Drizzle ORM on Neon Serverless Postgres. Users ask questions in a
+chat UI and receive cited answers drawn from uploaded PDF documentation;
+when the agent cannot find a match, it offers to open a support ticket.
+
+The app does **not** ship authentication — it's intended to be embedded
+inside a host site that already owns its user identity. The host should
+forward the active user id (and any other necessary details) via a header
+or shared session before calling into this service. See "Identity" below.
 
 ## Stack
 
-- **Framework:** Next.js 16 (App Router) with the new `proxy.ts` convention
+- **Framework:** Next.js 16 (App Router)
 - **LLM:** Google AI Studio `text-embedding-004` (free 768-dim embeddings)
   + any OpenAI-compatible chat endpoint via `CUSTOM_LLM_*` env vars
 - **Database:** Neon Serverless Postgres with the `pgvector` extension and
   HNSW cosine index
 - **ORM:** Drizzle
-- **Auth:** Neon Auth (Better Auth) with role-based access control
 - **Tooling:** Vitest, Testing Library, Playwright, `drizzle-kit`
 
 ## Local development
@@ -24,8 +28,7 @@ pnpm install
 
 # 2. Copy env template
 cp .env.example .env.local
-# …then fill DATABASE_URL, NEON_AUTH_BASE_URL, NEON_AUTH_COOKIE_SECRET,
-#    AI_STUDIO_KEY, CUSTOM_LLM_*, ADMIN_EMAILS
+# …then fill DATABASE_URL, AI_STUDIO_KEY, CUSTOM_LLM_*
 
 # 3. Apply schema
 pnpm db:push
@@ -37,9 +40,16 @@ pnpm seed
 pnpm dev
 ```
 
-The app boots on <http://localhost:3000>. The `ADMIN_EMAILS` env var is a
-comma-separated list; emails matching an entry are auto-promoted to the
-`admin` role when they sign up.
+The app boots on <http://localhost:3000>.
+
+## Identity
+
+Tickets and uploaded documents record a `userId` for audit purposes, but
+the app has no concept of a user session of its own. Until the host site
+wires through its own identity, every record is tagged with the placeholder
+`DEFAULT_USER_ID = "anonymous"` from `src/lib/auth/session.ts`. Change
+that constant (or replace the `getSession()` shim with one that reads
+the host's user info) once the integration is in place.
 
 ## Scripts
 
@@ -72,16 +82,13 @@ Co-located next to each feature. Run with `pnpm test` (single run) or
 - `src/lib/rag/ingest.test.ts` — PDF → chunks → embed pipeline with mocked `embed` and `pdf-parse`
 - `src/lib/rag/search.test.ts` — cosine similarity search with stubbed `db.execute`
 - `src/app/api/chat/route.test.ts` — `/api/chat` route via `next-test-api-route-handler`
-- `src/proxy.test.ts` — session and admin RBAC redirects
 - `src/components/ChatInterface.test.tsx` — citation card rendering
-- `src/app/admin/actions.test.ts` — admin-only server actions
-- `src/app/signup/signup.test.ts` — admin bootstrap
 
 ### E2E (Playwright)
 
-`e2e/chat.spec.ts` signs in, asks a seeded question, asserts a citation,
-then escalates to a ticket. The Playwright config boots the dev server
-and runs `pnpm setup-test-db` as a global setup.
+`e2e/chat.spec.ts` asks a seeded question, asserts a citation, then
+escalates to a ticket. The Playwright config boots the dev server and
+runs `pnpm setup-test-db` as a global setup.
 
 ## Architecture
 
@@ -89,29 +96,23 @@ and runs `pnpm setup-test-db` as a global setup.
 src/
 ├── app/
 │   ├── api/
-│   │   ├── auth/[...neonAuth]/route.ts   # Better Auth catch-all
 │   │   └── chat/route.ts                 # RAG streaming + ticket tool
-│   ├── chat/page.tsx                     # Auth-gated chat UI
-│   ├── login/page.tsx                    # Sign-in form
-│   ├── signup/page.tsx                   # Sign-up form
+│   ├── chat/page.tsx                     # Chat UI
 │   ├── admin/
-│   │   ├── actions.ts                    # uploadPdfAction, setRoleAction
-│   │   ├── layout.tsx                    # Admin-only layout
-│   │   ├── upload/page.tsx               # PDF upload
-│   │   └── users/page.tsx                # Role management
+│   │   ├── actions.ts                    # uploadPdfAction
+│   │   ├── layout.tsx                    # Admin shell
+│   │   └── upload/page.tsx               # PDF upload
 │   ├── layout.tsx
 │   └── page.tsx                          # Landing
 ├── components/
 │   ├── ChatInterface.tsx                 # Streaming chat with citations
-│   ├── Navigation.tsx                    # Top nav
-│   └── SignOutButton.tsx
+│   └── Navigation.tsx                    # Top nav
 ├── lib/
-│   ├── auth/                             # Neon Auth wrappers + role bootstrap
+│   ├── auth/                             # Default-user shim (no auth provider)
 │   ├── chat/                             # UIMessage type
 │   ├── db/                               # Drizzle schema + pg client
 │   ├── llm/                              # Embedding + chat model factory
 │   └── rag/                              # PDF ingest + cosine search
-├── proxy.ts                              # Auth + admin RBAC for Next 16
 └── …
 scripts/
 ├── fixtures/sample.pdf                   # Seeded handbook

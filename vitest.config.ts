@@ -15,6 +15,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Next.js' `server-only` package throws at import time in client
+      // bundles; for unit tests we just need a noop module so the
+      // import resolves.
+      'server-only': path.resolve(__dirname, './vitest.shims/server-only.ts'),
     },
   },
 });

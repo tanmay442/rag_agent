@@ -23,12 +23,25 @@ beforeEach(() => {
 });
 
 describe('seed-docs', () => {
-  it('passes the fixture PDF to ingestFile and prints status', async () => {
-    ingestFileMock.mockResolvedValueOnce({
-      documentId: 7,
-      chunks: 11,
-      status: 'inserted',
-    });
+  it('passes every fixture PDF to ingestFile and prints status', async () => {
+    // The fixtures dir contains a small set of portal PDFs (sample
+    // handbook plus topical guides). Mock one ingestFile response
+    // per file; the last mock wins but we only care about call
+    // count + the first call's shape.
+    const fixtureNames = [
+      'sample.pdf',
+      'admissions.pdf',
+      'exams-and-grading.pdf',
+      'co-curricular.pdf',
+      'parent-portal-guide.pdf',
+    ];
+    for (let i = 0; i < fixtureNames.length; i++) {
+      ingestFileMock.mockResolvedValueOnce({
+        documentId: i + 1,
+        chunks: 3,
+        status: 'inserted',
+      });
+    }
 
     const logs: string[] = [];
     const original = console.log;
@@ -39,13 +52,13 @@ describe('seed-docs', () => {
       console.log = original;
     }
 
-    expect(ingestFileMock).toHaveBeenCalledTimes(1);
+    expect(ingestFileMock).toHaveBeenCalledTimes(fixtureNames.length);
     const arg = ingestFileMock.mock.calls[0]?.[0] as {
       fileName: string;
       buffer: Buffer;
       uploadedBy: string;
     };
-    expect(arg.fileName).toBe('sample.pdf');
+    expect(fixtureNames).toContain(arg.fileName);
     expect(arg.buffer.length).toBeGreaterThan(0);
     expect(arg.buffer.slice(0, 4).toString('utf8')).toBe('%PDF');
     expect(arg.uploadedBy).toBe('seed-script');
@@ -53,11 +66,13 @@ describe('seed-docs', () => {
   });
 
   it('passes a custom userId when given via opts', async () => {
-    ingestFileMock.mockResolvedValueOnce({
-      documentId: 1,
-      chunks: 1,
-      status: 'unchanged',
-    });
+    for (let i = 0; i < 5; i++) {
+      ingestFileMock.mockResolvedValueOnce({
+        documentId: i + 1,
+        chunks: 1,
+        status: 'unchanged',
+      });
+    }
     await runSeed({ fixturesDir: FIXTURES, userId: 'admin-user-1' });
     const arg = ingestFileMock.mock.calls[0]?.[0] as { uploadedBy: string };
     expect(arg.uploadedBy).toBe('admin-user-1');

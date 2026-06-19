@@ -26,7 +26,6 @@
     "@ai-sdk/provider": "^3.0.10",
     "@ai-sdk/react": "^3.0.210",
     "@langchain/textsplitters": "^1.0.1",
-    "@neondatabase/auth": "0.4.2-beta",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/functions": "^3.7.1",
     "ai": "^6.0.208",
