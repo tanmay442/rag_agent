@@ -27,6 +27,7 @@ opened only when the user explicitly asks for one.
   and HNSW cosine index
 - **ORM:** Drizzle
 - **Tooling:** Vitest, Testing Library, Playwright, `drizzle-kit`
+- **UI:** Dark "obsidian slate" theme via CSS custom properties in `src/app/globals.css` (no light variant). Mobile-first navigation: a `<MobileNavSheet />` wraps the top nav and the admin sidebar, swapping in a hamburger below `md`.
 
 ## Local development
 
@@ -82,11 +83,18 @@ The app boots on <http://localhost:3000>.
 - **`/admin/documents`** — Searchable, paginated table. Each row has
   *Preview* (inline iframe over `/api/admin/documents/[id]/blob`),
   *Download*, *Replace*, *Delete* (soft delete with 7-day restore
-  window), and *Hard delete* (cascade).
-- **`/admin/tickets`** — Searchable, paginated list. Each row opens a
-  drawer with the full issue, a notes thread, a status select, an
-  assignee select, and an "Add note" textarea. Status transitions are
-  validated (no `closed → created/in_progress`).
+  window), and *Hard delete* (cascade). A page-level *Recount all*
+  button re-derives every document's chunk count from the
+  `chunks` table (the `recountAllChunksAction` server action).
+- **`/admin/tickets`** — Searchable, paginated list. The table is
+  `table-fixed` with bounded column widths and a compact
+  `YYYY-MM-DD HH:mm` Created column so it never overflows the
+  viewport — no horizontal page scroll. Each row links to
+  `?ticket=…`, which a client-side overlay (`ticket-overlay.tsx`)
+  reads via `useSearchParams` and renders the existing `TicketDrawer`
+  body into a portal: the full issue, a notes thread, a status
+  select, an assignee select, and an "Add note" textarea. Status
+  transitions are validated (no `closed → created/in_progress`).
 - **`/admin/users`** — Searchable, paginated list of all Clerk users.
   Per-row *Promote / Demote* and *Impersonate* (issues a short-lived
   Clerk sign-in token and opens it in a new tab).
@@ -133,7 +141,7 @@ columns on the pre-existing `documents` and `tickets` tables.
 
 ### Unit + integration (Vitest)
 
-91 tests across 17 files. Run with `pnpm test` (single run) or
+115 tests across 18 files. Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/lib/db/schema.test-d.ts` — Drizzle type inference
@@ -141,13 +149,24 @@ columns on the pre-existing `documents` and `tickets` tables.
   mocked `embed` and `pdf-parse`
 - `src/lib/rag/search.test.ts` — cosine similarity search with stubbed
   `db.execute`
+- `src/lib/llm/client.test.ts` — env-var wiring for the Google
+  embedding model and the OpenAI-compatible chat model
 - `src/lib/auth/users.test.ts` — Clerk-mirror `users` table, role
   transitions, pagination
 - `src/lib/auth/ratelimit.test.ts` — 30 / 60 s budget, LRU eviction,
   429 surface
 - `src/lib/auth/audit.test.ts` — audit row inserts (document + ticket)
 - `src/lib/auth/query-stats.test.ts` — per-user top-queries counter
-- `src/app/api/chat/route.test.ts` — 401 / 429 paths + tool wiring
+- `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
+  `searchDocumentation` and `createSupportTicket` tool wiring
+  (searchChunks shape, 800-char cap, user-supplied limit, captured-
+  citation emission), the Clerk identity override in
+  `createSupportTicket`, and the first-turn pre-fetch (no header on
+  empty `lastUserText`, chunks injected on the first turn,
+  pre-fetched chunks surface as `data-citation` parts without a
+  tool call, no pre-fetch on follow-up turns)
+- `src/components/ChatInterface.test.tsx` — streaming / citations
+  rendering
 - `src/app/api/admin/{users,documents,tickets}/...` — 403 / 400 / 404 /
   409 paths and the happy path
 - `src/app/admin/actions.test.ts` — every admin server action 403s for
@@ -170,31 +189,41 @@ boots the dev server and runs `pnpm setup-test-db` as a global setup.
 src/
 ├── app/
 │   ├── api/
-│   │   ├── chat/route.ts                 # RAG streaming + ticket tool (auth)
+│   │   ├── chat/route.ts                 # tool-driven RAG + first-turn pre-fetch + ticket tool (auth)
 │   │   └── admin/                        # All admin API routes (auth + role)
 │   ├── chat/page.tsx                     # Chat UI (auth)
 │   ├── sign-in/[[...sign-in]]/page.tsx   # Clerk <SignIn /> card
 │   ├── sign-up/[[...sign-up]]/page.tsx   # Clerk <SignUp /> card
 │   ├── admin/                            # Admin pages (auth + role)
-│   │   ├── layout.tsx                    # Side nav + requireAdmin()
+│   │   ├── layout.tsx                    # Dark shell: sidebar (md+) + MobileNavSheet (sm) + requireAdmin()
 │   │   ├── page.tsx                      # Overview
 │   │   ├── actions.ts                    # All admin server actions
 │   │   ├── upload/page.tsx
-│   │   ├── documents/page.tsx
-│   │   ├── documents/[id]/preview/page.tsx
-│   │   ├── tickets/page.tsx
-│   │   ├── users/page.tsx
+│   │   ├── documents/
+│   │   │   ├── page.tsx
+│   │   │   ├── document-row-actions.tsx
+│   │   │   ├── recount-all-button.tsx
+│   │   │   └── [id]/preview/page.tsx
+│   │   ├── tickets/
+│   │   │   ├── page.tsx
+│   │   │   ├── ticket-drawer.tsx
+│   │   │   └── ticket-overlay.tsx        # URL-driven ?ticket= portal
+│   │   ├── users/
+│   │   │   ├── page.tsx
+│   │   │   └── user-row-actions.tsx
 │   │   ├── analytics/page.tsx
 │   │   └── audit/page.tsx
+│   ├── globals.css                       # Dark "obsidian slate" CSS tokens
 │   ├── layout.tsx                        # ClerkProvider + Navigation
 │   └── page.tsx                          # Landing (public)
 ├── components/
 │   ├── ChatInterface.tsx                 # Streaming chat with citations
+│   ├── MobileNavSheet.tsx                # Hamburger + slide-down sheet
 │   └── Navigation.tsx                    # Top nav (auth-aware server component)
 ├── lib/
 │   ├── auth/                             # Clerk session + bootstrap + helpers
-│   │   ├── session.ts
-│   │   ├── users.ts
+│   │   ├── session.ts                    # getAppSession, requireAdmin, requireSession, ForbiddenError
+│   │   ├── users.ts                      # syncUserFromClerk, setUserRole, listUsers
 │   │   ├── ratelimit.ts
 │   │   ├── query-stats.ts
 │   │   └── audit.ts
