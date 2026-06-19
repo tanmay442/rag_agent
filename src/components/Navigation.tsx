@@ -24,15 +24,15 @@ export async function Navigation() {
   }
 
   return (
-    <MobileNavSheet
-      brand="RAG Support"
-      items={navItems}
-      triggerTestId="nav-hamburger"
-      sheetTestId="nav-mobile-sheet"
+    <nav
+      className="sticky top-0 z-40 w-full border-b border-[var(--border-subtle)] bg-[var(--background)]/85 backdrop-blur-md"
+      data-testid="nav"
     >
-      <nav
-        className="sticky top-0 z-40 w-full border-b border-[var(--border-subtle)] bg-[var(--background)]/85 backdrop-blur-md"
-        data-testid="nav"
+      <MobileNavSheet
+        brand="RAG Support"
+        items={navItems}
+        triggerTestId="nav-hamburger"
+        sheetTestId="nav-mobile-sheet"
       >
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link
@@ -56,7 +56,8 @@ export async function Navigation() {
                 <path d="M4 4h16v12H7l-3 4V4z" />
               </svg>
             </span>
-            <span>RAG Support</span>
+            <span className="hidden sm:inline">RAG Support</span>
+            <span className="sm:hidden">RAG</span>
           </Link>
 
           <div className="flex items-center gap-1">
@@ -105,7 +106,7 @@ export async function Navigation() {
             )}
           </div>
         </div>
-      </nav>
-    </MobileNavSheet>
+      </MobileNavSheet>
+    </nav>
   );
 }
