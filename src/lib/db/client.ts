@@ -1,28 +1,90 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { attachDatabasePool } from '@vercel/functions';
 import * as schema from './schema';
 
-// Singleton pg.Pool + drizzle wrapper. We attach the pool to the Vercel
-// request lifecycle in production so it is cleaned up between invocations
-// (avoids stale connections during serverless cold/warm cycles).
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not set');
+type Schema = typeof schema;
+export type Database = NodePgDatabase<Schema>;
+
+/**
+ * Build the singleton pg.Pool.
+ *
+ * Two modes:
+ *  1. DATABASE_URL is set -> real Pool, attached to Vercel's
+ *     request lifecycle so it's cleaned up between serverless
+ *     invocations.
+ *  2. DATABASE_URL is missing -> a stub Pool whose .query()
+ *     throws a clear, actionable error. This lets `next build`
+ *     complete (the route-graph walk imports every module) when
+ *     the env isn't set, while still surfacing a useful message
+ *     at the first real request.
+ *
+ * Importers use `import { db } from '@/lib/db/client'` exactly as
+ * before; the export shape is unchanged.
+ */
+function buildPool(): Pool {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    return makeMissingDatabasePool();
+  }
+  return new Pool({ connectionString, max: 10 });
 }
 
-// Reuse a single pool across module reloads in dev (next-dev HMR).
-declare global {
-  var __ragAgentPgPool: Pool | undefined;
+/**
+ * Build a stub Pool that defers the "DATABASE_URL is not set"
+ * error until first use. We do NOT throw at module load because
+ * `next build` imports every module in the route graph and the
+ * production build environment doesn't always have DATABASE_URL.
+ *
+ * The stub returns a never-resolving Promise from .connect()
+ * and a rejecting Promise from .query() / .end() so any real
+ * usage fails fast and loudly.
+ */
+function makeMissingDatabasePool(): Pool {
+  const message =
+    'DATABASE_URL is not set. Add it to .env.local (see .env.example) or set it in your deployment environment.';
+  // We need an object that satisfies pg.Pool's structural shape
+  // (it has many properties we don't use). `as unknown as Pool`
+  // is safe because the only thing reachable in production code
+  // is Drizzle's chain, which calls .query() / .connect() on
+  // whatever we hand it.
+  const stub = {
+    query: <T extends QueryResultRow = QueryResultRow>(
+      _textOrConfig: unknown,
+      _valuesOrCallback?: unknown,
+    ): Promise<QueryResult<T>> => {
+      return Promise.reject(new Error(message));
+    },
+    connect: (): Promise<PoolClient> => Promise.reject(new Error(message)),
+    end: (): Promise<void> => Promise.reject(new Error(message)),
+    on: () => stub,
+    once: () => stub,
+    emit: () => false,
+    removeListener: () => stub,
+    removeAllListeners: () => stub,
+    setMaxListeners: () => stub,
+    getMaxListeners: () => 0,
+    listeners: () => [],
+    rawListeners: () => [],
+    eventNames: () => [],
+    listenerCount: () => 0,
+    addListener: () => stub,
+    off: () => stub,
+    prependListener: () => stub,
+    prependOnceListener: () => stub,
+  };
+  return stub as unknown as Pool;
 }
 
-const pool =
-  globalThis.__ragAgentPgPool ?? new Pool({ connectionString, max: 10 });
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.__ragAgentPgPool = pool;
+function getPool(): Pool {
+  return buildPool();
 }
 
-attachDatabasePool(pool);
+const pool = getPool();
+const hasRealDatabase = Boolean(process.env.DATABASE_URL);
+if (hasRealDatabase) {
+  attachDatabasePool(pool);
+}
 
 export const db = drizzle(pool, { schema });
 export { schema };
