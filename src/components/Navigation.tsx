@@ -30,64 +30,80 @@ export async function Navigation() {
       triggerTestId="nav-hamburger"
       sheetTestId="nav-mobile-sheet"
     >
-      <nav className="sticky top-0 z-40 flex w-full items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--background)]/80 px-4 py-3 backdrop-blur-md sm:px-6">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-base font-semibold tracking-tight"
-        >
-          <span
-            aria-hidden
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-            >
-              <path d="M4 4h16v12H7l-3 4V4z" />
-            </svg>
-          </span>
-          RAG Support
-        </Link>
-        <div className="flex items-center gap-1 sm:gap-3 text-sm">
+      <nav
+        className="sticky top-0 z-40 w-full border-b border-[var(--border-subtle)] bg-[var(--background)]/85 backdrop-blur-md"
+        data-testid="nav"
+      >
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link
-            href="/chat"
-            className="rounded-xl px-3 py-1.5 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-            data-testid="nav-chat"
+            href="/"
+            className="group inline-flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-[var(--foreground)]"
+            data-testid="nav-brand"
           >
-            Chat
-          </Link>
-          {isAdmin ? (
-            <Link
-              href="/admin"
-              className="rounded-xl px-3 py-1.5 text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-              data-testid="nav-admin"
-            >
-              Admin
-            </Link>
-          ) : null}
-          {userId ? (
             <span
-              className="ml-1 flex items-center"
-              data-testid="nav-user-button"
+              aria-hidden
+              className="relative inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[var(--accent)]/15 text-[var(--accent)] ring-1 ring-inset ring-[var(--accent)]/25"
             >
-              <UserButton />
-            </span>
-          ) : (
-            <SignInButton mode="modal">
-              <button
-                type="button"
-                className="ml-1 rounded-xl bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-[var(--accent-hover)]"
-                data-testid="nav-sign-in"
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
               >
-                Sign in
-              </button>
-            </SignInButton>
-          )}
+                <path d="M4 4h16v12H7l-3 4V4z" />
+              </svg>
+            </span>
+            <span>RAG Support</span>
+          </Link>
+
+          <div className="flex items-center gap-1">
+            <Link
+              href="/chat"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--foreground-muted)] transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out-quart)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+              data-testid="nav-chat"
+            >
+              Chat
+            </Link>
+            {isAdmin ? (
+              <Link
+                href="/admin"
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--foreground-muted)] transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out-quart)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+                data-testid="nav-admin"
+              >
+                Admin
+              </Link>
+            ) : null}
+
+            <span className="mx-2 hidden h-5 w-px bg-[var(--border-subtle)] sm:inline-block" />
+
+            {userId ? (
+              <span
+                className="flex items-center"
+                data-testid="nav-user-button"
+              >
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: 'h-8 w-8',
+                    },
+                  }}
+                />
+              </span>
+            ) : (
+              <SignInButton mode="modal">
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--accent)] px-3.5 text-sm font-medium text-[var(--accent-foreground)] transition-colors duration-[var(--dur-fast)] ease-[var(--ease-out-quart)] hover:bg-[var(--accent-hover)] active:bg-[var(--accent-pressed)]"
+                  data-testid="nav-sign-in"
+                >
+                  Sign in
+                </button>
+              </SignInButton>
+            )}
+          </div>
         </div>
       </nav>
     </MobileNavSheet>

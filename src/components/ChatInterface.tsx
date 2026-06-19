@@ -2,8 +2,33 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import type { MyUIMessage } from '@/lib/chat/types';
+
+const QUICK_PROMPTS: Array<{ label: string; text: string }> = [
+  {
+    label: 'Tuition',
+    text: 'What is the tuition fee for grade 6?',
+  },
+  {
+    label: 'Transport',
+    text: 'Does the school bus serve the East side of town?',
+  },
+  {
+    label: 'Exam schedule',
+    text: 'When do the mid-term exams start this year?',
+  },
+  {
+    label: 'Open a ticket',
+    text: "I'd like to open a support ticket.",
+  },
+];
 
 export function ChatInterface() {
   const [input, setInput] = useState('');
@@ -19,10 +44,8 @@ export function ChatInterface() {
     setInput('');
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Enter sends; Shift+Enter is a no-op (single-line input) so the
-    // press is treated as a send rather than swallowing it. This is a
-    // small UX win for chat: hit Enter to send.
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter sends; Shift+Enter inserts a newline (multiline composer).
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e as unknown as FormEvent<HTMLFormElement>);
@@ -31,16 +54,20 @@ export function ChatInterface() {
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 
-  // Auto-scroll: the messages container is the only vertically
-  // scrollable region in the chat frame (the form is pinned to the
-  // bottom of the flex column, the page itself does not scroll). On
-  // every change to `messages` (new text part, citation, or new
-  // message appended) and on every status transition (so we keep up
-  // with streaming token deltas), scroll the container to the bottom
-  // so the user's eye is on the latest reply. We use `scrollTop =`
-  // instead of `Element.scrollIntoView` to avoid scrolling the
-  // whole page on long threads, and we skip the smooth behavior
-  // during streaming to keep up with rapid token deltas.
+  // Auto-grow the composer up to a max height.
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
+
+  // Auto-scroll the messages container to the bottom on every change
+  // (new message, new part, status transition). Use `scrollTop =`
+  // rather than `Element.scrollIntoView` to avoid scrolling the
+  // whole page on long threads. Skip smooth scrolling during
+  // streaming so we keep up with rapid token deltas.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = messagesScrollRef.current;
@@ -49,21 +76,21 @@ export function ChatInterface() {
   }, [messages, status]);
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-3">
       <div
         ref={messagesScrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40 p-3 sm:p-5"
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40 p-4 sm:p-6"
         data-testid="chat-messages"
       >
         {messages.length === 0 && (
           <div
-            className="m-auto flex max-w-md flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/60 p-5 text-sm text-[var(--foreground-muted)]"
+            className="m-auto flex w-full max-w-xl flex-col gap-5"
             data-testid="chat-intro"
           >
-            <div className="flex items-center gap-2 text-[var(--foreground)]">
+            <div className="flex flex-col items-start gap-3">
               <span
                 aria-hidden
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)]"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] ring-1 ring-inset ring-[var(--accent)]/30"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -77,36 +104,70 @@ export function ChatInterface() {
                   <path d="M4 4h16v12H7l-3 4V4z" />
                 </svg>
               </span>
-              <p className="font-medium">Hi! I&apos;m the support assistant for the school.</p>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[15px] font-semibold text-[var(--foreground)]">
+                  Hi! I&apos;m the support assistant for the school.
+                </p>
+                <p className="text-sm leading-relaxed text-[var(--foreground-muted)]">
+                  I can answer questions about school policies, schedules,
+                  fees, exams, transport, the parent portal, and
+                  co-curricular activities. I&apos;ll search the official
+                  documentation and show the sources I used.
+                </p>
+                <p className="text-sm leading-relaxed text-[var(--foreground-muted)]">
+                  If I can&apos;t find an answer, just ask me to file a support ticket
+                  and I&apos;ll get one started for you.
+                </p>
+              </div>
             </div>
-            <p>
-              I can answer questions about school policies, schedules, fees,
-              exams, transport, the parent portal, and co-curricular activities.
-              I&apos;ll search the official documentation and show you the
-              sources I used.
-            </p>
-            <p>
-              If I can&apos;t find an answer, just say{' '}
-              <em className="not-italic text-[var(--foreground)]">
-                open a ticket
-              </em>{' '}
-              or{' '}
-              <em className="not-italic text-[var(--foreground)]">
-                talk to a human
-              </em>{' '}
-              and I&apos;ll file one for you.
-            </p>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-subtle)]">
+                Try one of these
+              </span>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {QUICK_PROMPTS.map((q) => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => {
+                      setInput(q.text);
+                      composerRef.current?.focus();
+                    }}
+                    className="group flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]/70 px-3.5 py-2.5 text-left text-sm text-[var(--foreground-muted)] transition-all duration-[var(--dur-fast)] ease-[var(--ease-out-quart)] hover:border-[var(--border)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+                    data-testid="chat-quick-prompt"
+                  >
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--foreground-subtle)]">
+                        {q.label}
+                      </span>
+                      <span className="text-[13px] leading-snug text-[var(--foreground-muted)] group-hover:text-[var(--foreground)]">
+                        {q.text}
+                      </span>
+                    </span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-3.5 w-3.5 shrink-0 text-[var(--foreground-faint)] transition-transform duration-[var(--dur-fast)] group-hover:translate-x-0.5 group-hover:text-[var(--foreground-muted)]"
+                      aria-hidden
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
+
         {messages.map((m) => {
-          // Group consecutive text/data parts on the same side. The
-          // citation parts are pulled out into their own rail docked
-          // against the AI bubble; this keeps the bubble itself
-          // compact and lets users scan sources at a glance.
           const isUser = m.role === 'user';
-          const textParts = m.parts.filter(
-            (p) => p.type === 'text' || p.type === 'data-citation',
-          );
+          const textParts = m.parts.filter((p) => p.type === 'text');
           const citations = m.parts.filter(
             (p) => p.type === 'data-citation',
           ) as Array<{
@@ -119,15 +180,25 @@ export function ChatInterface() {
               className={
                 isUser
                   ? 'flex flex-col items-end gap-2'
-                  : 'flex flex-col items-start gap-2'
+                  : 'flex flex-col items-start gap-2.5'
               }
+              data-testid={isUser ? 'chat-message-user' : 'chat-message-assistant'}
             >
+              <span
+                className={
+                  isUser
+                    ? 'text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--foreground-subtle)]'
+                    : 'text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--accent)]'
+                }
+              >
+                {isUser ? 'You' : 'Assistant'}
+              </span>
               {textParts.map((part, i) => {
                 if (part.type === 'text') {
                   return isUser ? (
                     <div
                       key={i}
-                      className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-[var(--accent)] px-4 py-2.5 text-sm text-[var(--accent-foreground)] shadow-sm"
+                      className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-[var(--accent)] px-4 py-2.5 text-sm leading-relaxed text-[var(--accent-foreground)] shadow-sm"
                       data-testid="chat-text"
                     >
                       {part.text}
@@ -135,7 +206,7 @@ export function ChatInterface() {
                   ) : (
                     <div
                       key={i}
-                      className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--foreground)] shadow-sm"
+                      className="max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/80 px-4 py-3 text-[14.5px] leading-relaxed text-[var(--foreground)] shadow-sm"
                       data-testid="chat-text"
                     >
                       {part.text}
@@ -146,94 +217,188 @@ export function ChatInterface() {
               })}
               {citations.length > 0 && !isUser && (
                 <div
-                  className="-mx-1 flex max-w-full snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1"
+                  className="flex max-w-full flex-col gap-2"
                   data-testid="chat-citations"
                 >
-                  {citations.map((c, i) => (
-                    <div
-                      key={i}
-                      className="w-64 shrink-0 snap-start rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/80 p-3 shadow-sm"
-                      data-testid="chat-citation"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-subtle)]">
-                          Source
-                        </span>
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--accent)]"
-                          title="Cosine similarity to your question"
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--foreground-subtle)]">
+                    Sources · {citations.length}
+                  </span>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {citations.map((c, i) => {
+                      const sim = c.data.similarity;
+                      const simPct = Math.round(sim * 100);
+                      const simTone =
+                        sim >= 0.8
+                          ? 'var(--success)'
+                          : sim >= 0.6
+                            ? 'var(--accent)'
+                            : 'var(--warning)';
+                      return (
+                        <div
+                          key={i}
+                          className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/70 p-3 shadow-sm"
+                          data-testid="chat-citation"
                         >
-                          similarity {c.data.similarity.toFixed(2)}
-                        </span>
-                      </div>
-                      <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-[var(--foreground-muted)]">
-                        {c.data.snippet}
-                      </p>
-                    </div>
-                  ))}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-subtle)]">
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-3 w-3"
+                                aria-hidden
+                              >
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                              Source {i + 1}
+                            </span>
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums"
+                              style={{
+                                color: simTone,
+                                background: `color-mix(in oklch, ${simTone} 14%, transparent)`,
+                              }}
+                              title="Cosine similarity to your question"
+                            >
+                              {simPct}% match
+                            </span>
+                          </div>
+                          <div
+                            className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]"
+                            aria-hidden
+                          >
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${simPct}%`,
+                                background: simTone,
+                              }}
+                            />
+                          </div>
+                          <p className="line-clamp-4 text-[12.5px] leading-relaxed text-[var(--foreground-muted)]">
+                            {c.data.snippet}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
+
         {isStreaming && (
-          <div className="flex items-center gap-2 self-start text-xs text-[var(--foreground-subtle)]">
-            <span className="flex gap-1">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--foreground-subtle)] [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--foreground-subtle)] [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--foreground-subtle)]" />
+          <div
+            className="flex items-center gap-2 self-start rounded-full border border-[var(--border-subtle)] bg-[var(--surface)]/80 px-2.5 py-1 text-xs text-[var(--foreground-muted)]"
+            data-testid="chat-streaming"
+          >
+            <span className="flex gap-1" aria-hidden>
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent)] [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent)] [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent)]" />
             </span>
+            <span>Generating</span>
             <button
               type="button"
               onClick={() => stop()}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2.5 py-1 text-xs text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+              className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--foreground-subtle)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
             >
               Stop
             </button>
           </div>
         )}
+
         {error && (
-          <div className="rounded-xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]">
-            Something went wrong.
+          <div
+            className="flex items-start gap-2.5 rounded-xl border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
+            role="alert"
+            data-testid="chat-error"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium">Something went wrong.</span>
+              <span className="text-[12px] text-[var(--danger)]/80">
+                Try again in a moment.
+              </span>
+            </div>
           </div>
         )}
       </div>
 
       <form
         onSubmit={onSubmit}
-        className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 p-1.5 shadow-lg shadow-black/20 backdrop-blur-md transition-shadow focus-within:border-[var(--accent)]/60 focus-within:shadow-[var(--accent)]/10"
+        className="group/composer flex items-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 p-2 shadow-lg shadow-black/20 backdrop-blur-md transition-colors duration-[var(--dur-fast)] focus-within:border-[var(--accent)]/60"
+        data-testid="chat-composer"
       >
-        <input
+        <textarea
+          ref={composerRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={isStreaming}
           placeholder="Type your question…"
-          className="min-h-[44px] flex-1 rounded-xl bg-transparent px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none disabled:opacity-60"
+          rows={1}
+          className="min-h-[40px] max-h-[200px] flex-1 resize-none rounded-xl bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none disabled:opacity-60"
           data-testid="chat-input"
         />
         <button
           type="submit"
           disabled={isStreaming || !input.trim()}
-          className="inline-flex h-[44px] items-center gap-1.5 rounded-xl bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-foreground)] transition-all hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={isStreaming ? 'Stop generating' : 'Send message'}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)] text-[var(--accent-foreground)] transition-all duration-[var(--dur-fast)] ease-[var(--ease-out-quart)] hover:bg-[var(--accent-hover)] active:bg-[var(--accent-pressed)] disabled:cursor-not-allowed disabled:opacity-40"
           data-testid="chat-send"
         >
-          Send
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4"
-            aria-hidden
-          >
-            <path d="M5 12h14" />
-            <path d="m12 5 7 7-7 7" />
-          </svg>
+          {isStreaming ? (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden
+            >
+              <rect x="6" y="6" width="12" height="12" rx="1" />
+            </svg>
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden
+            >
+              <path d="M12 19V5" />
+              <path d="m5 12 7-7 7 7" />
+            </svg>
+          )}
         </button>
       </form>
+      <p className="px-1 text-[11px] text-[var(--foreground-faint)]">
+        Enter to send · Shift + Enter for newline
+      </p>
     </div>
   );
 }
