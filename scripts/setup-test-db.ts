@@ -52,9 +52,38 @@ export async function main() {
     if (!create.ok) {
       throw new Error(`Failed to create branch: ${create.status} ${await create.text()}`);
     }
-    const created = (await create.json()) as { branch: { id: string; name: string } };
+    const created = (await create.json()) as {
+      branch: { id: string; name: string; current_state: string };
+      operations?: Array<{ id: string; action: string; status: string }>;
+    };
     branch = created.branch;
     console.log(`[setup-test-db] Created branch ${branch.name} (${branch.id})`);
+    // Wait for the branch to leave the `init` state before
+    // making further API calls against it. The create_branch
+    // operation runs asynchronously on Neon's side; trying
+    // to add an endpoint while it's still running returns
+    // HTTP 423 "project already has running conflicting
+    // operations". We poll current_state until it's `ready`,
+    // with a 60s deadline so a stuck branch doesn't hang CI.
+    {
+      const deadline = Date.now() + 60_000;
+      let state = created.branch.current_state;
+      while (state !== 'ready' && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const poll = await fetch(api(`/branches/${created.branch.id}`), { headers });
+        if (poll.ok) {
+          const polled = (await poll.json()) as {
+            branch: { current_state: string };
+          };
+          state = polled.branch.current_state;
+        }
+      }
+      if (state !== 'ready') {
+        throw new Error(
+          `Branch ${created.branch.id} did not become ready in time (state=${state}).`,
+        );
+      }
+    }
   } else {
     console.log(`[setup-test-db] Reusing existing branch ${branch.name} (${branch.id})`);
   }
@@ -80,18 +109,36 @@ export async function main() {
   let endpoint =
     endpoints.find((e) => e.type === 'read_write') ?? endpoints[0];
   if (!endpoint) {
-    const createEp = await fetch(api('/endpoints'), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        endpoint: { branch_id: branch.id, type: 'read_write' },
-      }),
-    });
-    if (!createEp.ok) {
+    // Retry the endpoint create if Neon returns 423
+    // "project already has running conflicting operations".
+    // The wait-for-branch-ready above handles the *create_branch*
+    // case; this handles concurrent ops from other sources.
+    const createEp = await (async () => {
+      const deadline = Date.now() + 60_000;
+      let lastErr: Response | undefined;
+      while (Date.now() < deadline) {
+        const r = await fetch(api('/endpoints'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            endpoint: { branch_id: branch.id, type: 'read_write' },
+          }),
+        });
+        if (r.ok) return r;
+        if (r.status === 423) {
+          lastErr = r;
+          await new Promise((res) => setTimeout(res, 2000));
+          continue;
+        }
+        // Non-retryable: surface immediately.
+        throw new Error(
+          `Failed to create endpoint: ${r.status} ${await r.text()}`,
+        );
+      }
       throw new Error(
-        `Failed to create endpoint: ${createEp.status} ${await createEp.text()}`,
+        `Failed to create endpoint: still 423 after 60s (last=${lastErr ? await lastErr.text() : 'n/a'})`,
       );
-    }
+    })();
     const created = (await createEp.json()) as {
       endpoint: { id: string; type: string; current_state: string };
     };

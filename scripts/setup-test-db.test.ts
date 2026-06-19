@@ -108,12 +108,16 @@ describe('setup-test-db', () => {
         branches: [{ id: 'br-primary', name: 'production', primary: true }],
       }),
     });
-    // 2. Create branch.
+    // 2. Create branch (returns branch with state=ready so the
+    //    wait-for-ready loop is skipped).
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       text: async () => '',
-      json: async () => ({ branch: { id: 'br-new', name: 'dev-test' } }),
+      json: async () => ({
+        branch: { id: 'br-new', name: 'dev-test', current_state: 'ready' },
+        operations: [],
+      }),
     });
     // 3. List endpoints on the new branch — empty.
     fetchMock.mockResolvedValueOnce({
@@ -131,7 +135,7 @@ describe('setup-test-db', () => {
         endpoint: { id: 'ep-new', type: 'read_write', current_state: 'init' },
       }),
     });
-    // 5. Poll endpoint — first call says "active", so the loop exits.
+    // 5. Poll endpoint — first call says "active", loop exits.
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
