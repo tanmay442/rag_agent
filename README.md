@@ -142,7 +142,7 @@ columns on the pre-existing `documents` and `tickets` tables.
 
 ### Unit + integration (Vitest)
 
-116 tests across 18 files. Run with `pnpm test` (single run) or
+164 tests across 23 files (plus Playwright e2e when run with `pnpm test:ci`). Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/lib/db/schema.test-d.ts` — Drizzle type inference

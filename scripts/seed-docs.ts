@@ -20,14 +20,22 @@ import { ingestFile } from '../src/lib/rag/ingest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..');
 
-function parseArgs(argv: string[]): { dir: string; userId?: string } {
+export function parseArgs(argv: string[]): { dir: string; userId?: string } {
   let dir: string | undefined;
   const positional: string[] = [];
-  for (const a of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
     if (a.startsWith('--dir=')) {
       dir = a.slice('--dir='.length);
     } else if (a === '--dir') {
-      // next arg is the value; loop will pick it up if we shift
+      // Space-separated form: consume the next arg as the value
+      // when it looks like a path (not another flag). Falls back
+      // to the default if the user wrote `--dir` with nothing after.
+      const next = argv[i + 1];
+      if (next && !next.startsWith('--')) {
+        dir = next;
+        i++;
+      }
     } else if (!a.startsWith('--')) {
       positional.push(a);
     }

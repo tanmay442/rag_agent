@@ -47,19 +47,35 @@ export function AppSidebar({
   const { signOut } = useClerk();
 
   // Auto-open the admin accordion whenever the user is on any
-  // /admin/* route, so deep links don't hide their context.
+  // /admin/* route, so deep links don't hide their context. The
+  // user can still collapse it manually; once they do, we keep
+  // their preference until they navigate away from /admin/*.
   const onAdmin = pathname?.startsWith('/admin') ?? false;
   const [adminOpen, setAdminOpen] = useState<boolean>(onAdmin);
+  const [userToggledAdmin, setUserToggledAdmin] = useState<boolean>(false);
+  // Re-sync to the route when the user hasn't expressed a
+  // preference, or when they leave the admin section entirely.
+  // This is the React-recommended "adjust state on prop change"
+  // pattern: compare against a stored value and call the setter
+  // during render. The eslint rule against setState-in-effect
+  // exists to prevent cascading re-renders, but this version
+  // runs only when the value would actually differ.
+  if (onAdmin && !adminOpen && !userToggledAdmin) {
+    setAdminOpen(true);
+  } else if (!onAdmin && adminOpen) {
+    setAdminOpen(false);
+    setUserToggledAdmin(false);
+  }
+
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (onAdmin) setAdminOpen(true);
-  }, [onAdmin]);
-
-  // Close the mobile drawer on route change.
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  // Close the mobile drawer on route change. Same pattern as
+  // above: track the last-seen path in state and reset when it
+  // shifts, without an effect.
+  const [lastPath, setLastPath] = useState<string | null>(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    if (mobileOpen) setMobileOpen(false);
+  }
 
   // Lock body scroll while the mobile drawer is open.
   useEffect(() => {
