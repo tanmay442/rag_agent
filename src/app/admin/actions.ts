@@ -10,6 +10,8 @@ import {
   softDeleteDocument,
   restoreDocument,
   hardDeleteDocument,
+  recountChunksForDocument,
+  recountChunksForAllDocuments,
 } from '@/lib/admin/documents';
 import { updateTicket, type TicketStatus } from '@/lib/admin/tickets';
 import { setUserRole, type AppRole } from '@/lib/auth/users';
@@ -244,6 +246,56 @@ export async function impersonateUserAction(
   } catch (err) {
     console.error('impersonateUserAction failed', err);
     return { error: (err as Error).message ?? 'Impersonation failed.' };
+  }
+}
+
+export interface RecountChunksResult {
+  error?: string;
+  count?: number;
+}
+
+// Admin-only server action: re-derives the live chunk count for a
+// single document from the `chunks` table. Read-only; returns the
+// fresh count so the UI can surface it. Revalidates the documents
+// page so any cache is cleared even if the displayed count was
+// already correct.
+export async function recountChunksAction(
+  documentId: number,
+): Promise<RecountChunksResult> {
+  const session = await requireAdminOrError();
+  if ('error' in session) return session;
+  try {
+    const result = await recountChunksForDocument(documentId);
+    revalidatePath('/admin/documents');
+    return { count: result.count };
+  } catch (err) {
+    console.error('recountChunksAction failed', err);
+    return { error: (err as Error).message ?? 'Recount failed.' };
+  }
+}
+
+export interface RecountAllChunksResult {
+  error?: string;
+  documents?: number;
+  total?: number;
+}
+
+// Admin-only server action: re-derives chunk counts for every document
+// in the system. Returns summary numbers so the page can render a
+// "Recounted N documents, total M chunks" banner. The page reads the
+// summary from the `?recounted=...` search param so the message
+// survives the page reload that `revalidatePath` triggers.
+export async function recountAllChunksAction(): Promise<RecountAllChunksResult> {
+  const session = await requireAdminOrError();
+  if ('error' in session) return session;
+  try {
+    const results = await recountChunksForAllDocuments();
+    const total = results.reduce((acc, r) => acc + r.count, 0);
+    revalidatePath('/admin/documents');
+    return { documents: results.length, total };
+  } catch (err) {
+    console.error('recountAllChunksAction failed', err);
+    return { error: (err as Error).message ?? 'Recount failed.' };
   }
 }
 

@@ -1,7 +1,7 @@
 import { tool, convertToModelMessages, streamText, createUIMessageStream, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
 import { z } from 'zod';
 import { desc } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { db } from '@/lib/db/client';
 import { tickets } from '@/lib/db/schema';
 import { getChatModel } from '@/lib/llm/client';
@@ -67,11 +67,47 @@ export async function POST(req: Request) {
         description:
           'Open a support ticket when the documentation does not answer the user.',
         inputSchema: z.object({
-          name: z.string().describe("The user's name"),
-          email: z.string().email().describe("The user's email address"),
+          // `name` and `email` are intentionally still on the tool's
+          // contract so the LLM can pass them, but the server ignores
+          // them in `execute` and overwrites with the signed-in Clerk
+          // identity. This avoids the LLM hallucinating identity while
+          // keeping the schema stable for future model upgrades.
+          name: z
+            .string()
+            .describe(
+              "Ignored by the server — the signed-in user's name is used instead.",
+            ),
+          email: z
+            .string()
+            .email()
+            .describe(
+              "Ignored by the server — the signed-in user's email is used instead.",
+            ),
           issue: z.string().describe('Brief description of the unresolved issue'),
         }),
-        execute: async ({ name, email, issue }) => {
+        execute: async ({ issue }) => {
+          // Resolve the signed-in Clerk identity. `auth()` already
+          // gated this request, so this should never be null in
+          // practice — but if it is, we log a warning and fall back
+          // to placeholders rather than inserting a row with the
+          // LLM-fabricated values.
+          const clerkUser = await currentUser();
+          let realName: string;
+          let realEmail: string;
+          if (clerkUser) {
+            realName =
+              clerkUser.fullName ??
+              clerkUser.firstName ??
+              clerkUser.username ??
+              'User';
+            realEmail = clerkUser.emailAddresses[0]?.emailAddress ?? '';
+          } else {
+            console.warn(
+              'createSupportTicket: currentUser() returned null after auth() succeeded; storing placeholder identity',
+            );
+            realName = 'Unknown';
+            realEmail = '';
+          }
           const [latest] = await db
             .select({ ticketId: tickets.ticketId })
             .from(tickets)
@@ -84,8 +120,8 @@ export async function POST(req: Request) {
           await db.insert(tickets).values({
             ticketId,
             userId,
-            name,
-            email,
+            name: realName,
+            email: realEmail,
             issue,
           });
           return { ticketId, status: 'created' };

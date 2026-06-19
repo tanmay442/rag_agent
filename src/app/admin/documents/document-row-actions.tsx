@@ -6,6 +6,7 @@ import {
   deleteDocumentAction,
   restoreDocumentAction,
   hardDeleteDocumentAction,
+  recountChunksAction,
 } from '../actions';
 
 export function DocumentRowActions({
@@ -21,6 +22,9 @@ export function DocumentRowActions({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [recountPending, startRecount] = useTransition();
+  const [recountCount, setRecountCount] = useState<number | null>(null);
+  const [recountError, setRecountError] = useState<string | null>(null);
   return (
     <div className="flex flex-wrap items-center gap-1">
       {hasBlob && !isDeleted ? (
@@ -90,6 +94,42 @@ export function DocumentRowActions({
         >
           {pending ? 'Removing…' : 'Hard delete'}
         </button>
+      ) : null}
+      <button
+        type="button"
+        disabled={recountPending}
+        onClick={() =>
+          startRecount(async () => {
+            setRecountError(null);
+            const res = await recountChunksAction(id);
+            if (res.error) {
+              setRecountError(res.error);
+            } else if (typeof res.count === 'number') {
+              setRecountCount(res.count);
+            }
+          })
+        }
+        className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        data-testid={`documents-recount-${id}`}
+      >
+        {recountPending ? 'Recounting…' : 'Recount chunks'}
+      </button>
+      {recountCount !== null ? (
+        <span
+          className="text-xs text-emerald-700"
+          data-testid={`documents-recount-result-${id}`}
+        >
+          → {recountCount}
+        </span>
+      ) : null}
+      {recountError ? (
+        <span
+          className="text-xs text-red-700"
+          role="alert"
+          data-testid={`documents-recount-error-${id}`}
+        >
+          {recountError}
+        </span>
       ) : null}
       {error ? (
         <span className="text-xs text-red-700" role="alert">

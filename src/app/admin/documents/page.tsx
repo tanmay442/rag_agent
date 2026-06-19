@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { listDocuments } from '@/lib/admin/documents';
 import { DocumentRowActions } from './document-row-actions';
+import { RecountAllButton } from './recount-all-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,12 +10,34 @@ const PAGE_SIZE = 25;
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    page?: string;
+    recountedDocs?: string;
+    recountedTotal?: string;
+  }>;
 }) {
   const params = await searchParams;
   const search = params.search?.trim() ?? '';
   const page = Math.max(1, Number(params.page ?? 1));
   const offset = (page - 1) * PAGE_SIZE;
+  // Read the success-banner params (set by RecountAllButton) so the
+  // message survives the page reload triggered by revalidatePath.
+  const recountedDocsRaw = params.recountedDocs;
+  const recountedTotalRaw = params.recountedTotal;
+  const recountedDocs =
+    recountedDocsRaw !== undefined && recountedDocsRaw !== ''
+      ? Number(recountedDocsRaw)
+      : null;
+  const recountedTotal =
+    recountedTotalRaw !== undefined && recountedTotalRaw !== ''
+      ? Number(recountedTotalRaw)
+      : null;
+  const showRecountBanner =
+    recountedDocs !== null &&
+    !Number.isNaN(recountedDocs) &&
+    recountedTotal !== null &&
+    !Number.isNaN(recountedTotal);
   const result = await listDocuments({
     search: search || undefined,
     includeDeleted: true,
@@ -25,22 +48,34 @@ export default async function DocumentsPage({
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-medium">Documents</h2>
-      <form className="flex gap-2" method="get">
-        <input
-          type="search"
-          name="search"
-          defaultValue={search}
-          placeholder="Search file name…"
-          className="flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-          data-testid="documents-search"
-        />
-        <button
-          type="submit"
-          className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Search
-        </button>
-      </form>
+      <div className="flex flex-col gap-2">
+        <form className="flex gap-2" method="get">
+          <input
+            type="search"
+            name="search"
+            defaultValue={search}
+            placeholder="Search file name…"
+            className="flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            data-testid="documents-search"
+          />
+          <button
+            type="submit"
+            className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Search
+          </button>
+          <RecountAllButton />
+        </form>
+        {showRecountBanner ? (
+          <div
+            className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+            data-testid="documents-recount-banner"
+            role="status"
+          >
+            Recounted {recountedDocs} document{recountedDocs === 1 ? '' : 's'}, total {recountedTotal} chunk{recountedTotal === 1 ? '' : 's'}.
+          </div>
+        ) : null}
+      </div>
       <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
         <table className="w-full text-sm" data-testid="documents-table">
           <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500 dark:bg-zinc-900">
