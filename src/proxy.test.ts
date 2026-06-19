@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { protectMock, redirectMock, nextMock } = vi.hoisted(() => ({
+const {
+  protectMock,
+  redirectMock,
+  nextMock,
+  getClerkUserMock,
+} = vi.hoisted(() => ({
   protectMock: vi.fn(),
   redirectMock: vi.fn(),
   nextMock: vi.fn(),
+  getClerkUserMock: vi.fn(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -17,6 +23,10 @@ vi.mock('@clerk/nextjs/server', () => ({
       return handler(fakeAuth, req);
     };
   },
+  clerkClient: () =>
+    Promise.resolve({
+      users: { getUser: getClerkUserMock },
+    }),
   createRouteMatcher: (routes: string[]) => {
     // Simplified path matcher. The proxy uses (.*) at the end of each
     // route; we recognise that pattern and treat it as a prefix.
@@ -53,6 +63,9 @@ beforeEach(() => {
   protectMock.mockReset();
   redirectMock.mockReset();
   nextMock.mockReset();
+  getClerkUserMock.mockReset();
+  // Default: Clerk user lookup returns no role.
+  getClerkUserMock.mockResolvedValue({ publicMetadata: {} });
 });
 
 function makeReq(pathname: string) {
@@ -107,5 +120,24 @@ describe('proxy.ts (clerkMiddleware)', () => {
     protectMock.mockResolvedValue(makeAuth('user_admin', 'admin'));
     await proxyHandler(makeReq('/api/admin/users'));
     expect(nextMock).toHaveBeenCalled();
+  });
+
+  it('falls back to Clerk publicMetadata when JWT has no role', async () => {
+    protectMock.mockResolvedValue(makeAuth('user_admin', null));
+    getClerkUserMock.mockResolvedValue({
+      publicMetadata: { role: 'admin' },
+    });
+    await proxyHandler(makeReq('/admin'));
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(nextMock).toHaveBeenCalled();
+  });
+
+  it('redirects to /chat when fallback Clerk user is not admin', async () => {
+    protectMock.mockResolvedValue(makeAuth('user_1', null));
+    getClerkUserMock.mockResolvedValue({
+      publicMetadata: { role: 'user' },
+    });
+    await proxyHandler(makeReq('/admin'));
+    expect(redirectMock).toHaveBeenCalled();
   });
 });

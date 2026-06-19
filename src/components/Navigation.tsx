@@ -8,7 +8,11 @@ export async function Navigation() {
   const claims = sessionClaims as
     | { metadata?: { role?: string } }
     | undefined;
-  const role = claims?.metadata?.role;
+  const roleFromClaims = claims?.metadata?.role;
+  const roleFromClerk = (user?.publicMetadata as
+    | { role?: string }
+    | null)?.role;
+  const role = roleFromClaims ?? roleFromClerk;
   const isAdmin = role === 'admin';
   return (
     <nav className="flex w-full items-center justify-between border-b border-zinc-200 bg-white px-6 py-3 dark:border-zinc-800 dark:bg-zinc-950">

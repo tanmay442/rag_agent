@@ -62,6 +62,15 @@ export async function syncUserFromClerk(input: {
   if (!row) {
     throw new Error('Failed to upsert user row');
   }
+  // Mirror the role into Clerk's publicMetadata so that the next session
+  // JWT (after the session-token template is configured) carries it.
+  // Fire-and-forget — the local DB row is the source of truth that
+  // proxy.ts consults in the meantime.
+  if (row.role === 'admin') {
+    void syncClerkRole(input.clerkUserId, 'admin').catch((err) => {
+      console.error('syncUserFromClerk: Clerk role sync failed', err);
+    });
+  }
   return row as LocalUser;
 }
 
