@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { MyUIMessage } from '@/lib/chat/types';
 
 export function ChatInterface() {
@@ -31,10 +31,28 @@ export function ChatInterface() {
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 
+  // Auto-scroll: the messages container is the only vertically
+  // scrollable region in the chat frame (the form is pinned to the
+  // bottom of the flex column, the page itself does not scroll). On
+  // every change to `messages` (new text part, citation, or new
+  // message appended) and on every status transition (so we keep up
+  // with streaming token deltas), scroll the container to the bottom
+  // so the user's eye is on the latest reply. We use `scrollTop =`
+  // instead of `Element.scrollIntoView` to avoid scrolling the
+  // whole page on long threads, and we skip the smooth behavior
+  // during streaming to keep up with rapid token deltas.
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, status]);
+
   return (
     <div className="flex flex-1 flex-col gap-4">
       <div
-        className="flex max-h-[calc(100dvh-16rem)] min-h-[60vh] flex-col gap-5 overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40 p-3 backdrop-blur sm:p-5"
+        ref={messagesScrollRef}
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40 p-3 sm:p-5"
         data-testid="chat-messages"
       >
         {messages.length === 0 && (
@@ -183,7 +201,7 @@ export function ChatInterface() {
 
       <form
         onSubmit={onSubmit}
-        className="sticky bottom-4 flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 p-1.5 shadow-2xl shadow-black/20 backdrop-blur-md transition-shadow focus-within:border-[var(--accent)]/60 focus-within:shadow-[var(--accent)]/10"
+        className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 p-1.5 shadow-lg shadow-black/20 backdrop-blur-md transition-shadow focus-within:border-[var(--accent)]/60 focus-within:shadow-[var(--accent)]/10"
       >
         <input
           value={input}
