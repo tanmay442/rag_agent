@@ -6,7 +6,14 @@ v6, and Drizzle ORM on Neon Serverless Postgres. Users sign in with
 cited answers drawn from uploaded PDF documentation; when the agent
 cannot find a match, it offers to open a support ticket. A separate
 **admin console** lets staff upload, list, preview, replace, and
-delete documents, manage users, and triage tickets.
+delete documents, manage users, and triage tickets. Retrieval is
+tool-driven: the chat model calls a `searchDocumentation` tool when
+it needs context (and may ask a clarifying question first). On the
+first user turn the server also pre-fetches chunks server-side and
+injects them into the system prompt, so the model has grounded
+context even when it does not call the tool itself; the LLM may
+still call `searchDocumentation` for reformulations. Tickets are
+opened only when the user explicitly asks for one.
 
 ## Stack
 

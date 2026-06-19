@@ -1,16 +1,16 @@
-import { tool, convertToModelMessages, streamText, createUIMessageStream, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
+import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
 import { z } from 'zod';
 import { desc } from 'drizzle-orm';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { db } from '@/lib/db/client';
 import { tickets } from '@/lib/db/schema';
 import { getChatModel } from '@/lib/llm/client';
-import { searchChunks } from '@/lib/rag/search';
+import { searchChunks, type RetrievedChunk } from '@/lib/rag/search';
 import { rateLimit } from '@/lib/auth/ratelimit';
 import { recordQuery } from '@/lib/auth/query-stats';
 import type { MyUIMessage } from '@/lib/chat/types';
 
-const SYSTEM_PROMPT = `You are a friendly, accurate customer support representative for a
+const SYSTEM_PROMPT_BASE = `You are a friendly, accurate customer support representative for a
 K-12 school. Your job is to help parents and students find answers in the
 school's official documentation.
 
@@ -20,17 +20,19 @@ school's official documentation.
    (e.g. "what's the dress code?" without saying which grade or which
    season), ask ONE short clarifying question before answering. Do not
    ask more than one at a time.
-2. Look at the documentation context provided under the \`--- CONTEXT ---\`
-   section. Prefer context that has a higher similarity score — those
-   are the chunks closest to the user's question.
-3. If the context contains a clear answer:
+2. If you need documentation to answer, call the \`searchDocumentation\`
+   tool with a focused, specific query. You can call it more than once
+   in a turn; reformulate the query if the user's wording is vague. The
+   tool is the only source of truth for documentation — do not invent
+   policies, fees, or rules from outside what it returns.
+3. If the tool returns a clear answer:
    - Answer in plain language, paraphrasing rather than copy-pasting.
    - Cite the relevant chunk(s) by referencing the snippet you used.
      Citations are injected automatically; you don't need to include
      URLs or footnote markers.
    - If the answer depends on grade, term, or year, mention that
      explicitly so the user can self-check.
-4. If the context does NOT contain a clear answer:
+4. If the tool returns nothing useful, or the chunks are off-topic:
    - Say so honestly. Never invent a policy, fee, schedule, or rule.
    - Suggest one specific thing the user could check (a page of the
      handbook, the parent portal, the front office).
@@ -69,6 +71,29 @@ school's official documentation.
 - If the user is frustrated, acknowledge it once and then focus on
   what you can do, not on apologies.`;
 
+// Builds the system prompt for a given turn. On the first user turn we
+// pre-fetch chunks server-side and append them as a fenced section so
+// the model has grounded context even if it does not call
+// `searchDocumentation` itself. On follow-up turns (or when the
+// pre-fetch returned nothing above `SIMILARITY_THRESHOLD`) the prompt
+// is just the base prompt with no pre-fetched content.
+function buildSystemPrompt(prefetch: RetrievedChunk[] | null): string {
+  if (!prefetch || prefetch.length === 0) return SYSTEM_PROMPT_BASE;
+  const header = `# Pre-fetched documentation for the user's first message`;
+  const bullets = prefetch
+    .map((c) => {
+      const content =
+        c.content.length > 800 ? c.content.slice(0, 800) + '…' : c.content;
+      return `- (sim ${c.similarity.toFixed(2)}) ${content}`;
+    })
+    .join('\n');
+  const directive =
+    'If the user message is a greeting or the chunks below are not ' +
+    'relevant, ignore them and answer conversationally. You may still ' +
+    'call searchDocumentation to reformulate.';
+  return `${SYSTEM_PROMPT_BASE}\n\n${header}\n${bullets}\n\n${directive}`;
+}
+
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -95,28 +120,116 @@ export async function POST(req: Request) {
     recordQuery(userId, lastUserText);
   }
 
-  // 1. Retrieve relevant chunks for the latest user question.
-  let sources: Array<{ similarity: number; snippet: string }> = [];
-  if (lastUserText) {
+  // Chunks that produced citations on the assistant message. Two
+  // sources can push into this array:
+  //   1. The first-turn pre-fetch below, so the client surfaces
+  //      citation cards even when the LLM never called
+  //      `searchDocumentation` itself.
+  //   2. The `searchDocumentation` tool's `execute`, so the LLM's
+  //      own reformulations and follow-up searches also surface.
+  // The post-stream wrapper emits the array as `data-citation` parts
+  // in the order they were pushed. Capped per-chunk so a long
+  // retrieval doesn't blow up the citation payload.
+  const capturedCitations: Array<{ similarity: number; snippet: string }> = [];
+  const CITATION_SNIPPET_MAX = 150;
+
+  // First-turn pre-fetch: when no assistant message has been
+  // produced yet in this conversation (i.e. `messages.length <= 1`
+  // — the only message is the current user message, or the array
+  // is empty in degenerate test/direct-API cases), run
+  // `searchChunks` against the user's text and inject the results
+  // into the system prompt. This guarantees the model has grounded
+  // context even if it does not decide to call the
+  // `searchDocumentation` tool itself — important because the
+  // model often skips the tool on a first turn with vague wording,
+  // and the user currently perceives "the LLM isn't using RAG." We
+  // only pre-fetch on the first turn to bound the embedding-call
+  // cost: on follow-up turns the model already has either grounded
+  // context from prior tool calls or conversational context from a
+  // clarifying question, so a fresh embedding is wasted. The
+  // pre-fetched chunks are also pushed onto `capturedCitations` so
+  // the client surfaces citation cards even when the LLM never
+  // called the tool.
+  const isFirstTurn = messages.length <= 1;
+  let prefetch: RetrievedChunk[] | null = null;
+  if (isFirstTurn && lastUserText.trim() !== '') {
     try {
-      const matches = await searchChunks(lastUserText);
-      sources = matches.map((m) => ({
-        similarity: m.similarity,
-        snippet: m.content.slice(0, 150) + (m.content.length > 150 ? '…' : ''),
-      }));
+      prefetch = await searchChunks(lastUserText);
     } catch (err) {
-      console.error('RAG retrieval failed:', err);
+      console.error('First-turn pre-fetch failed:', err);
+      prefetch = null;
+    }
+    if (prefetch) {
+      for (const m of prefetch) {
+        capturedCitations.push({
+          similarity: m.similarity,
+          snippet:
+            m.content.length > CITATION_SNIPPET_MAX
+              ? m.content.slice(0, CITATION_SNIPPET_MAX) + '…'
+              : m.content,
+        });
+      }
     }
   }
 
-  const context = sources.map((s) => s.snippet).join('\n\n');
-
-  // 2. Run the LLM to get a UIMessage stream.
+  // Run the LLM with a tool-driven RAG loop: the model decides when to
+  // call `searchDocumentation` (and how to reformulate vague queries).
+  // `stopWhen: stepCountIs(5)` gives the model room for a clarifying
+  // question plus a couple of reformulated searches without runaway
+  // loops.
   const result = streamText({
     model: getChatModel(),
-    system: `${SYSTEM_PROMPT}\n\n---\n${context || 'No documentation found for this query.'}\n---`,
+    system: buildSystemPrompt(prefetch),
     messages: await convertToModelMessages(messages),
+    stopWhen: stepCountIs(5),
     tools: {
+      searchDocumentation: tool({
+        description:
+          "Search the school documentation for chunks relevant to the user's question. Returns an array of { content, similarity } objects, ordered by similarity (highest first). Call this tool whenever you need to ground an answer in the official docs. You may call it more than once with a reformulated query if the first call returns nothing useful. Each `content` is capped at 800 characters; the full chunk is still available, but only the top 3 results are returned by default. Do NOT call this for non-documentation questions (medical, legal, personal).",
+        inputSchema: z.object({
+          query: z
+            .string()
+            .min(1)
+            .describe(
+              'A focused, specific search query. Reformulate vague user wording into a tight phrase (e.g. "school cell phone policy" instead of "phones").',
+            ),
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(10)
+            .optional()
+            .describe(
+              'Maximum number of chunks to return. Defaults to 3. Use a larger value only if the first call returned nothing useful.',
+            ),
+        }),
+        execute: async ({ query, limit }) => {
+          const TOOL_CONTENT_CAP = 800;
+          try {
+            const matches = await searchChunks(query, { limit });
+            const capped = matches.map((m) => ({
+              content:
+                m.content.length > TOOL_CONTENT_CAP
+                  ? m.content.slice(0, TOOL_CONTENT_CAP) + '…'
+                  : m.content,
+              similarity: m.similarity,
+            }));
+            for (const m of matches) {
+              capturedCitations.push({
+                similarity: m.similarity,
+                snippet:
+                  m.content.length > CITATION_SNIPPET_MAX
+                    ? m.content.slice(0, CITATION_SNIPPET_MAX) + '…'
+                    : m.content,
+              });
+            }
+            return capped;
+          } catch (err) {
+            console.error('RAG retrieval failed:', err);
+            return [];
+          }
+        },
+      }),
       createSupportTicket: tool({
         description:
           'Open a support ticket. ONLY call this tool when the user has explicitly asked to open one, file one, escalate, talk to a human, or submit a complaint. Do NOT call it just because the RAG context was empty. The `issue` argument should be a self-contained, structured summary an admin can read without the conversation transcript: Question / What was tried / Docs searched / User context.',
@@ -190,29 +303,32 @@ export async function POST(req: Request) {
 
   const llmStream = result.toUIMessageStream({ originalMessages: messages });
 
-  // 3. Wrap the LLM stream so that as soon as the assistant message
-  // starts, we inject the citation data parts immediately afterwards
-  // (so the client sees them as parts of the assistant message).
-  const sourcesCopy = sources;
+  // Wrap the LLM stream so that captured citations from the
+  // `searchDocumentation` tool are emitted as `data-citation` parts
+  // on the assistant message. The tool may be called zero, one, or
+  // many times during a multi-step turn, and the model can decide to
+  // call it late in the stream (e.g. after a clarifying question is
+  // answered), so we don't have the citations available when the
+  // assistant `start` chunk arrives. Instead, we buffer nothing and
+  // append the citations after the LLM's final chunk, just before
+  // closing the stream. The client renders them as parts of the
+  // assistant message under the same `chat-citation` testid as
+  // before.
   const citationStream = new ReadableStream<InferUIMessageChunk<MyUIMessage>>({
     start(controller) {
       const reader = llmStream.getReader();
-      let injected = false;
       (async () => {
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             controller.enqueue(value);
-            if (!injected && value && typeof value === 'object' && (value as { type?: string }).type === 'start') {
-              injected = true;
-              for (const src of sourcesCopy) {
-                controller.enqueue({
-                  type: 'data-citation',
-                  data: src,
-                } as InferUIMessageChunk<MyUIMessage>);
-              }
-            }
+          }
+          for (const src of capturedCitations) {
+            controller.enqueue({
+              type: 'data-citation',
+              data: src,
+            } as InferUIMessageChunk<MyUIMessage>);
           }
         } catch (err) {
           controller.error(err);

@@ -35,25 +35,38 @@ export function TicketDrawer({
   const [currentAssignee, setCurrentAssignee] = useState(assignedTo ?? '');
   return (
     <div
-      className="mt-2 flex flex-col gap-2 rounded border border-zinc-200 bg-zinc-50 p-3 text-xs dark:border-zinc-800 dark:bg-zinc-900"
+      className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 text-sm"
       data-testid={`ticket-drawer-body-${ticketId}`}
     >
       <div>
-        <strong>Name:</strong> {name}
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+          Name
+        </span>
+        <div className="mt-0.5 text-[var(--foreground)]">{name}</div>
       </div>
       <div>
-        <strong>Email:</strong> {email}
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+          Email
+        </span>
+        <div className="mt-0.5 text-[var(--foreground)]">{email}</div>
       </div>
       <div>
-        <strong>Issue:</strong> {issue}
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+          Issue
+        </span>
+        <div className="mt-0.5 whitespace-pre-wrap text-[var(--foreground)]">
+          {issue}
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex flex-col gap-1">
-          <span>Status</span>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-1 flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+            Status
+          </span>
           <select
             value={currentStatus}
             onChange={(e) => setCurrentStatus(e.target.value)}
-            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
             data-testid={`ticket-status-${ticketId}`}
           >
             <option value="created">created</option>
@@ -61,12 +74,14 @@ export function TicketDrawer({
             <option value="closed">closed</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1">
-          <span>Assignee</span>
+        <label className="flex flex-1 flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+            Assignee
+          </span>
           <select
             value={currentAssignee}
             onChange={(e) => setCurrentAssignee(e.target.value)}
-            className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
             data-testid={`ticket-assignee-${ticketId}`}
           >
             <option value="">—</option>
@@ -90,20 +105,25 @@ export function TicketDrawer({
               if (res.error) setError(res.error);
             })
           }
-          className="rounded bg-blue-600 px-2 py-1 text-xs text-white disabled:opacity-50"
+          className="rounded-xl bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           data-testid={`ticket-save-${ticketId}`}
         >
           {pending ? 'Saving…' : 'Save'}
         </button>
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor={`ticket-note-${ticketId}`}>Add note</label>
+        <label
+          htmlFor={`ticket-note-${ticketId}`}
+          className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]"
+        >
+          Add note
+        </label>
         <textarea
           id={`ticket-note-${ticketId}`}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          className="rounded border border-zinc-300 bg-white p-2 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+          className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-2 text-sm text-[var(--foreground)]"
           data-testid={`ticket-note-${ticketId}`}
         />
         <button
@@ -120,7 +140,7 @@ export function TicketDrawer({
               }
             })
           }
-          className="self-start rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          className="self-start rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--foreground)] disabled:opacity-50"
           data-testid={`ticket-add-note-${ticketId}`}
         >
           {pending ? 'Posting…' : 'Post note'}
@@ -128,15 +148,22 @@ export function TicketDrawer({
       </div>
       {notes ? (
         <div
-          className="rounded border border-zinc-200 bg-white p-2 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+          className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 text-sm"
           data-testid={`ticket-notes-${ticketId}`}
         >
-          <strong>Notes:</strong>
-          <pre className="whitespace-pre-wrap">{notes}</pre>
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+            Notes
+          </span>
+          <pre className="mt-1 whitespace-pre-wrap text-[var(--foreground)]">
+            {notes}
+          </pre>
         </div>
       ) : null}
       {error ? (
-        <div className="rounded bg-red-100 p-2 text-red-700" role="alert">
+        <div
+          className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}

@@ -28,7 +28,7 @@ export function UserRowActions({
             else setMessage(`Role set to ${next}`);
           })
         }
-        className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)] disabled:opacity-50"
         data-testid={`users-toggle-role-${clerkUserId}`}
       >
         {pending ? '…' : role === 'admin' ? 'Demote' : 'Promote'}
@@ -49,18 +49,18 @@ export function UserRowActions({
             }
           })
         }
-        className="rounded border border-amber-500 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+        className="rounded-xl border border-[var(--warning)]/40 px-2 py-1 text-xs text-[var(--warning)] transition-colors hover:bg-[var(--warning)]/10 disabled:opacity-50"
         data-testid={`users-impersonate-${clerkUserId}`}
       >
         Impersonate
       </button>
       {error ? (
-        <span className="text-xs text-red-700" role="alert">
+        <span className="text-xs text-[var(--danger)]" role="alert">
           {error}
         </span>
       ) : null}
       {message ? (
-        <span className="text-xs text-emerald-700" role="status">
+        <span className="text-xs text-[var(--success)]" role="status">
           {message}
         </span>
       ) : null}

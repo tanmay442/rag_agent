@@ -55,12 +55,12 @@ export default async function DocumentsPage({
             name="search"
             defaultValue={search}
             placeholder="Search file name…"
-            className="flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)]"
             data-testid="documents-search"
           />
           <button
             type="submit"
-            className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-xl bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-[var(--accent-hover)]"
           >
             Search
           </button>
@@ -68,7 +68,7 @@ export default async function DocumentsPage({
         </form>
         {showRecountBanner ? (
           <div
-            className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+            className="rounded-xl border border-[var(--success)]/40 bg-[var(--success)]/10 px-3 py-2 text-sm text-[var(--success)]"
             data-testid="documents-recount-banner"
             role="status"
           >
@@ -76,14 +76,14 @@ export default async function DocumentsPage({
           </div>
         ) : null}
       </div>
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
         <table className="w-full text-sm" data-testid="documents-table">
-          <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500 dark:bg-zinc-900">
+          <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="px-3 py-2">File</th>
               <th className="px-3 py-2">Uploaded by</th>
-              <th className="px-3 py-2">At</th>
-              <th className="px-3 py-2">Chunks</th>
+              <th className="px-3 py-2 text-right">At</th>
+              <th className="px-3 py-2 text-right">Chunks</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Actions</th>
             </tr>
@@ -93,7 +93,7 @@ export default async function DocumentsPage({
               <tr>
                 <td
                   colSpan={6}
-                  className="px-3 py-4 text-center text-zinc-500"
+                  className="px-3 py-4 text-center text-[var(--foreground-muted)]"
                 >
                   No documents.
                 </td>
@@ -102,24 +102,28 @@ export default async function DocumentsPage({
               result.documents.map((d) => (
                 <tr
                   key={d.id}
-                  className="border-t border-zinc-200 dark:border-zinc-800"
+                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)]/40"
                   data-testid={`documents-row-${d.id}`}
                 >
-                  <td className="px-3 py-2 font-medium">{d.fileName}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 font-medium text-[var(--foreground)]">
+                    {d.fileName}
+                  </td>
+                  <td className="px-3 py-2 text-[var(--foreground-muted)]">
                     {d.uploaderName ?? d.uploadedBy}
                   </td>
-                  <td className="px-3 py-2 text-xs text-zinc-500">
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-[var(--foreground-muted)]">
                     {d.uploadedAt.toISOString()}
                   </td>
-                  <td className="px-3 py-2">{d.chunkCount}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-[var(--foreground)]">
+                    {d.chunkCount}
+                  </td>
                   <td className="px-3 py-2">
                     {d.deletedAt ? (
-                      <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-800">
+                      <span className="rounded-full border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-2 py-0.5 text-xs text-[var(--danger)]">
                         deleted
                       </span>
                     ) : (
-                      <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                      <span className="rounded-full border border-[var(--success)]/40 bg-[var(--success)]/10 px-2 py-0.5 text-xs text-[var(--success)]">
                         live
                       </span>
                     )}
@@ -149,7 +153,7 @@ export default async function DocumentsPage({
                 pathname: '/admin/documents',
                 query: { search, page: page - 1 },
               }}
-              className="rounded border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-xl border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
             >
               Previous
             </Link>
@@ -160,7 +164,7 @@ export default async function DocumentsPage({
                 pathname: '/admin/documents',
                 query: { search, page: page + 1 },
               }}
-              className="rounded border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-xl border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
             >
               Next
             </Link>

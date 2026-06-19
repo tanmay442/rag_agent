@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { listAudit } from '@/lib/admin/audit';
 
 export const dynamic = 'force-dynamic';
@@ -30,25 +31,25 @@ export default async function AuditPage({
           name="documentId"
           defaultValue={documentId ?? ''}
           placeholder="Document id"
-          className="w-32 rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-32 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)]"
         />
         <input
           type="text"
           name="ticketId"
           defaultValue={ticketId ?? ''}
           placeholder="Ticket id (TKT-1001)"
-          className="w-48 rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-48 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)]"
         />
         <button
           type="submit"
-          className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="rounded-xl bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-[var(--accent-hover)]"
         >
           Filter
         </button>
       </form>
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
         <table className="w-full text-sm" data-testid="audit-table">
-          <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500 dark:bg-zinc-900">
+          <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="px-3 py-2">When</th>
               <th className="px-3 py-2">Kind</th>
@@ -62,7 +63,7 @@ export default async function AuditPage({
               <tr>
                 <td
                   colSpan={5}
-                  className="px-3 py-4 text-center text-zinc-500"
+                  className="px-3 py-4 text-center text-[var(--foreground-muted)]"
                 >
                   No audit events.
                 </td>
@@ -71,21 +72,23 @@ export default async function AuditPage({
               result.events.map((e) => (
                 <tr
                   key={`${e.kind}-${e.id}`}
-                  className="border-t border-zinc-200 dark:border-zinc-800"
+                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)]/40"
                 >
-                  <td className="px-3 py-2 text-xs text-zinc-500">
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-[var(--foreground-muted)]">
                     {e.at.toISOString()}
                   </td>
-                  <td className="px-3 py-2 text-xs">{e.kind}</td>
-                  <td className="px-3 py-2 text-xs font-medium">
+                  <td className="px-3 py-2 text-xs text-[var(--foreground)]">
+                    {e.kind}
+                  </td>
+                  <td className="px-3 py-2 text-xs font-medium text-[var(--foreground)]">
                     {e.action}
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="px-3 py-2 text-xs text-[var(--foreground-muted)]">
                     {e.kind === 'document'
                       ? `document #${e.documentId}`
                       : e.ticketId}
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="px-3 py-2 text-xs text-[var(--foreground-muted)]">
                     {e.actorName ?? e.actorId}
                   </td>
                 </tr>
@@ -98,6 +101,30 @@ export default async function AuditPage({
         <span>
           Page {page} of {totalPages} ({result.total} total)
         </span>
+        <div className="flex gap-2">
+          {page > 1 ? (
+            <Link
+              href={{
+                pathname: '/admin/audit',
+                query: { documentId, ticketId, page: page - 1 },
+              }}
+              className="rounded-xl border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+            >
+              Previous
+            </Link>
+          ) : null}
+          {page < totalPages ? (
+            <Link
+              href={{
+                pathname: '/admin/audit',
+                query: { documentId, ticketId, page: page + 1 },
+              }}
+              className="rounded-xl border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+            >
+              Next
+            </Link>
+          ) : null}
+        </div>
       </div>
     </section>
   );
