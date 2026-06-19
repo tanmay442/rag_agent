@@ -63,27 +63,30 @@ export function ChatInterface() {
   }, [input]);
 
   // Auto-scroll the messages container to the bottom on every change
-  // (new message, new part, status transition). Use `scrollTop =`
-  // rather than `Element.scrollIntoView` to avoid scrolling the
-  // whole page on long threads. Skip smooth scrolling during
-  // streaming so we keep up with rapid token deltas.
+  // using requestAnimationFrame to capture the correct scrollHeight after layout paints.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = messagesScrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+
+    const handleScroll = () => {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: status === 'streaming' ? 'auto' : 'smooth',
+      });
+    };
+
+    const frameId = requestAnimationFrame(handleScroll);
+    return () => cancelAnimationFrame(frameId);
   }, [messages, status]);
 
   return (
-    // The chat card is a single bordered surface that owns the
-    // viewport height. `flex-1 min-h-0` lets it take exactly the
-    // remaining height of the page column (set in chat/page.tsx)
-    // and gives the inner messages region a definite height to
-    // scroll within. The composer and the messages area are
-    // siblings inside this column so the card never reflows with
-    // conversation length.
+    // To prevent the layout from stretching, we assign a explicit height limitation. 
+    // Here we use `h-[600px] md:h-[700px] max-h-full` to bound the container. 
+    // If your parent wrapper already has a rigid height (e.g. `h-screen` or `h-[80vh]`), 
+    // you can swap this class to `h-full`.
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40"
+      className="flex h-[600px] md:h-[700px] max-h-full w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40"
       data-testid="chat-frame"
     >
       <div
