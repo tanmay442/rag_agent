@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { PDFParse } from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { embed } from 'ai';
 import { eq } from 'drizzle-orm';
@@ -23,13 +23,14 @@ function sha256(buf: Buffer): string {
 }
 
 export async function extractText(buffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText();
-    return result.text;
-  } finally {
-    await parser.destroy();
-  }
+  // pdf-parse@1 returns { text, numpages, info, metadata, version }.
+  // pdf-parse@2 (which we just downgraded away from) returned the same
+  // shape but via a PDFParse class with .getText(). The v1 function
+  // form is what works on Vercel's Node serverless runtime; the v2
+  // class form bundles pdfjs-dist@5 which needs DOMMatrix / canvas
+  // globals that don't exist in plain Node.
+  const result = await pdfParse(buffer);
+  return result.text;
 }
 
 export async function chunkText(text: string): Promise<string[]> {

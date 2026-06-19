@@ -93,20 +93,13 @@ vi.mock('@/lib/llm/client', () => ({
   EMBEDDING_OPTIONS: { outputDimensionality: 768 },
 }));
 vi.mock('pdf-parse', () => ({
-  PDFParse: class {
-    constructor({ data }: { data: Uint8Array }) {
-      this.data = data;
-    }
-    async getText() {
-      const text = new TextDecoder('utf-8').decode(this.data);
-      return {
-        pages: [{ num: 1, text: `EXTRACTED:${text}` }],
-        text: `EXTRACTED:${text}`,
-        total: 1,
-      };
-    }
-    async destroy() {}
-    data: Uint8Array;
+  default: async (data: Uint8Array) => {
+    const text = new TextDecoder('utf-8').decode(data);
+    return {
+      pages: [{ num: 1, text: `EXTRACTED:${text}` }],
+      text: `EXTRACTED:${text}`,
+      total: 1,
+    };
   },
 }));
 vi.mock('ai', async () => {
