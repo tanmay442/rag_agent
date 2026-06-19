@@ -1,3 +1,4 @@
+import { appConfig } from '@/lib/config';
 import Link from 'next/link';
 import { SignInButton, UserButton } from '@clerk/nextjs';
 import { auth, currentUser } from '@clerk/nextjs/server';
@@ -29,7 +30,7 @@ export async function Navigation() {
       data-testid="nav"
     >
       <MobileNavSheet
-        brand="RAG Support"
+        brand={appConfig.orgShortName}
         items={navItems}
         triggerTestId="nav-hamburger"
         sheetTestId="nav-mobile-sheet"
@@ -56,7 +57,7 @@ export async function Navigation() {
                 <path d="M4 4h16v12H7l-3 4V4z" />
               </svg>
             </span>
-            <span className="hidden sm:inline">RAG Support</span>
+            <span className="hidden sm:inline">{appConfig.orgShortName}</span>
             <span className="sm:hidden">RAG</span>
           </Link>
 

@@ -47,3 +47,7 @@ next-env.d.ts
 /test-results/
 /blob-report/
 .playwright/
+
+# Seed PDFs dropped by `pnpm setup`. Comment out to commit your
+# corpus (e.g. for a small fixture set you want version-controlled).
+/documents/

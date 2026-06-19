@@ -128,6 +128,7 @@ do not need to change.
 | `pnpm db:push` | Apply the Drizzle schema to the configured DB (interactive) |
 | `pnpm db:generate` | Generate SQL migrations from `src/lib/db/schema.ts` |
 | `pnpm db:studio` | Drizzle Studio |
+| `pnpm setup` | Interactive first-time setup: org name, agent persona, admin emails, seed PDFs. Writes `config/app.config.ts` and re-seeds. |
 | `pnpm seed` | Ingest every PDF in `scripts/fixtures/` |
 | `pnpm setup-test-db` | Provision a `dev-test` Neon branch and write `DATABASE_URL` to `.env.test` |
 | `pnpm teardown-test-db` | Delete the `dev-test` branch |
