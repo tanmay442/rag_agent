@@ -25,20 +25,22 @@ export function DocumentRowActions({
   const [recountPending, startRecount] = useTransition();
   const [recountCount, setRecountCount] = useState<number | null>(null);
   const [recountError, setRecountError] = useState<string | null>(null);
+  const btn =
+    'rounded-xl border border-[var(--border)] px-2 py-1 text-xs text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)] disabled:opacity-50';
   return (
     <div className="flex flex-wrap items-center gap-1">
       {hasBlob && !isDeleted ? (
         <>
           <Link
             href={`/admin/documents/${id}/preview`}
-            className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            className={btn}
             data-testid={`documents-preview-${id}`}
           >
             Preview
           </Link>
           <a
             href={`/api/admin/documents/${id}/download`}
-            className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            className={btn}
             data-testid={`documents-download-${id}`}
           >
             Download
@@ -56,7 +58,7 @@ export function DocumentRowActions({
               if (res.error) setError(res.error);
             })
           }
-          className="rounded border border-emerald-500 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+          className="rounded-xl border border-[var(--success)]/40 px-2 py-1 text-xs text-[var(--success)] transition-colors hover:bg-[var(--success)]/10 disabled:opacity-50"
           data-testid={`documents-restore-${id}`}
         >
           {pending ? 'Restoring…' : 'Restore'}
@@ -72,7 +74,7 @@ export function DocumentRowActions({
               if (res.error) setError(res.error);
             })
           }
-          className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800 disabled:opacity-50"
+          className={btn}
           data-testid={`documents-delete-${id}`}
         >
           {pending ? 'Deleting…' : 'Delete'}
@@ -89,7 +91,7 @@ export function DocumentRowActions({
               if (res.error) setError(res.error);
             })
           }
-          className="rounded border border-red-500 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+          className="rounded-xl border border-[var(--danger)]/40 px-2 py-1 text-xs text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10 disabled:opacity-50"
           data-testid={`documents-hard-delete-${id}`}
         >
           {pending ? 'Removing…' : 'Hard delete'}
@@ -109,14 +111,14 @@ export function DocumentRowActions({
             }
           })
         }
-        className="rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className={btn}
         data-testid={`documents-recount-${id}`}
       >
         {recountPending ? 'Recounting…' : 'Recount chunks'}
       </button>
       {recountCount !== null ? (
         <span
-          className="text-xs text-emerald-700"
+          className="text-xs text-[var(--success)]"
           data-testid={`documents-recount-result-${id}`}
         >
           → {recountCount}
@@ -124,7 +126,7 @@ export function DocumentRowActions({
       ) : null}
       {recountError ? (
         <span
-          className="text-xs text-red-700"
+          className="text-xs text-[var(--danger)]"
           role="alert"
           data-testid={`documents-recount-error-${id}`}
         >
@@ -132,7 +134,7 @@ export function DocumentRowActions({
         </span>
       ) : null}
       {error ? (
-        <span className="text-xs text-red-700" role="alert">
+        <span className="text-xs text-[var(--danger)]" role="alert">
           {error}
         </span>
       ) : null}

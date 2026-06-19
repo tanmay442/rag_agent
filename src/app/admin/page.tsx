@@ -45,24 +45,24 @@ export default async function AdminOverviewPage() {
       <div className="flex flex-col gap-2">
         <h3 className="text-lg font-medium">Latest audit events</h3>
         {audit.events.length === 0 ? (
-          <p className="text-sm text-zinc-500">No audit events yet.</p>
+          <p className="text-sm text-[var(--foreground-muted)]">No audit events yet.</p>
         ) : (
           <ul
-            className="flex flex-col gap-1 rounded border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+            className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
             data-testid="admin-latest-audit"
           >
             {audit.events.map((e) => (
-              <li key={`${e.kind}-${e.id}`} className="flex gap-2">
-                <span className="text-xs text-zinc-500">
+              <li key={`${e.kind}-${e.id}`} className="flex flex-wrap gap-2">
+                <span className="text-xs text-[var(--foreground-muted)]">
                   {e.at.toISOString()}
                 </span>
                 <span className="font-medium">{e.action}</span>
-                <span className="text-zinc-600 dark:text-zinc-400">
+                <span className="text-[var(--foreground-muted)]">
                   {e.kind === 'document'
                     ? `document #${e.documentId}`
                     : `ticket ${e.ticketId}`}
                 </span>
-                <span className="text-zinc-500">
+                <span className="text-[var(--foreground-muted)]">
                   by {e.actorName ?? e.actorId}
                 </span>
               </li>
@@ -88,13 +88,15 @@ function Card({
   return (
     <Link
       href={href}
-      className="flex flex-col gap-1 rounded border border-zinc-200 bg-white p-4 transition hover:border-blue-500 dark:border-zinc-800 dark:bg-zinc-950"
+      className="group flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/60 hover:bg-[var(--surface-elevated)] hover:shadow-lg"
       data-testid={testId}
     >
-      <span className="text-xs uppercase tracking-wide text-zinc-500">
+      <span className="text-xs uppercase tracking-wide text-[var(--foreground-muted)]">
         {label}
       </span>
-      <span className="text-2xl font-semibold">{value}</span>
+      <span className="text-2xl font-semibold text-[var(--foreground)]">
+        {value}
+      </span>
     </Link>
   );
 }

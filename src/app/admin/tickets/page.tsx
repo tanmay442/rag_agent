@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { listTickets, TICKET_STATUSES } from '@/lib/admin/tickets';
 import { listUsers } from '@/lib/auth/users';
-import { TicketDrawer } from './ticket-drawer';
+import { TicketOverlay, type TicketRow } from './ticket-overlay';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,8 +51,19 @@ export default async function TicketsPage({
   }
   const isPlaceholderEmail = (e: string) =>
     e === '' || e === 'user@example.com' || e.endsWith('@example.com');
+  const rows: TicketRow[] = result.tickets.map((t) => ({
+    ticketId: t.ticketId,
+    userId: t.userId,
+    name: t.name,
+    email: t.email,
+    issue: t.issue,
+    status: t.status,
+    assignedTo: t.assignedTo,
+    notes: t.notes,
+  }));
   return (
     <section className="flex flex-col gap-4">
+      <TicketOverlay tickets={rows} userOptions={userList.users} />
       <h2 className="text-xl font-medium">Tickets</h2>
       <form
         className="grid grid-cols-1 gap-2 sm:grid-cols-4"
@@ -108,7 +119,7 @@ export default async function TicketsPage({
               <th className="px-3 py-2">Issue</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Assignee</th>
-              <th className="px-3 py-2">Created</th>
+              <th className="px-3 py-2 text-right">Created</th>
             </tr>
           </thead>
           <tbody>
@@ -129,21 +140,16 @@ export default async function TicketsPage({
                   data-testid={`tickets-row-${t.ticketId}`}
                 >
                   <td className="px-3 py-2 font-medium">
-                    <details data-testid={`tickets-drawer-${t.ticketId}`}>
-                      <summary className="cursor-pointer text-blue-600 hover:underline">
-                        {t.ticketId}
-                      </summary>
-                      <TicketDrawer
-                        ticketId={t.ticketId}
-                        name={t.name}
-                        email={t.email}
-                        issue={t.issue}
-                        status={t.status}
-                        assignedTo={t.assignedTo}
-                        notes={t.notes}
-                        userOptions={userList.users}
-                      />
-                    </details>
+                    <Link
+                      href={{
+                        pathname: '/admin/tickets',
+                        query: { ...params, ticket: t.ticketId },
+                      }}
+                      className="text-blue-600 hover:underline"
+                      data-testid={`tickets-open-${t.ticketId}`}
+                    >
+                      {t.ticketId}
+                    </Link>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-col">
@@ -192,7 +198,7 @@ export default async function TicketsPage({
                   <td className="max-w-md truncate px-3 py-2 text-xs">
                     {t.issue}
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">
                     <span className="rounded bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                       {t.status}
                     </span>
@@ -200,7 +206,7 @@ export default async function TicketsPage({
                   <td className="px-3 py-2 text-xs">
                     {t.assignedTo ?? '—'}
                   </td>
-                  <td className="px-3 py-2 text-xs text-zinc-500">
+                  <td className="whitespace-nowrap px-3 py-2 text-right text-xs text-zinc-500">
                     {t.createdAt.toISOString()}
                   </td>
                 </tr>

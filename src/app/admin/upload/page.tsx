@@ -1,46 +1,185 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef, useState, type DragEvent } from 'react';
 import { uploadPdfAction, type UploadState } from '../actions';
 
 const initial: UploadState = {};
 
 export default function UploadPage() {
   const [state, formAction, pending] = useActionState(uploadPdfAction, initial);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileSize, setFileSize] = useState<number | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  function acceptFile(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      setLocalError('Only PDF files are supported.');
+      return;
+    }
+    setLocalError(null);
+    // The native <input type="file"> is read-only; we have to copy the
+    // dropped file into a DataTransfer and assign that to .files.
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    if (inputRef.current) {
+      inputRef.current.files = dt.files;
+    }
+    setFileName(file.name);
+    setFileSize(file.size);
+  }
+
+  function clearFile() {
+    setFileName(null);
+    setFileSize(null);
+    setLocalError(null);
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  function onDrop(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) acceptFile(file);
+  }
+
+  function onDragOver(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+
+  function onDragLeave(e: DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setDragOver(false);
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-lg font-medium">Upload documentation</h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-[var(--foreground-muted)]">
         Drop a PDF and we&apos;ll chunk, embed, and index it for RAG search.
       </p>
       <form action={formAction} className="flex flex-col gap-3">
+        <label
+          htmlFor="upload-input"
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragEnter={onDragOver}
+          onDragLeave={onDragLeave}
+          className={[
+            'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
+            dragOver
+              ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+              : fileName
+                ? 'border-[var(--border)] bg-[var(--surface-elevated)]'
+                : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)]/60',
+          ].join(' ')}
+          data-testid="upload-dropzone"
+        >
+          {fileName ? (
+            <div className="flex flex-col items-center gap-2 text-sm">
+              <span className="text-base font-medium text-[var(--foreground)]">
+                {fileName}
+              </span>
+              {fileSize !== null ? (
+                <span className="text-xs text-[var(--foreground-muted)]">
+                  {Math.max(1, Math.round(fileSize / 1024))} KB
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  clearFile();
+                }}
+                className="rounded-xl border border-[var(--border)] px-3 py-1 text-xs text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+              >
+                Replace
+              </button>
+            </div>
+          ) : (
+            <>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-8 w-8 text-[var(--foreground-muted)]"
+                aria-hidden
+              >
+                <path d="M12 3v12" />
+                <path d="M7 8l5-5 5 5" />
+                <path d="M5 21h14" />
+              </svg>
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                {dragOver
+                  ? 'Release to upload'
+                  : 'Drop a PDF here or click to browse'}
+              </span>
+              <span className="text-xs text-[var(--foreground-muted)]">
+                PDF only · up to your server&apos;s request limit
+              </span>
+            </>
+          )}
+        </label>
         <input
+          ref={inputRef}
+          id="upload-input"
           type="file"
           name="file"
           accept="application/pdf"
           required
-          className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) acceptFile(f);
+          }}
           data-testid="upload-input"
         />
+        {fileName ? (
+          <span
+            className="text-xs text-[var(--foreground-muted)]"
+            data-testid="upload-filename"
+          >
+            Selected: {fileName}
+          </span>
+        ) : null}
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="self-start rounded-xl bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
           data-testid="upload-submit"
         >
           {pending ? 'Uploading…' : 'Upload'}
         </button>
       </form>
-      {state.error && (
-        <div className="rounded bg-red-100 p-3 text-sm text-red-700">
+      {localError ? (
+        <div
+          className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
+          role="alert"
+        >
+          {localError}
+        </div>
+      ) : null}
+      {state.error ? (
+        <div
+          className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)]"
+          role="alert"
+        >
           {state.error}
         </div>
-      )}
-      {state.status && (
-        <div className="rounded bg-emerald-50 p-3 text-sm text-emerald-800">
+      ) : null}
+      {state.status ? (
+        <div
+          className="rounded-xl border border-[var(--success)]/40 bg-[var(--success)]/10 p-3 text-sm text-[var(--success)]"
+          data-testid="upload-success"
+        >
           {state.fileName}: {state.status} ({state.chunks} chunks)
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
