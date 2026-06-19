@@ -45,7 +45,6 @@ export function ChatInterface() {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter sends; Shift+Enter inserts a newline (multiline composer).
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e as unknown as FormEvent<HTMLFormElement>);
@@ -76,10 +75,20 @@ export function ChatInterface() {
   }, [messages, status]);
 
   return (
-    <div className="flex flex-1 flex-col gap-3">
+    // The chat card is a single bordered surface that owns the
+    // viewport height. `flex-1 min-h-0` lets it take exactly the
+    // remaining height of the page column (set in chat/page.tsx)
+    // and gives the inner messages region a definite height to
+    // scroll within. The composer and the messages area are
+    // siblings inside this column so the card never reflows with
+    // conversation length.
+    <div
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40"
+      data-testid="chat-frame"
+    >
       <div
         ref={messagesScrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40 p-4 sm:p-6"
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-6"
         data-testid="chat-messages"
       >
         {messages.length === 0 && (
@@ -115,8 +124,8 @@ export function ChatInterface() {
                   documentation and show the sources I used.
                 </p>
                 <p className="text-sm leading-relaxed text-[var(--foreground-muted)]">
-                  If I can&apos;t find an answer, just ask me to file a support ticket
-                  and I&apos;ll get one started for you.
+                  If I can&apos;t find an answer, just ask me to file a support
+                  ticket and I&apos;ll get one started for you.
                 </p>
               </div>
             </div>
@@ -217,75 +226,70 @@ export function ChatInterface() {
               })}
               {citations.length > 0 && !isUser && (
                 <div
-                  className="flex max-w-full flex-col gap-2"
+                  className="-mx-1 flex w-full max-w-[90%] snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1"
                   data-testid="chat-citations"
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--foreground-subtle)]">
-                    Sources · {citations.length}
-                  </span>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    {citations.map((c, i) => {
-                      const sim = c.data.similarity;
-                      const simPct = Math.round(sim * 100);
-                      const simTone =
-                        sim >= 0.8
-                          ? 'var(--success)'
-                          : sim >= 0.6
-                            ? 'var(--accent)'
-                            : 'var(--warning)';
-                      return (
-                        <div
-                          key={i}
-                          className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/70 p-3 shadow-sm"
-                          data-testid="chat-citation"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-subtle)]">
-                              <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-3 w-3"
-                                aria-hidden
-                              >
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                              </svg>
-                              Source {i + 1}
-                            </span>
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums"
-                              style={{
-                                color: simTone,
-                                background: `color-mix(in oklch, ${simTone} 14%, transparent)`,
-                              }}
-                              title="Cosine similarity to your question"
+                  {citations.map((c, i) => {
+                    const sim = c.data.similarity;
+                    const simPct = Math.round(sim * 100);
+                    const simTone =
+                      sim >= 0.8
+                        ? 'var(--success)'
+                        : sim >= 0.6
+                          ? 'var(--accent)'
+                          : 'var(--warning)';
+                    return (
+                      <div
+                        key={i}
+                        className="flex w-64 shrink-0 snap-start flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-sunken)]/70 p-3 shadow-sm"
+                        data-testid="chat-citation"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-subtle)]">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-3 w-3"
+                              aria-hidden
                             >
-                              {simPct}% match
-                            </span>
-                          </div>
-                          <div
-                            className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]"
-                            aria-hidden
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                            Source {i + 1}
+                          </span>
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums"
+                            style={{
+                              color: simTone,
+                              background: `color-mix(in oklch, ${simTone} 14%, transparent)`,
+                            }}
+                            title="Cosine similarity to your question"
                           >
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${simPct}%`,
-                                background: simTone,
-                              }}
-                            />
-                          </div>
-                          <p className="line-clamp-4 text-[12.5px] leading-relaxed text-[var(--foreground-muted)]">
-                            {c.data.snippet}
-                          </p>
+                            {simPct}% match
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div
+                          className="h-1 w-full overflow-hidden rounded-full bg-[var(--surface-elevated)]"
+                          aria-hidden
+                        >
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${simPct}%`,
+                              background: simTone,
+                            }}
+                          />
+                        </div>
+                        <p className="line-clamp-4 text-[12.5px] leading-relaxed text-[var(--foreground-muted)]">
+                          {c.data.snippet}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -345,7 +349,7 @@ export function ChatInterface() {
 
       <form
         onSubmit={onSubmit}
-        className="group/composer flex items-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/80 p-2 shadow-lg shadow-black/20 backdrop-blur-md transition-colors duration-[var(--dur-fast)] focus-within:border-[var(--accent)]/60"
+        className="group/composer flex shrink-0 items-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface)]/60 p-2 backdrop-blur-md transition-colors duration-[var(--dur-fast)] focus-within:border-[var(--accent)]/60"
         data-testid="chat-composer"
       >
         <textarea
@@ -356,7 +360,7 @@ export function ChatInterface() {
           disabled={isStreaming}
           placeholder="Type your question…"
           rows={1}
-          className="min-h-[40px] max-h-[200px] flex-1 resize-none rounded-xl bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none disabled:opacity-60"
+          className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl bg-transparent px-3 py-2 text-sm leading-relaxed text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none disabled:opacity-60"
           data-testid="chat-input"
         />
         <button
@@ -396,9 +400,6 @@ export function ChatInterface() {
           )}
         </button>
       </form>
-      <p className="px-1 text-[11px] text-[var(--foreground-faint)]">
-        Enter to send · Shift + Enter for newline
-      </p>
     </div>
   );
 }
