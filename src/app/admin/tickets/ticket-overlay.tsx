@@ -126,6 +126,7 @@ export function TicketOverlay({
         <div className="flex-1 overflow-y-auto p-4">
           {ticket ? (
             <TicketDrawer
+              key={ticket.ticketId}
               ticketId={ticket.ticketId}
               name={ticket.name}
               email={ticket.email}

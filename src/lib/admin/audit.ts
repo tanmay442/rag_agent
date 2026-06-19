@@ -58,6 +58,8 @@ export async function listAudit(
           })
           .from(documentAudit)
           .where(docFilter.length > 0 ? and(...docFilter) : undefined)
+          .orderBy(desc(documentAudit.at))
+          .limit(limit + offset)
       : Promise.resolve([] as Array<{
           id: number;
           kind: 'document';
@@ -80,6 +82,8 @@ export async function listAudit(
           })
           .from(ticketAudit)
           .where(tixFilter.length > 0 ? and(...tixFilter) : undefined)
+          .orderBy(desc(ticketAudit.at))
+          .limit(limit + offset)
       : Promise.resolve([] as Array<{
           id: number;
           kind: 'ticket';

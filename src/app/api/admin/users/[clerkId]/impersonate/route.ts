@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
 import { logTicketEvent } from '@/lib/auth/audit';
 
-export async function GET(
+export async function POST(
   req: Request,
   context: { params: Promise<{ clerkId: string }> },
 ) {

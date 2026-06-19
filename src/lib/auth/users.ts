@@ -17,9 +17,6 @@ function computeAdminEmails(): readonly string[] {
 export function getAdminEmails(): readonly string[] {
   return computeAdminEmails();
 }
-// Convenience export for read-mostly consumers. Reads the env at module
-// load time; tests can re-import or use `getAdminEmails()` instead.
-export const ADMIN_EMAILS: readonly string[] = computeAdminEmails();
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
@@ -110,8 +107,8 @@ export async function listUsers(
 
   const where = search
     ? or(
-        ilike(users.email, `%${search}%`),
-        ilike(users.name, `%${search}%`),
+        ilike(users.email, `%${search.replace(/[%_]/g, '\\$&')}%`),
+        ilike(users.name, `%${search.replace(/[%_]/g, '\\$&')}%`),
       )
     : undefined;
 

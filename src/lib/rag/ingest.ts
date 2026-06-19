@@ -47,14 +47,19 @@ export async function chunkText(text: string): Promise<string[]> {
 export async function embedChunks(texts: string[]): Promise<number[][]> {
   const model = getEmbeddingModel();
   const out: number[][] = [];
-  // Sequential to keep things simple. Could batch via embedMany in a future pass.
-  for (const value of texts) {
-    const { embedding } = await embed({
-      model,
-      value,
-      providerOptions: { google: EMBEDDING_OPTIONS },
-    });
-    out.push(embedding);
+  const BATCH_SIZE = 20;
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batch = texts.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map((value) =>
+        embed({
+          model,
+          value,
+          providerOptions: { google: EMBEDDING_OPTIONS },
+        }).then(({ embedding }) => embedding),
+      ),
+    );
+    out.push(...results);
   }
   return out;
 }

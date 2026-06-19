@@ -17,6 +17,9 @@ export const vector = customType<{ data: number[]; driverData: string }>({
         .split(',')
         .map((n) => Number(n));
     }
-    return value as unknown as number[];
+    // Defensive: if pg returns a non-string (e.g. already parsed JSON array),
+    // coerce to number[] rather than crashing.
+    const arr = value as unknown as unknown[];
+    return arr.map((n) => Number(n));
   },
 });

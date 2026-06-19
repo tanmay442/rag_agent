@@ -23,11 +23,12 @@ export async function GET(
   if (!doc.blob) {
     return new NextResponse('Preview unavailable', { status: 404 });
   }
+  const safeName = doc.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
   return new NextResponse(new Uint8Array(doc.blob), {
     status: 200,
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="${doc.fileName}"`,
+      'Content-Disposition': `inline; filename="${safeName}"`,
       'Cache-Control': 'private, max-age=300',
     },
   });
