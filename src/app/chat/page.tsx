@@ -7,8 +7,13 @@ export default async function ChatPage() {
   // the page itself no longer reads the returned session.
   await requireSession();
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-6 sm:px-6 sm:py-10">
-      <header className="flex flex-col gap-3">
+    // The page column is a full-height flex column. The chat card
+    // below uses `flex-1` to take the remaining viewport height —
+    // not `h-full` — so on a short viewport the card can still
+    // shrink to fit without the page itself scrolling, and on a
+    // tall viewport it caps naturally at the viewport.
+    <div className="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6">
+      <header className="flex shrink-0 flex-col gap-2.5">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface)]/70 px-2.5 py-0.5 text-[11px] font-medium text-[var(--foreground-muted)]">
             <span className="relative flex h-1.5 w-1.5">
