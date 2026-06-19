@@ -27,7 +27,7 @@ opened only when the user explicitly asks for one.
   and HNSW cosine index
 - **ORM:** Drizzle
 - **Tooling:** Vitest, Testing Library, Playwright, `drizzle-kit`
-- **UI:** Dark "obsidian slate" theme via CSS custom properties in `src/app/globals.css` (no light variant). Mobile-first navigation: a `<MobileNavSheet />` wraps the top nav and the admin sidebar, swapping in a hamburger below `md`.
+- **UI:** Dark "obsidian slate" theme via CSS custom properties in `src/app/globals.css` (no light variant). Route groups split the app: `(marketing)` for the public landing, `(app)` for the unified sidebar + mobile-drawer shell that wraps `/chat` and `/admin/*`.
 
 ## Local development
 
@@ -198,64 +198,27 @@ boots the dev server and runs `pnpm setup-test-db` as a global setup.
 ```
 src/
 ├── app/
-│   ├── api/
-│   │   ├── chat/route.ts                 # tool-driven RAG + first-turn pre-fetch + ticket tool (auth)
-│   │   └── admin/                        # All admin API routes (auth + role)
-│   ├── chat/page.tsx                     # Chat UI (auth)
-│   ├── sign-in/[[...sign-in]]/page.tsx   # Clerk <SignIn /> card
-│   ├── sign-up/[[...sign-up]]/page.tsx   # Clerk <SignUp /> card
-│   ├── admin/                            # Admin pages (auth + role)
-│   │   ├── layout.tsx                    # Dark shell: sidebar (md+) + MobileNavSheet (sm) + requireAdmin()
-│   │   ├── page.tsx                      # Overview
-│   │   ├── actions.ts                    # All admin server actions
-│   │   ├── upload/page.tsx
-│   │   ├── documents/
-│   │   │   ├── page.tsx
-│   │   │   ├── document-row-actions.tsx
-│   │   │   ├── recount-all-button.tsx
-│   │   │   └── [id]/preview/page.tsx
-│   │   ├── tickets/
-│   │   │   ├── page.tsx
-│   │   │   ├── ticket-drawer.tsx
-│   │   │   └── ticket-overlay.tsx        # URL-driven ?ticket= portal
-│   │   ├── users/
-│   │   │   ├── page.tsx
-│   │   │   └── user-row-actions.tsx
-│   │   ├── analytics/page.tsx
-│   │   └── audit/page.tsx
-│   ├── globals.css                       # Dark "obsidian slate" CSS tokens
-│   ├── layout.tsx                        # ClerkProvider + Navigation
-│   └── page.tsx                          # Landing (public)
+│   ├── (marketing)/        # Public landing (no app chrome)
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── (app)/              # Authenticated shell (sidebar + mobile drawer)
+│   │   ├── layout.tsx
+│   │   ├── chat/page.tsx
+│   │   └── admin/          # requireAdmin() guard + admin pages + actions
+│   ├── api/{chat,admin}/   # Tool-driven RAG + admin API routes
+│   ├── sign-in/[[...sign-in]]/page.tsx
+│   ├── sign-up/[[...sign-up]]/page.tsx
+│   ├── layout.tsx          # ClerkProvider, html/body, fonts
+│   └── globals.css         # Dark "obsidian slate" CSS tokens
 ├── components/
-│   ├── ChatInterface.tsx                 # Streaming chat with citations
-│   ├── MobileNavSheet.tsx                # Hamburger + slide-down sheet
-│   └── Navigation.tsx                    # Top nav (auth-aware server component)
-├── lib/
-│   ├── auth/                             # Clerk session + bootstrap + helpers
-│   │   ├── session.ts                    # getAppSession, requireAdmin, requireSession, ForbiddenError
-│   │   ├── users.ts                      # syncUserFromClerk, setUserRole, listUsers
-│   │   ├── ratelimit.ts
-│   │   ├── query-stats.ts
-│   │   └── audit.ts
-│   ├── admin/                            # Admin reads + writes
-│   │   ├── documents.ts
-│   │   ├── tickets.ts
-│   │   ├── analytics.ts
-│   │   └── audit.ts
-│   ├── chat/                             # UIMessage type
-│   ├── db/                               # Drizzle schema + pg client
-│   ├── llm/                              # Embedding + chat model factory
-│   └── rag/                              # PDF ingest + cosine search
-├── proxy.ts                              # clerkMiddleware (Next 16 convention)
+│   ├── ChatInterface.tsx
+│   ├── app/AppSidebar.tsx  # Unified sidebar + mobile drawer (Client)
+│   ├── landing/            # LandingHeader, LandingCard, LandingFooter
+│   └── icons/GithubIcon.tsx
+├── lib/{auth,admin,chat,db,llm,rag,config,prompt}/
+├── proxy.ts                # clerkMiddleware (Next 16 convention)
 └── …
-scripts/
-├── apply-migration.mjs                   # Non-interactive migrator
-├── fixtures/                             # Seeded PDFs
-├── make-sample-pdf.ts                    # Regenerates the handbook
-├── make-portal-fixtures.ts               # Regenerates the topic PDFs
-├── seed-docs.ts                          # CLI seeder
-├── setup-test-db.ts                      # Per-run Neon branch
-└── teardown-test-db.ts                   # Branch cleanup
+scripts/                   # setup, seed, e2e fixtures
 ```
 
 ### CI
