@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
-    "test:ci": "tsx scripts/setup-test-db.ts && vitest run --reporter=dot && playwright test && tsx scripts/teardown-test-db.ts",
+    "test:ci": "bash -c \"tsx scripts/setup-test-db.ts && trap \\\"tsx scripts/teardown-test-db.ts\\\" EXIT; vitest run --reporter=dot && playwright test\"",
     "e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
@@ -19,7 +19,8 @@
     "setup-test-db": "tsx scripts/setup-test-db.ts",
     "teardown-test-db": "tsx scripts/teardown-test-db.ts",
     "typecheck": "tsc --noEmit",
-    "setup": "tsx scripts/setup.ts"
+    "setup": "tsx scripts/setup.ts",
+    "test:ci:run": "vitest run --reporter=dot && playwright test"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.83",

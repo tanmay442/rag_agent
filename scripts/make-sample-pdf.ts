@@ -104,7 +104,7 @@ const PAGE_CONTENT = `BT
 ET`;
 
 // Minimal PDF writer — produces a single page text PDF.
-function buildPdf(content: string): string {
+export function buildPdf(content: string): string {
   const objects: string[] = [];
   objects.push('<< /Type /Catalog /Pages 2 0 R >>');
   objects.push('<< /Type /Pages /Count 1 /Kids [3 0 R] >>');
@@ -130,6 +130,22 @@ function buildPdf(content: string): string {
   return pdf;
 }
 
-const out = join(HERE, 'fixtures', 'sample.pdf');
-writeFileSync(out, buildPdf(PAGE_CONTENT), 'utf8');
-console.log(`Wrote ${out} (${PAGE_CONTENT.length + 200} bytes)`);
+export function writeSamplePdf(outPath: string = join(HERE, 'fixtures', 'sample.pdf')): string {
+  const pdf = buildPdf(PAGE_CONTENT);
+  writeFileSync(outPath, pdf, 'utf8');
+  return outPath;
+}
+
+// CLI entry — only run when this module is the program root.
+const invokedDirectly = (() => {
+  try {
+    return import.meta.url === `file://${process.argv[1]}`;
+  } catch {
+    return false;
+  }
+})();
+
+if (invokedDirectly) {
+  const out = writeSamplePdf();
+  console.log(`Wrote ${out} (${PAGE_CONTENT.length + 200} bytes)`);
+}
