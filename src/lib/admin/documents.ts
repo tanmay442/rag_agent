@@ -200,14 +200,21 @@ export async function hardDeleteDocument(
   documentId: number,
   actorId: string,
 ): Promise<void> {
-  // CASCADE on chunks handles the rest. The audit row keeps a `set null`
-  // reference so the audit history is preserved.
-  await db.delete(documents).where(eq(documents.id, documentId));
+  // Insert the audit row FIRST. The FK on document_audit.document_id
+  // is `ON DELETE SET NULL`, so the audit row's document_id would be
+  // nulled out by the cascade if we logged after the delete — but
+  // logging first means we still get the action+actor row even if
+  // the cascade later nulls the link, and we avoid inserting a row
+  // that references an id that no longer exists (which fails the FK
+  // check at insert time and turns the whole call into a 500).
   await logDocumentEvent({
     action: 'delete',
     documentId,
     actorId,
   });
+  // CASCADE on chunks handles the rest. The audit row keeps a `set null`
+  // reference so the audit history is preserved.
+  await db.delete(documents).where(eq(documents.id, documentId));
 }
 
 export async function getDocumentById(
