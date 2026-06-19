@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documents, chunks, users } from '@/lib/db/schema';
 import { ingestFile } from '@/lib/rag/ingest';
@@ -68,7 +68,7 @@ export async function listDocuments(
           count: sql<number>`count(*)::int`,
         })
         .from(chunks)
-        .where(sql`${chunks.documentId} IN ${sql.join(docIds.map((id) => sql`${id}`), sql`, `)}`)
+        .where(inArray(chunks.documentId, docIds))
         .groupBy(chunks.documentId)
     : [];
 
