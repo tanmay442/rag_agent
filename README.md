@@ -141,7 +141,7 @@ columns on the pre-existing `documents` and `tickets` tables.
 
 ### Unit + integration (Vitest)
 
-115 tests across 18 files. Run with `pnpm test` (single run) or
+116 tests across 18 files. Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/lib/db/schema.test-d.ts` — Drizzle type inference
@@ -149,6 +149,8 @@ columns on the pre-existing `documents` and `tickets` tables.
   mocked `embed` and `pdf-parse`
 - `src/lib/rag/search.test.ts` — cosine similarity search with stubbed
   `db.execute`
+- `src/lib/admin/documents.test.ts` — admin document helpers (list,
+  upload, replace, soft/restore/hard delete, recount)
 - `src/lib/llm/client.test.ts` — env-var wiring for the Google
   embedding model and the OpenAI-compatible chat model
 - `src/lib/auth/users.test.ts` — Clerk-mirror `users` table, role
@@ -165,7 +167,14 @@ columns on the pre-existing `documents` and `tickets` tables.
   empty `lastUserText`, chunks injected on the first turn,
   pre-fetched chunks surface as `data-citation` parts without a
   tool call, no pre-fetch on follow-up turns)
-- `src/components/ChatInterface.test.tsx` — streaming / citations
+- `src/app/api/admin/documents/[id]/blob/route.test.ts` —
+  inline PDF preview route (auth + content-type + 404 paths)
+- `src/app/api/admin/tickets/[ticketId]/route.test.ts` —
+  single-ticket GET/PATCH (auth + 404 + status validation)
+- `src/app/api/admin/users/[clerkId]/role/route.test.ts` —
+  role update route (auth + invalid role + forbidden)
+- `src/components/ChatInterface.test.tsx` — chat frame layout
+  (`flex-1 min-h-0 overflow-y-auto`) + streaming / citations
   rendering
 - `src/app/api/admin/{users,documents,tickets}/...` — 403 / 400 / 404 /
   409 paths and the happy path
