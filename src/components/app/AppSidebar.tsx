@@ -46,26 +46,25 @@ export function AppSidebar({
   const pathname = usePathname();
   const { signOut } = useClerk();
 
-  // Auto-open the admin accordion whenever the user is on any
-  // /admin/* route, so deep links don't hide their context. The
-  // user can still collapse it manually; once they do, we keep
-  // their preference until they navigate away from /admin/*.
+  // Admin accordion state. The accordion is open by default
+  // whenever the user is on a /admin/* route, so deep links
+  // don't hide their context. The user can collapse it manually
+  // and we honour that choice for the rest of the current admin
+  // visit; the accordion auto-reopens on the next visit (i.e.
+  // when the route transitions from non-admin to admin).
   const onAdmin = pathname?.startsWith('/admin') ?? false;
   const [adminOpen, setAdminOpen] = useState<boolean>(onAdmin);
-  const [userToggledAdmin, setUserToggledAdmin] = useState<boolean>(false);
-  // Re-sync to the route when the user hasn't expressed a
-  // preference, or when they leave the admin section entirely.
-  // This is the React-recommended "adjust state on prop change"
-  // pattern: compare against a stored value and call the setter
-  // during render. The eslint rule against setState-in-effect
-  // exists to prevent cascading re-renders, but this version
-  // runs only when the value would actually differ.
-  if (onAdmin && !adminOpen && !userToggledAdmin) {
-    setAdminOpen(true);
-  } else if (!onAdmin && adminOpen) {
-    setAdminOpen(false);
-    setUserToggledAdmin(false);
+  // When the route transitions from non-admin to admin, reset
+  // the accordion to open. We use the "adjust state in render"
+  // pattern (compare against a stored previous value and call
+  // the setter during render) so the reset is a direct
+  // derivation from the route change, not a side effect.
+  const [prevOnAdmin, setPrevOnAdmin] = useState<boolean>(onAdmin);
+  if (prevOnAdmin !== onAdmin) {
+    setPrevOnAdmin(onAdmin);
+    if (onAdmin) setAdminOpen(true);
   }
+
 
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   // Close the mobile drawer on route change. Same pattern as
@@ -96,6 +95,13 @@ export function AppSidebar({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
+
+  // Toggle the admin accordion. While on /admin/* this just
+  // flips the state; off /admin/* the accordion isn't rendered
+  // so the call is a no-op.
+  const toggleAdmin = () => {
+    setAdminOpen((open) => !open);
+  };
 
   const isActive = (href: string) => {
     if (!pathname) return false;
@@ -159,7 +165,7 @@ export function AppSidebar({
           user={user}
           role={role}
           adminOpen={adminOpen}
-          setAdminOpen={setAdminOpen}
+          toggleAdmin={toggleAdmin}
           isActive={isActive}
           onSignOut={() => signOut({ redirectUrl: '/' })}
         />
@@ -201,7 +207,7 @@ export function AppSidebar({
                 user={user}
                 role={role}
                 adminOpen={adminOpen}
-                setAdminOpen={setAdminOpen}
+                toggleAdmin={toggleAdmin}
                 isActive={isActive}
                 onSignOut={() => signOut({ redirectUrl: '/' })}
               />
@@ -217,14 +223,14 @@ function SidebarBody({
   user,
   role,
   adminOpen,
-  setAdminOpen,
+  toggleAdmin,
   isActive,
   onSignOut,
 }: {
   user: AppSidebarUser | null;
   role: AppRole;
   adminOpen: boolean;
-  setAdminOpen: (v: boolean) => void;
+  toggleAdmin: () => void;
   isActive: (href: string) => boolean;
   onSignOut: () => void;
 }) {
@@ -272,7 +278,7 @@ function SidebarBody({
           <div className="mt-2">
             <button
               type="button"
-              onClick={() => setAdminOpen(!adminOpen)}
+              onClick={toggleAdmin}
               aria-expanded={adminOpen}
               className={[
                 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-[var(--dur-fast)]',
