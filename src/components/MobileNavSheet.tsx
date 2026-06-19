@@ -10,14 +10,16 @@ export interface NavItem {
 }
 
 /**
- * MobileNavSheet — a small client component that renders a sticky top bar
- * with a hamburger button (visible below `md`) and a slide-down sheet of
- * links. The desktop horizontal nav and the admin sidebar are passed in
- * as `children` and rendered unchanged on `md+`. Below `md` the children
- * are hidden and the hamburger takes over.
+ * MobileNavSheet — the desktop nav is passed in as `children` and
+ * shown at every breakpoint. Below `md`, we overlay a single
+ * hamburger button in the top-left of that topbar (it sits on top
+ * of the brand mark in the topbar visually, but the brand mark is
+ * still in the DOM for layout/screen-readers). Tapping the
+ * hamburger opens a slide-in sheet with the same items.
  *
- * Closes on: backdrop click, link click, Escape. Locks body scroll while
- * open. Animates with Tailwind transitions only — no JS animation lib.
+ * Closes on: backdrop click, link click, Escape. Locks body scroll
+ * while open. Respects `prefers-reduced-motion` via Tailwind
+ * transitions only.
  */
 export function MobileNavSheet({
   brand,
@@ -34,8 +36,6 @@ export function MobileNavSheet({
 }) {
   const [open, setOpen] = useState(false);
 
-  // Lock body scroll while the sheet is open so the page behind doesn't
-  // move when the user swipes.
   useEffect(() => {
     if (!open) return;
     const prev = document.documentElement.style.overflow;
@@ -45,7 +45,6 @@ export function MobileNavSheet({
     };
   }, [open]);
 
-  // Close on Escape.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -57,18 +56,19 @@ export function MobileNavSheet({
 
   return (
     <>
-      {/* Mobile-only top bar. Hidden on `md+`. */}
-      <div className="sticky top-0 z-40 flex w-full items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--background)]/80 px-4 py-3 backdrop-blur-md md:hidden">
-        <span className="text-base font-semibold tracking-tight">
-          {brand}
-        </span>
+      <div className="relative">
+        {children}
+
+        {/* Hamburger overlay. Visible only below md; floats over the
+            topbar's brand mark area so the user has a stable tap
+            target regardless of where the topbar scrolls to. */}
         <button
           type="button"
           aria-label="Open navigation"
           aria-expanded={open}
           aria-controls={sheetTestId}
           onClick={() => setOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition-colors hover:bg-[var(--surface-elevated)]"
+          className="absolute left-3 top-1/2 z-10 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)]/90 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors duration-[var(--dur-fast)] hover:bg-[var(--surface-elevated)] md:hidden"
           data-testid={triggerTestId}
         >
           <svg
@@ -78,7 +78,7 @@ export function MobileNavSheet({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-5 w-5"
+            className="h-4 w-4"
             aria-hidden
           >
             <line x1="4" y1="7" x2="20" y2="7" />
@@ -88,14 +88,13 @@ export function MobileNavSheet({
         </button>
       </div>
 
-      {/* Desktop content (unchanged nav / sidebar). */}
-      <div className="hidden md:block">{children}</div>
-
-      {/* Mobile sheet + backdrop. */}
       {open ? (
-        <div className="fixed inset-0 z-50 md:hidden" data-testid={sheetTestId}>
+        <div
+          className="fixed inset-0 z-[60] md:hidden"
+          data-testid={sheetTestId}
+        >
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[oklch(0.08_0.01_262_/_0.7)] backdrop-blur-sm"
             onClick={() => setOpen(false)}
             aria-hidden
           />
@@ -104,17 +103,17 @@ export function MobileNavSheet({
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="absolute right-0 top-0 flex h-full w-72 max-w-[80vw] flex-col gap-1 border-l border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xl transition-transform duration-200"
+            className="absolute right-0 top-0 flex h-full w-72 max-w-[80vw] flex-col gap-1 border-l border-[var(--border-subtle)] bg-[var(--surface)] p-4 shadow-2xl"
           >
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-semibold uppercase tracking-wide text-[var(--foreground-muted)]">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground-subtle)]">
                 {brand}
               </span>
               <button
                 type="button"
                 aria-label="Close navigation"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--foreground-muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -136,7 +135,7 @@ export function MobileNavSheet({
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className="rounded-xl px-3 py-2 text-sm text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--foreground-muted)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
                 data-testid={item.testId}
               >
                 {item.label}

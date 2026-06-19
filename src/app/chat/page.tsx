@@ -7,13 +7,29 @@ export default async function ChatPage() {
   // the page itself no longer reads the returned session.
   await requireSession();
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-      <header className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Support Chat</h1>
-        <p className="text-sm text-[var(--foreground-muted)]">
-          Ask a question and we&apos;ll answer from our documentation, with citations.
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-6 sm:px-6 sm:py-10">
+      <header className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface)]/70 px-2.5 py-0.5 text-[11px] font-medium text-[var(--foreground-muted)]">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+            </span>
+            Online
+          </span>
+          <span className="text-[11px] font-medium text-[var(--foreground-subtle)]">
+            Citations on · 30 messages / min
+          </span>
+        </div>
+        <h1 className="text-balance text-2xl font-semibold tracking-tight text-[var(--foreground)] sm:text-[1.7rem]">
+          Support Chat
+        </h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
+          Ask a question and we&apos;ll answer from the school&apos;s
+          documentation, with the source highlighted for every reply.
         </p>
       </header>
+
       <ChatInterface />
     </div>
   );

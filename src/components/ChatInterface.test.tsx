@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 // Mock @ai-sdk/react useChat so we can drive messages from the test.
 const useChatMock = vi.fn();
@@ -45,14 +45,22 @@ describe('ChatInterface', () => {
   it('renders a welcome intro when there are no messages', () => {
     setupChat();
     render(<ChatInterface />);
-    // The intro card explains what the agent can do and how to open a
-    // ticket. We assert on the data-testid + a stable phrase instead
-    // of the full sentence, so rewordings don't break the test.
-    expect(screen.getByTestId('chat-intro')).toBeInTheDocument();
+    // The intro explains what the agent can do and how to open a
+    // ticket. We assert inside the intro testid so the quick-prompt
+    // buttons (which also say "open a ticket") don't collide with
+    // the body copy.
+    const intro = screen.getByTestId('chat-intro');
+    expect(intro).toBeInTheDocument();
     expect(
-      screen.getByText(/support assistant for the school/i),
+      within(intro).getByText(/support assistant for the school/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/open a ticket/i)).toBeInTheDocument();
+    expect(
+      within(intro).getByText(/file a support ticket/i),
+    ).toBeInTheDocument();
+    // Quick-prompt affordance is part of the empty state.
+    expect(
+      within(intro).getAllByTestId('chat-quick-prompt').length,
+    ).toBeGreaterThan(0);
   });
 
   it('renders citation cards for data-citation parts', () => {
@@ -70,9 +78,13 @@ describe('ChatInterface', () => {
       },
     ]);
     render(<ChatInterface />);
-    expect(screen.getByTestId('chat-citation')).toBeInTheDocument();
-    expect(screen.getByText(/similarity 0.92/i)).toBeInTheDocument();
-    expect(screen.getByText(/dental plan covers two cleanings/i)).toBeInTheDocument();
+    const citation = screen.getByTestId('chat-citation');
+    expect(citation).toBeInTheDocument();
+    // Similarity is now rendered as a percentage match.
+    expect(within(citation).getByText(/92% match/i)).toBeInTheDocument();
+    expect(
+      within(citation).getByText(/dental plan covers two cleanings/i),
+    ).toBeInTheDocument();
   });
 
   it('renders text parts in the conversation', () => {
@@ -89,7 +101,7 @@ describe('ChatInterface', () => {
     const sendMessage = vi.fn();
     setupChat([], { send: sendMessage });
     render(<ChatInterface />);
-    const input = screen.getByTestId('chat-input') as HTMLInputElement;
+    const input = screen.getByTestId('chat-input') as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: 'What is the dental plan?' } });
     fireEvent.click(screen.getByTestId('chat-send'));
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith({ text: 'What is the dental plan?' }));
@@ -99,7 +111,7 @@ describe('ChatInterface', () => {
   it('disables the send button while streaming', () => {
     setupChat([], { status: 'streaming' });
     render(<ChatInterface />);
-    const input = screen.getByTestId('chat-input') as HTMLInputElement;
+    const input = screen.getByTestId('chat-input') as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: 'q' } });
     expect(input).toBeDisabled();
     expect(screen.getByTestId('chat-send')).toBeDisabled();

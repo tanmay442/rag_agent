@@ -1,36 +1,84 @@
 @import "tailwindcss";
 
+/* ----------------------------------------------------------------
+   Design tokens
+   Dark graphite surface, single warm-tinted neutral ramp, one
+   accent (a deliberate teal/violet — not generic SaaS blue). All
+   semantic colors are derived from the ramp so states (hover,
+   focus, selected) stay coherent across the app.
+   ---------------------------------------------------------------- */
 :root {
-  /* Obsidian slate palette. Dark by default; the app is a dark-mode
-     experience, so we don't bother with a light variant. */
-  --background: #0B0F19;
-  --surface: #161E2E;
-  --surface-elevated: #1E2839;
-  --border: #2A3344;
-  --border-subtle: #1F2733;
-  --foreground: #E6EBF5;
-  --foreground-muted: #9AA4B8;
-  --foreground-subtle: #6B7588;
-  --accent: #5B8DEF;
-  --accent-hover: #7AA3FF;
-  --accent-foreground: #FFFFFF;
-  --ring: rgba(91, 141, 239, 0.5);
-  --danger: #F87171;
-  --success: #4ADE80;
-  --warning: #FBBF24;
+  /* Surfaces (cooler graphite; chroma 0.005-0.012 toward indigo) */
+  --background: oklch(0.17 0.012 262);
+  --surface: oklch(0.205 0.013 262);
+  --surface-elevated: oklch(0.245 0.013 262);
+  --surface-sunken: oklch(0.155 0.011 262);
+
+  /* Borders */
+  --border: oklch(0.32 0.014 262);
+  --border-subtle: oklch(0.265 0.012 262);
+  --border-strong: oklch(0.4 0.016 262);
+
+  /* Ink (high-contrast body, muted-secondary, hint/eyebrow) */
+  --foreground: oklch(0.965 0.005 250);
+  --foreground-muted: oklch(0.78 0.012 256);
+  --foreground-subtle: oklch(0.6 0.012 258);
+  --foreground-faint: oklch(0.45 0.012 260);
+
+  /* Accent (single brand hue: a saturated teal leaning violet).
+     Used for primary actions, current selection, and citation
+     indicators only — not decoration. */
+  --accent: oklch(0.78 0.14 196);
+  --accent-hover: oklch(0.84 0.13 196);
+  --accent-pressed: oklch(0.72 0.15 198);
+  --accent-foreground: oklch(0.18 0.04 198);
+  --accent-soft: oklch(0.34 0.08 196);
+
+  /* Semantic */
+  --ring: oklch(0.78 0.14 196 / 0.55);
+  --danger: oklch(0.7 0.18 25);
+  --danger-soft: oklch(0.32 0.08 25);
+  --success: oklch(0.78 0.16 155);
+  --success-soft: oklch(0.32 0.08 155);
+  --warning: oklch(0.82 0.15 80);
+  --warning-soft: oklch(0.32 0.08 80);
+
+  /* Glow (only used behind hero / on focus, never as decoration
+     on cards). Tinted from the accent. */
+  --glow-accent: oklch(0.78 0.14 196 / 0.18);
+
+  /* Motion */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
+  --color-surface-sunken: var(--surface-sunken);
   --color-foreground: var(--foreground);
   --color-foreground-muted: var(--foreground-muted);
   --color-foreground-subtle: var(--foreground-subtle);
+  --color-foreground-faint: var(--foreground-faint);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-pressed: var(--accent-pressed);
+  --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -44,10 +92,22 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
 }
 
-/* Slim, themed scrollbars so the chat timeline and citation rail
-   blend with the obsidian surface rather than fighting it. */
+body {
+  /* A barely-there radial wash gives the dark surface depth without
+     becoming a hero gradient. Anchored top-center, fades to the
+     background color in ~60% of the viewport. */
+  background-image: radial-gradient(
+    1200px 600px at 50% -10%,
+    var(--glow-accent),
+    transparent 60%
+  );
+  background-attachment: fixed;
+}
+
+/* Themed scrollbars. Slim, low-contrast on idle, brighter on hover. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -64,14 +124,43 @@ body {
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground-subtle);
+  background: var(--border-strong);
 }
 
-/* Visible focus ring across the app. Tailwind's default focus-visible
-   ring is invisible against a dark background; this gives a clean
-   accent ring on every interactive element. */
-:where(button, a, input, textarea, [role="button"]):focus-visible {
+/* Focus ring. Two-layer box-shadow gives a clean inner+outer ring
+   against any background (Tailwind's default ring is invisible on
+   the graphite surface). */
+:where(button, a, input, textarea, [role="button"], [tabindex]):focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-md);
+}
+
+/* Subtle reveal for elements that opt in. The default state is
+   visible — the animation enhances, it doesn't gate. */
+@keyframes impex-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: impex-fade-up var(--dur-slow) var(--ease-out-quart) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
 }
