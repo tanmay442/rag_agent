@@ -21,6 +21,8 @@ const {
   softDeleteDocumentMock,
   restoreDocumentMock,
   hardDeleteDocumentMock,
+  recountChunksForDocumentMock,
+  recountChunksForAllDocumentsMock,
   setUserRoleMock,
   updateTicketMock,
   clerkClientMock,
@@ -32,6 +34,8 @@ const {
   softDeleteDocumentMock: vi.fn(),
   restoreDocumentMock: vi.fn(),
   hardDeleteDocumentMock: vi.fn(),
+  recountChunksForDocumentMock: vi.fn(),
+  recountChunksForAllDocumentsMock: vi.fn(),
   setUserRoleMock: vi.fn(),
   updateTicketMock: vi.fn(),
   clerkClientMock: vi.fn(),
@@ -45,6 +49,8 @@ vi.mock('@/lib/admin/documents', () => ({
   softDeleteDocument: softDeleteDocumentMock,
   restoreDocument: restoreDocumentMock,
   hardDeleteDocument: hardDeleteDocumentMock,
+  recountChunksForDocument: recountChunksForDocumentMock,
+  recountChunksForAllDocuments: recountChunksForAllDocumentsMock,
 }));
 
 vi.mock('@/lib/admin/tickets', () => ({
@@ -78,6 +84,8 @@ import {
   setRoleAction,
   updateTicketAction,
   impersonateUserAction,
+  recountChunksAction,
+  recountAllChunksAction,
 } from './actions';
 
 beforeEach(() => {
@@ -87,6 +95,8 @@ beforeEach(() => {
   softDeleteDocumentMock.mockReset();
   restoreDocumentMock.mockReset();
   hardDeleteDocumentMock.mockReset();
+  recountChunksForDocumentMock.mockReset();
+  recountChunksForAllDocumentsMock.mockReset();
   setUserRoleMock.mockReset();
   updateTicketMock.mockReset();
   clerkClientMock.mockReset();
@@ -204,5 +214,65 @@ describe('admin actions', () => {
     });
     const result = await impersonateUserAction('user_1');
     expect(result.url).toContain('clerk.example');
+  });
+
+  it('recountChunksAction 403s when requireAdmin throws', async () => {
+    const forbiddenError = new Error('Forbidden') as Error & { status: number };
+    forbiddenError.status = 403;
+    requireAdminMock.mockRejectedValue(forbiddenError);
+    const result = await recountChunksAction(42);
+    expect(result.error).toBe('Forbidden');
+    expect(recountChunksForDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it('recountChunksAction returns the count and revalidates the path for an admin', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    recountChunksForDocumentMock.mockResolvedValue({ documentId: 42, count: 12 });
+    const result = await recountChunksAction(42);
+    expect(result).toEqual({ count: 12 });
+    expect(recountChunksForDocumentMock).toHaveBeenCalledWith(42);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/admin/documents');
+  });
+
+  it('recountChunksAction surfaces errors thrown by the helper', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    recountChunksForDocumentMock.mockRejectedValue(new Error('db down'));
+    const result = await recountChunksAction(42);
+    expect(result.error).toBe('db down');
+  });
+
+  it('recountAllChunksAction 403s when requireAdmin throws', async () => {
+    const forbiddenError = new Error('Forbidden') as Error & { status: number };
+    forbiddenError.status = 403;
+    requireAdminMock.mockRejectedValue(forbiddenError);
+    const result = await recountAllChunksAction();
+    expect(result.error).toBe('Forbidden');
+    expect(recountChunksForAllDocumentsMock).not.toHaveBeenCalled();
+  });
+
+  it('recountAllChunksAction returns summary numbers and revalidates the path for an admin', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    recountChunksForAllDocumentsMock.mockResolvedValue([
+      { documentId: 1, count: 5 },
+      { documentId: 2, count: 7 },
+    ]);
+    const result = await recountAllChunksAction();
+    expect(result).toEqual({ documents: 2, total: 12 });
+    expect(revalidatePathMock).toHaveBeenCalledWith('/admin/documents');
+  });
+
+  it('recountAllChunksAction surfaces errors thrown by the helper', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    recountChunksForAllDocumentsMock.mockRejectedValue(new Error('nope'));
+    const result = await recountAllChunksAction();
+    expect(result.error).toBe('nope');
   });
 });

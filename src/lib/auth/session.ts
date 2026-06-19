@@ -1,6 +1,12 @@
 import 'server-only';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { getUserByClerkId, syncUserFromClerk, isAdminEmail, type AppRole } from './users';
+import {
+  getUserByClerkId,
+  syncUserFromClerk,
+  isAdminEmail,
+  touchLastSeen,
+  type AppRole,
+} from './users';
 
 // Existing modules import `DEFAULT_USER_ID` and `getSession()`; we keep
 // the same shape so they don't have to be rewritten. New code should call
@@ -58,6 +64,12 @@ export async function getAppSession(): Promise<AppSessionFull | null> {
       clerkRole: 'admin',
     });
   }
+  // Fire-and-forget: bump lastSeenAt on every successful session
+  // resolution so the /admin/users page reflects recent activity.
+  // The column is otherwise never written and stays null forever.
+  void touchLastSeen(userId).catch((err) => {
+    console.error('getAppSession: touchLastSeen failed', err);
+  });
   return {
     user: {
       id: userId,

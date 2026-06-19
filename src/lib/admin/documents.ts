@@ -218,3 +218,42 @@ export async function getDocumentById(
   });
   return row ?? null;
 }
+
+
+export interface RecountResult {
+  documentId: number;
+  count: number;
+}
+
+// Read-only helper: returns the chunk count for a single document by
+// running `count(*)` against the `chunks` table. Used by the admin
+// "Recount chunks" button to surface the live count and verify that
+// the page-level `chunks_count` denormalization is in sync with the
+// `chunks` table. Does not mutate any rows.
+export async function recountChunksForDocument(
+  documentId: number,
+): Promise<RecountResult> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(chunks)
+    .where(eq(chunks.documentId, documentId));
+  return { documentId, count: rows[0]?.count ?? 0 };
+}
+
+// Read-only helper: same as `recountChunksForDocument` but returns the
+// count for every document in the system in one query. Used by the
+// "Recount all" admin button on `/admin/documents`. Does not mutate any
+// rows; `listDocuments` reads `chunks` directly, so this is just a
+// diagnostic.
+export async function recountChunksForAllDocuments(): Promise<
+  Array<RecountResult>
+> {
+  const rows = await db
+    .select({
+      documentId: chunks.documentId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(chunks)
+    .groupBy(chunks.documentId);
+  return rows.map((r) => ({ documentId: r.documentId, count: r.count }));
+}

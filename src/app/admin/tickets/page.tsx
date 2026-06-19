@@ -34,6 +34,23 @@ export default async function TicketsPage({
     listUsers({ limit: 100 }),
   ]);
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
+  // Build a clerkUserId -> { name, email } index for display. Tickets
+  // raised before the chat tool started overriding the LLM-provided
+  // identity still have placeholder values like 'user@example.com';
+  // falling back to the userList join cleans those rows up at render
+  // time without touching the database.
+  const userByClerkId = new Map<
+    string,
+    { name: string | null; email: string }
+  >();
+  for (const u of userList.users) {
+    userByClerkId.set(u.clerkUserId, {
+      name: u.name,
+      email: u.email,
+    });
+  }
+  const isPlaceholderEmail = (e: string) =>
+    e === '' || e === 'user@example.com' || e.endsWith('@example.com');
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-medium">Tickets</h2>
@@ -130,9 +147,40 @@ export default async function TicketsPage({
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-col">
-                      <span>{t.name}</span>
+                      <span>
+                        {(() => {
+                          // If the stored name looks like a placeholder
+                          // (e.g. 'User' from the LLM-fabricated row) and
+                          // the user is a Clerk id that exists in the
+                          // local users table, fall back to that row.
+                          const looksLikeClerkId = t.userId.startsWith('user_');
+                          const nameLooksPlaceholder =
+                            !t.name || t.name === 'User' || t.name === 'Unknown';
+                          if (
+                            looksLikeClerkId &&
+                            nameLooksPlaceholder &&
+                            userByClerkId.has(t.userId)
+                          ) {
+                            return (
+                              userByClerkId.get(t.userId)?.name ??
+                              t.name
+                            );
+                          }
+                          return t.name;
+                        })()}
+                      </span>
                       <span className="text-xs text-zinc-500">
-                        {t.email}
+                        {(() => {
+                          const looksLikeClerkId = t.userId.startsWith('user_');
+                          if (
+                            looksLikeClerkId &&
+                            isPlaceholderEmail(t.email) &&
+                            userByClerkId.has(t.userId)
+                          ) {
+                            return userByClerkId.get(t.userId)?.email ?? t.email;
+                          }
+                          return t.email;
+                        })()}
                       </span>
                       {t.userId === 'anonymous' ? (
                         <span className="mt-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-800">
