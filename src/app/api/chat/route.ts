@@ -1,11 +1,13 @@
 import { tool, convertToModelMessages, streamText, createUIMessageStream, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
 import { z } from 'zod';
 import { desc } from 'drizzle-orm';
-import { DEFAULT_USER_ID } from '@/lib/auth/session';
+import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db/client';
 import { tickets } from '@/lib/db/schema';
 import { getChatModel } from '@/lib/llm/client';
 import { searchChunks } from '@/lib/rag/search';
+import { rateLimit } from '@/lib/auth/ratelimit';
+import { recordQuery } from '@/lib/auth/query-stats';
 import type { MyUIMessage } from '@/lib/chat/types';
 
 const SYSTEM_PROMPT = `You are a helpful customer support representative for our software company.
@@ -14,6 +16,18 @@ the answer, politely say so, and offer to open a support ticket using the create
 When the user explicitly asks to open a ticket, always use the tool.`;
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+  const limit = rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });
+  if (!limit.ok) {
+    return new Response('Too Many Requests', {
+      status: 429,
+      headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) },
+    });
+  }
+
   const { messages }: { messages: MyUIMessage[] } = await req.json();
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   const lastUserText = lastUserMessage
@@ -22,6 +36,10 @@ export async function POST(req: Request) {
         .map((p) => p.text)
         .join('\n')
     : '';
+
+  if (lastUserText) {
+    recordQuery(userId, lastUserText);
+  }
 
   // 1. Retrieve relevant chunks for the latest user question.
   let sources: Array<{ similarity: number; snippet: string }> = [];
@@ -65,7 +83,7 @@ export async function POST(req: Request) {
           const ticketId = `TKT-${nextNum}`;
           await db.insert(tickets).values({
             ticketId,
-            userId: DEFAULT_USER_ID,
+            userId,
             name,
             email,
             issue,

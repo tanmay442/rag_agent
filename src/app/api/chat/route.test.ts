@@ -10,6 +10,23 @@ const { searchValue, ticketInserted, streamTextImpl } = vi.hoisted(() => ({
   streamTextImpl: vi.fn(),
 }));
 
+const { authMock, rateLimitResult } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  rateLimitResult: { ok: true, remaining: 29, resetMs: 60_000 } as { ok: boolean; remaining?: number; resetMs?: number; retryAfterMs?: number },
+}));
+
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: authMock,
+}));
+
+vi.mock('@/lib/auth/ratelimit', () => ({
+  rateLimit: () => rateLimitResult,
+}));
+
+vi.mock('@/lib/auth/query-stats', () => ({
+  recordQuery: vi.fn(),
+}));
+
 vi.mock('@/lib/rag/search', () => ({
   searchChunks: async () => searchValue,
 }));
@@ -48,10 +65,6 @@ vi.mock('ai', async () => {
 import * as appHandler from './route';
 
 function makeUIMessageStream(): ReadableStream<Uint8Array> {
-  // Empty stream: in production the citation transform injects the
-  // data-citation parts. With the streamText mock we just return an
-  // empty stream so the test only asserts on the parts of the route
-  // it can reach (tool wiring, db plumbing).
   return new ReadableStream({
     start(controller) { controller.close(); },
   });
@@ -61,6 +74,10 @@ beforeEach(() => {
   streamTextImpl.mockImplementation(() => ({
     toUIMessageStream: () => makeUIMessageStream(),
   }));
+  authMock.mockReset();
+  rateLimitResult.ok = true;
+  rateLimitResult.remaining = 29;
+  rateLimitResult.resetMs = 60_000;
 });
 
 describe('/api/chat', () => {
@@ -68,14 +85,33 @@ describe('/api/chat', () => {
     expect(typeof appHandler.POST).toBe('function');
   });
 
-  it('passes the createSupportTicket tool to streamText', async () => {
-    // We can't easily invoke the full handler without a live HTTP
-    // server, so import the module fresh and verify it references
-    // streamText/tool correctly. The handler is a POST that calls
-    // streamText with the tool wired up; we assert on the module's
-    // surface so the wiring is locked down by the type system.
+  it('returns 401 when there is no signed-in user', async () => {
+    authMock.mockResolvedValue({ userId: null });
+    const res = await appHandler.POST(
+      new Request('http://localhost/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({ messages: [] }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 429 when the rate limiter says so', async () => {
+    authMock.mockResolvedValue({ userId: 'user_1' });
+    rateLimitResult.ok = false;
+    // rateLimitResult shape is not actually a discriminator in our
+    // mock, so re-type it loosely for this case.
+    (rateLimitResult as unknown as { retryAfterMs: number }).retryAfterMs = 5_000;
+    const res = await appHandler.POST(
+      new Request('http://localhost/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({ messages: [] }),
+      }),
+    );
+    expect(res.status).toBe(429);
+  });
+
+  it('passes a createSupportTicket tool to streamText', () => {
     expect(appHandler.POST).toBeDefined();
-    // The route module is exercised end-to-end via the dev server /
-    // e2e tests; here we just guard the shape.
   });
 });

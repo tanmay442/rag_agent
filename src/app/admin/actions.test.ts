@@ -1,0 +1,208 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const { sessionMock, requireAdminMock } = vi.hoisted(() => ({
+  sessionMock: vi.fn(),
+  requireAdminMock: vi.fn(),
+}));
+
+vi.mock('@/lib/auth/session', () => ({
+  requireAdmin: requireAdminMock,
+  requireSession: requireAdminMock,
+  getAppSession: vi.fn(),
+  getSession: vi.fn(),
+  ForbiddenError: class ForbiddenError extends Error {
+    status = 403;
+  },
+}));
+
+const {
+  uploadPdfMock,
+  replacePdfMock,
+  softDeleteDocumentMock,
+  restoreDocumentMock,
+  hardDeleteDocumentMock,
+  setUserRoleMock,
+  updateTicketMock,
+  clerkClientMock,
+  revalidatePathMock,
+  redirectMock,
+} = vi.hoisted(() => ({
+  uploadPdfMock: vi.fn(),
+  replacePdfMock: vi.fn(),
+  softDeleteDocumentMock: vi.fn(),
+  restoreDocumentMock: vi.fn(),
+  hardDeleteDocumentMock: vi.fn(),
+  setUserRoleMock: vi.fn(),
+  updateTicketMock: vi.fn(),
+  clerkClientMock: vi.fn(),
+  revalidatePathMock: vi.fn(),
+  redirectMock: vi.fn(),
+}));
+
+vi.mock('@/lib/admin/documents', () => ({
+  uploadPdf: uploadPdfMock,
+  replacePdf: replacePdfMock,
+  softDeleteDocument: softDeleteDocumentMock,
+  restoreDocument: restoreDocumentMock,
+  hardDeleteDocument: hardDeleteDocumentMock,
+}));
+
+vi.mock('@/lib/admin/tickets', () => ({
+  updateTicket: updateTicketMock,
+}));
+
+vi.mock('@/lib/auth/users', () => ({
+  setUserRole: setUserRoleMock,
+}));
+
+vi.mock('@/lib/auth/audit', () => ({
+  logTicketEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: clerkClientMock,
+}));
+
+vi.mock('next/cache', () => ({
+  revalidatePath: revalidatePathMock,
+}));
+
+vi.mock('next/navigation', () => ({
+  redirect: redirectMock,
+}));
+
+import {
+  uploadPdfAction,
+  deleteDocumentAction,
+  restoreDocumentAction,
+  setRoleAction,
+  updateTicketAction,
+  impersonateUserAction,
+} from './actions';
+
+beforeEach(() => {
+  requireAdminMock.mockReset();
+  uploadPdfMock.mockReset();
+  replacePdfMock.mockReset();
+  softDeleteDocumentMock.mockReset();
+  restoreDocumentMock.mockReset();
+  hardDeleteDocumentMock.mockReset();
+  setUserRoleMock.mockReset();
+  updateTicketMock.mockReset();
+  clerkClientMock.mockReset();
+  revalidatePathMock.mockReset();
+  redirectMock.mockReset();
+});
+
+describe('admin actions', () => {
+  it('uploadPdfAction 403s when requireAdmin throws', async () => {
+    const forbiddenError = new Error('Forbidden') as Error & { status: number };
+    forbiddenError.status = 403;
+    requireAdminMock.mockRejectedValue(forbiddenError);
+    const fd = new FormData();
+    fd.append('file', new File(['x'], 'a.pdf', { type: 'application/pdf' }));
+    const result = await uploadPdfAction({}, fd);
+    expect(result.error).toBe('Forbidden');
+    expect(uploadPdfMock).not.toHaveBeenCalled();
+  });
+
+  it('uploadPdfAction returns an error if no file is provided', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    const fd = new FormData();
+    const result = await uploadPdfAction({}, fd);
+    expect(result.error).toMatch(/No PDF/);
+  });
+
+  it('uploadPdfAction returns a success payload for a valid file', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    uploadPdfMock.mockResolvedValue({
+      documentId: 7,
+      status: 'inserted',
+      chunks: 12,
+    });
+    const fd = new FormData();
+    fd.append('file', new File(['x'], 'a.pdf', { type: 'application/pdf' }));
+    const result = await uploadPdfAction({}, fd);
+    expect(result.status).toBe('inserted');
+    expect(result.chunks).toBe(12);
+    expect(result.documentId).toBe(7);
+  });
+
+  it('deleteDocumentAction delegates to softDeleteDocument', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    softDeleteDocumentMock.mockResolvedValue(undefined);
+    const result = await deleteDocumentAction(42);
+    expect(softDeleteDocumentMock).toHaveBeenCalledWith(42, 'admin_1');
+    expect(result).toEqual({});
+  });
+
+  it('deleteDocumentAction surfaces errors', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    softDeleteDocumentMock.mockRejectedValue(new Error('boom'));
+    const result = await deleteDocumentAction(42);
+    expect(result.error).toBe('boom');
+  });
+
+  it('restoreDocumentAction surfaces non-ok reasons', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    restoreDocumentMock.mockResolvedValue({ ok: false, reason: 'expired' });
+    const result = await restoreDocumentAction(42);
+    expect(result.error).toContain('expired');
+  });
+
+  it('setRoleAction rejects invalid role values', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    const result = await setRoleAction('user_1', 'superuser' as 'admin');
+    expect(result.error).toMatch(/Invalid role/);
+    expect(setUserRoleMock).not.toHaveBeenCalled();
+  });
+
+  it('setRoleAction forwards valid roles to setUserRole', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    setUserRoleMock.mockResolvedValue({
+      clerkUserId: 'user_1',
+      role: 'admin',
+    } as never);
+    const result = await setRoleAction('user_1', 'admin');
+    expect(setUserRoleMock).toHaveBeenCalledWith('user_1', 'admin', 'admin_1');
+    expect(result).toEqual({});
+  });
+
+  it('updateTicketAction surfaces non-ok results', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    updateTicketMock.mockResolvedValue({ ok: false, reason: 'invalid_transition' });
+    const result = await updateTicketAction('TKT-1001', { status: 'closed' });
+    expect(result.error).toContain('invalid_transition');
+  });
+
+  it('impersonateUserAction returns a Clerk sign-in URL', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    clerkClientMock.mockResolvedValue({
+      signInTokens: {
+        createSignInToken: vi
+          .fn()
+          .mockResolvedValue({ url: 'https://clerk.example/impersonate' }),
+      },
+    });
+    const result = await impersonateUserAction('user_1');
+    expect(result.url).toContain('clerk.example');
+  });
+});

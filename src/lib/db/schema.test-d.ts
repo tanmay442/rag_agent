@@ -1,15 +1,21 @@
-// Type-only inference test plus a runtime smoke that the three pgTable
-// exports are defined. Runs with `vitest run`; the test file fails to load
-// if any expected type does not match.
+// Type-only inference test plus a runtime smoke that the pgTable exports
+// are defined. Runs with `vitest run`; the test file fails to load if any
+// expected type does not match.
 import { describe, it, expect, expectTypeOf } from 'vitest';
 import {
   documents,
   chunks,
   tickets,
+  users,
+  documentAudit,
+  ticketAudit,
   type Document,
   type NewDocument,
   type Chunk,
   type Ticket,
+  type User,
+  type DocumentAudit,
+  type TicketAudit,
 } from './schema';
 
 describe('schema types', () => {
@@ -42,9 +48,28 @@ describe('schema types', () => {
     expectTypeOf<Ticket['createdAt']>().toEqualTypeOf<Date>();
   });
 
+  it('infers User shape', () => {
+    expectTypeOf<User['clerkUserId']>().toEqualTypeOf<string>();
+    expectTypeOf<User['email']>().toEqualTypeOf<string>();
+    expectTypeOf<User['role']>().toEqualTypeOf<string>();
+  });
+
+  it('infers DocumentAudit shape', () => {
+    expectTypeOf<DocumentAudit['id']>().toEqualTypeOf<number>();
+    expectTypeOf<DocumentAudit['action']>().toEqualTypeOf<string>();
+  });
+
+  it('infers TicketAudit shape', () => {
+    expectTypeOf<TicketAudit['id']>().toEqualTypeOf<number>();
+    expectTypeOf<TicketAudit['action']>().toEqualTypeOf<string>();
+  });
+
   it('exposes pgTable definitions at runtime', () => {
     expect(documents).toBeDefined();
     expect(chunks).toBeDefined();
     expect(tickets).toBeDefined();
+    expect(users).toBeDefined();
+    expect(documentAudit).toBeDefined();
+    expect(ticketAudit).toBeDefined();
   });
 });
