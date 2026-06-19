@@ -1,0 +1,103 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2131 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - Billing and Plans) Tj
+0 -20 Td
+(Updated May 2026) Tj
+0 -40 Td
+(1. Plan tiers) Tj
+0 -20 Td
+(Pulsar offers four plan tiers:) Tj
+0 -20 Td
+(  Starter: free, up to 3 members, 1 GB data, 30-day history.) Tj
+0 -20 Td
+(  Team: USD 49 per member per month, unlimited dashboards, 1-year) Tj
+0 -20 Td
+(history, email support.) Tj
+0 -20 Td
+(  Business: USD 99 per member per month, SSO, audit log 365 days,) Tj
+0 -20 Td
+(SLA 99.9 percent, priority support.) Tj
+0 -20 Td
+(  Enterprise: custom pricing, custom roles, dedicated infra,) Tj
+0 -20 Td
+(SLA 99.99 percent, dedicated CSM.) Tj
+0 -40 Td
+(2. Invoices) Tj
+0 -20 Td
+(Invoices are issued on the first of each month for the previous) Tj
+0 -20 Td
+(month. Download them from Workspace > Billing > Invoices.) Tj
+0 -20 Td
+(Each invoice lists every line item, the unit price, and the) Tj
+0 -20 Td
+(applicable tax for your billing address.) Tj
+0 -40 Td
+(3. Payment methods) Tj
+0 -20 Td
+(Pulsar accepts Visa, Mastercard, American Express, and ACH) Tj
+0 -20 Td
+(direct debit. Enterprise customers can pay by wire transfer with) Tj
+0 -20 Td
+(net-30 terms. Add a payment method from Workspace > Billing >) Tj
+0 -20 Td
+(Payment method.) Tj
+0 -40 Td
+(4. Failed payments and dunning) Tj
+0 -20 Td
+(If a charge fails, Pulsar retries the card on day 3 and day 7,) Tj
+0 -20 Td
+(sending an email to the billing contact each time. On day 14) Tj
+0 -20 Td
+(the workspace is downgraded to read-only; on day 30 the workspace) Tj
+0 -20 Td
+(is suspended. Update the card to restore access immediately.) Tj
+0 -40 Td
+(5. Cancellation) Tj
+0 -20 Td
+(Cancel anytime from Workspace > Billing > Plan. The workspace) Tj
+0 -20 Td
+(remains active until the end of the current billing period. After) Tj
+0 -20 Td
+(cancellation, data is retained for 30 days and then permanently) Tj
+0 -20 Td
+(deleted. Download an export before cancelling if you need it.) Tj
+0 -40 Td
+(6. Plan changes) Tj
+0 -20 Td
+(Upgrades take effect immediately and are pro-rated. Downgrades) Tj
+0 -20 Td
+(take effect at the next billing date; the workspace keeps its) Tj
+0 -20 Td
+(current features until then.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000002427 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2500
+%%EOF

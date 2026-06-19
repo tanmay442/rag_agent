@@ -30,8 +30,9 @@ export default async function ChatPage() {
           Support Chat
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-[var(--foreground-muted)]">
-          Ask a question and we&apos;ll answer from the school&apos;s
-          documentation, with the source highlighted for every reply.
+          Ask a question about your docs and the support agent will answer
+          from the official documentation, with the source citation
+          highlighted for every reply.
         </p>
       </header>
 

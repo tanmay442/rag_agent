@@ -13,16 +13,16 @@ import type { MyUIMessage } from '@/lib/chat/types';
 
 const QUICK_PROMPTS: Array<{ label: string; text: string }> = [
   {
-    label: 'Tuition',
-    text: 'What is the tuition fee for grade 6?',
+    label: 'Reset password',
+    text: 'How do I change my password?',
   },
   {
-    label: 'Transport',
-    text: 'Does the school bus serve the East side of town?',
+    label: 'Add teammate',
+    text: 'How do I invite a teammate to my workspace?',
   },
   {
-    label: 'Exam schedule',
-    text: 'When do the mid-term exams start this year?',
+    label: 'API rate limit',
+    text: "What's the API rate limit on the Team plan?",
   },
   {
     label: 'Open a ticket',
@@ -126,13 +126,11 @@ export function ChatInterface() {
               </span>
               <div className="flex flex-col gap-1.5">
                 <p className="text-[15px] font-semibold text-[var(--foreground)]">
-                  Hi! I&apos;m the support assistant for the school.
+                  Hi! I&apos;m the support assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-[var(--foreground-muted)]">
-                  I can answer questions about school policies, schedules,
-                  fees, exams, transport, the parent portal, and
-                  co-curricular activities. I&apos;ll search the official
-                  documentation and show the sources I used.
+                  Ask a question about your docs and I&apos;ll search the
+                  official documentation and cite the source I used.
                 </p>
                 <p className="text-sm leading-relaxed text-[var(--foreground-muted)]">
                   If I can&apos;t find an answer, just ask me to file a support

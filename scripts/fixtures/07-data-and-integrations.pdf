@@ -1,0 +1,103 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2232 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - Data Sources and Integrations) Tj
+0 -20 Td
+(Effective May 2026) Tj
+0 -40 Td
+(1. Supported data sources) Tj
+0 -20 Td
+(Pulsar connects to managed Postgres (Neon, Supabase, RDS),) Tj
+0 -20 Td
+(Snowflake, BigQuery, Databricks, Redshift, and uploaded CSV.) Tj
+0 -20 Td
+(Each connection is configured in Workspace > Data sources and) Tj
+0 -20 Td
+(can be tested from the same page.) Tj
+0 -40 Td
+(2. Refresh cadence) Tj
+0 -20 Td
+(Each data source has a refresh schedule. The default is every 1) Tj
+0 -20 Td
+(hour for warehouse sources and every 15 minutes for Postgres) Tj
+0 -20 Td
+(replicas. Change the cadence from the data source's edit page.) Tj
+0 -20 Td
+(Schedules as fast as every 5 minutes are available on Business) Tj
+0 -20 Td
+(and Enterprise plans.) Tj
+0 -40 Td
+(3. Schema drift) Tj
+0 -20 Td
+(When a connected table adds, removes, or renames a column,) Tj
+0 -20 Td
+(Pulsar flags the dashboard with a yellow warning banner. Click the) Tj
+0 -20 Td
+(banner to view a diff and either accept the change (which updates) Tj
+0 -20 Td
+(the dashboard's query automatically) or pin the dashboard to) Tj
+0 -20 Td
+(the previous schema until you fix it manually.) Tj
+0 -40 Td
+(4. Stale data) Tj
+0 -20 Td
+(If a dashboard is showing older values than expected, the cause) Tj
+0 -20 Td
+(is almost always one of: (a) the warehouse has not received new) Tj
+0 -20 Td
+(rows since the last refresh; (b) the refresh schedule is set to) Tj
+0 -20 Td
+(daily instead of hourly; (c) the source credential has expired and) Tj
+0 -20 Td
+(the connection is in a failed state. Open Workspace > Data) Tj
+0 -20 Td
+(sources to inspect status and last-run timestamps.) Tj
+0 -40 Td
+(5. Webhooks and outbound events) Tj
+0 -20 Td
+(See the API reference for the full list of webhooks Pulsar) Tj
+0 -20 Td
+(emits. The most common for downstream automation are:) Tj
+0 -20 Td
+(dashboard.published, query.failed, datasource.health.degraded.) Tj
+0 -20 Td
+(All three are signed with HMAC-SHA256.) Tj
+0 -40 Td
+(6. Limits) Tj
+0 -20 Td
+(Per query: 10 000 rows returned, 60 second timeout, 1 GB scanned.) Tj
+0 -20 Td
+(Per dashboard: 50 tiles. Per workspace: 500 dashboards on Team,) Tj
+0 -20 Td
+(unlimited on Business and Enterprise.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000002528 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2601
+%%EOF

@@ -1,0 +1,85 @@
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1658 >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(Pulsar Analytics - Getting Started Guide) Tj
+0 -20 Td
+(Version 3.1 - Updated May 2026) Tj
+0 -40 Td
+(1. Create your account) Tj
+0 -20 Td
+(Go to app.pulsaranalytics.io/signup and enter your work email,) Tj
+0 -20 Td
+(full name, and a strong password. Pulsar sends a verification) Tj
+0 -20 Td
+(email; click the link within 24 hours to activate the workspace.) Tj
+0 -40 Td
+(2. First dashboard) Tj
+0 -20 Td
+(After verification, the onboarding wizard asks you to connect) Tj
+0 -20 Td
+(your first data source (Postgres, Snowflake, BigQuery, or CSV)) Tj
+0 -20 Td
+(and pick a starter template. The default template renders a) Tj
+0 -20 Td
+(revenue-by-week chart and a churn cohort table.) Tj
+0 -40 Td
+(3. Invite teammates) Tj
+0 -20 Td
+(Open Workspace > Members and click Invite. Enter email) Tj
+0 -20 Td
+(addresses and assign a role: Viewer, Editor, or Admin. Invited) Tj
+0 -20 Td
+(users receive an email with a one-time join link valid for 7) Tj
+0 -20 Td
+(days. The free Starter plan allows up to 3 members.) Tj
+0 -40 Td
+(4. Single sign-on) Tj
+0 -20 Td
+(Business and Enterprise plans can enable SSO via Workspace >) Tj
+0 -20 Td
+(Security > SSO. Pulsar supports SAML 2.0 and OIDC. After) Tj
+0 -20 Td
+(enabling SSO, new members must sign in through your IdP; the) Tj
+0 -20 Td
+(email/password path is disabled for the workspace.) Tj
+0 -40 Td
+(5. Get help) Tj
+0 -20 Td
+(From the app, click the question-mark icon to chat with Astra,) Tj
+0 -20 Td
+(Pulsar's in-app support agent, or email support@pulsaranalytics.io.) Tj
+0 -20 Td
+(Enterprise customers have a dedicated account manager reachable) Tj
+0 -20 Td
+(through the in-app support widget.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000000 00000 n 
+0000000052 00000 n 
+0000000112 00000 n 
+0000000241 00000 n 
+0000001954 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2027
+%%EOF
