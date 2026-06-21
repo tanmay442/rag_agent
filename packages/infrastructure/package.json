@@ -6,6 +6,29 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./db": "./src/db/index.ts",
+    "./llm": "./src/llm/index.ts",
+    "./auth": "./src/auth/index.ts",
+    "./pdf": "./src/pdf/index.ts"
+  },
+  "dependencies": {
+    "@app/application": "workspace:*",
+    "@app/domain": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "@ai-sdk/google": "^3.0.83",
+    "@ai-sdk/openai": "^3.0.73",
+    "@ai-sdk/provider": "^3.0.10",
+    "@clerk/nextjs": "^7.5.6",
+    "@langchain/textsplitters": "^1.0.1",
+    "@neondatabase/serverless": "^1.1.0",
+    "ai": "^6.0.208",
+    "pdf-parse": "1.1.1",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10"
   }
 }
