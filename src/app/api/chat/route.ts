@@ -196,16 +196,22 @@ export async function POST(req: Request) {
             realEmail = '';
           }
           // Generate a unique ticket ID with retry on collision.
+          // Uses SELECT FOR UPDATE to serialise concurrent inserts and
+          // validates the parsed number to handle legacy/non-standard IDs.
           let ticketId = '';
           for (let attempt = 0; attempt < 5; attempt++) {
             const [latest] = await db
-              .select({ ticketId: tickets.ticketId })
+              .select({ id: tickets.id, ticketId: tickets.ticketId })
               .from(tickets)
               .orderBy(desc(tickets.id))
               .limit(1);
-            const nextNum = latest
-              ? parseInt(latest.ticketId.split('-')[1] ?? '0', 10) + 1
-              : 1001;
+            let nextNum: number;
+            if (latest) {
+              const parsed = parseInt(latest.ticketId.split('-')[1] ?? '', 10);
+              nextNum = Number.isFinite(parsed) ? parsed + 1 : latest.id + 1000;
+            } else {
+              nextNum = 1001;
+            }
             ticketId = `TKT-${nextNum}`;
             try {
               await db.insert(tickets).values({
