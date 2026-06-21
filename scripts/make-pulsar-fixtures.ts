@@ -37,6 +37,9 @@ function buildPdf(content: string): string {
   const streamBytes = pdfBytes(content);
   const length = streamBytes.length;
 
+  // PDF header — every valid PDF must start with this.
+  const header = '%PDF-1.4\n';
+
   // Build the five objects in order.
   const obj1 = '<< /Type /Catalog /Pages 2 0 R >>';
   const obj2 = '<< /Type /Pages /Count 1 /Kids [3 0 R] >>';
@@ -51,7 +54,8 @@ function buildPdf(content: string): string {
 
   // Assemble the file body. Each object is followed by `\r\n` so the
   // xref offsets are calculated against a stable byte stream.
-  const body = `1 0 obj\r\n${obj1}\r\nendobj\r\n` +
+  const body = header +
+    `1 0 obj\r\n${obj1}\r\nendobj\r\n` +
     `2 0 obj\r\n${obj2}\r\nendobj\r\n` +
     `3 0 obj\r\n${obj3}\r\nendobj\r\n` +
     `4 0 obj\r\n${obj4}\r\nendobj\r\n` +
