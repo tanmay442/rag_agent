@@ -21,7 +21,9 @@
     "typecheck": "tsc --noEmit",
     "setup": "tsx scripts/setup.ts",
     "test:ci:run": "vitest run --reporter=dot && playwright test",
-    "lint:arch": "dependency-cruiser --config .dependency-cruiser.cjs packages src"
+    "cli": "tsx packages/cli/src/index.ts",
+    "cli:fixtures": "tsx packages/cli/src/index.ts fixtures",
+    "arch": "dependency-cruiser --config .dependency-cruiser.cjs packages src"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.83",
