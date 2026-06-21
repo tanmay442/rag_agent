@@ -55,3 +55,5 @@ next-env.d.ts
 # Workspace package build outputs
 /dist/
 /packages/*/dist/
+
+/packages/*/node_modules/

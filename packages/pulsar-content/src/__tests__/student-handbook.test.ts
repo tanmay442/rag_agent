@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPdf, writeSamplePdf } from './make-sample-pdf';
+import { buildPdf, writeStudentHandbook } from '../school/student-handbook.js';
 
 // We don't run `pdf-parse` in this test. It works fine in pure
 // Node but blows up in jsdom (the test environment) because
@@ -32,7 +32,7 @@ describe('buildPdf', () => {
     const out = mkdtempSync(join(tmpdir(), 'pdf-test-'));
     try {
       const path = join(out, 'hello.pdf');
-      writeSamplePdf(path);
+      writeStudentHandbook(path);
       const bytes = readFileSync(path);
       // Magic header.
       expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
