@@ -241,3 +241,56 @@ scripts/                   # setup, seed, e2e fixtures
 
 Set `SKIP_E2E_SETUP=1` to skip the branch provisioning step in
 environments where the DB is already seeded.
+
+## Workspace layout
+
+The business logic has been split into a 4-layer Clean Architecture
+inside `packages/`:
+
+```
+packages/
+├── domain/         # @app/domain — pure types, Zod schemas,
+│                   #   Result<T,E>, DomainError hierarchy
+├── application/    # @app/application — use-cases + port
+│                   #   interfaces. Returns Result<T, DomainError>.
+├── infrastructure/ # @app/infrastructure — Drizzle repos, AI SDK
+│                   #   adapters, Clerk session, pdf-parse, bytea
+├── cli/            # @app/cli — `rag-agent` sub-commands:
+│                   #   init, seed, fixtures, db-migrate
+└── pulsar-content/ # @app/pulsar-content — PDF fixtures + render-pdf
+```
+
+`src/` is the Next.js app shell. `src/composition.ts` is the only
+place where adapters are instantiated; routes import from
+`@/composition` and call the use-cases. `src/lib/` is currently a
+set of re-export shims that delegate to `@app/*`; the shims are
+scheduled for removal in a follow-up.
+
+### Layer rules (enforced by `pnpm lint:arch`)
+
+| Layer            | May import                                | May NOT import                |
+|------------------|-------------------------------------------|-------------------------------|
+| `domain`         | zod                                       | application, infrastructure, cli, pulsar-content, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
+| `application`    | domain, its own port interfaces           | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
+| `infrastructure` | domain, application, drizzle, @ai-sdk, clerk, pdf-parse, pg, pdf-lib | src/app, src/components, next |
+| `src/app`, `src/components` | application, domain, the (shimmed) src/lib helpers | drizzle, @ai-sdk, pdf-parse, infrastructure |
+| `cli`            | application, pulsar-content, infrastructure, dotenv | src/app, src/components |
+| `pulsar-content` | pdf-lib                                   | any other internal package |
+
+Run `pnpm lint:arch` after any change that touches the import graph.
+
+### Boundary validation
+
+Every route handler and server action parses its external input
+through a Zod schema before it reaches a use-case:
+
+- `src/env.ts` — `process.env` validated at server start
+- `src/app/api/chat/request-schema.ts` — POST `/api/chat` body
+- `src/app/api/admin/*/route.ts` — request bodies and URL params
+- Server actions in `src/app/(app)/admin/actions.ts` — form input
+
+Use-cases return `Result<T, DomainError>`; `src/lib/http.ts` exports
+`respond(result)` which maps `DomainError` to the right HTTP status
+(ValidationError → 400, UnauthorizedError → 401, ForbiddenError → 403,
+NotFoundError → 404, ConflictError → 409, GoneError → 410,
+RateLimitedError → 429 with `Retry-After`, ExternalServiceError → 502).
