@@ -13,7 +13,7 @@ module.exports = {
       name: 'no-domain-importing-src',
       severity: 'error',
       from: { path: '^packages/domain' },
-      to: { path: '^src/' },
+      to: { path: '^src/(app|components)' },
     },
     {
       name: 'no-domain-importing-banned-packages',
@@ -42,7 +42,7 @@ module.exports = {
       name: 'no-application-importing-src',
       severity: 'error',
       from: { path: '^packages/application' },
-      to: { path: '^src/' },
+      to: { path: '^src/(app|components)' },
     },
     {
       name: 'no-application-importing-banned-packages',

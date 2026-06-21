@@ -1,0 +1,19 @@
+// Use-case: enforce a per-user rate limit on the chat route.
+// Source: src/lib/auth/ratelimit.ts (enforceRateLimit).
+import { err, ok, type Result, RateLimitedError } from '@app/domain';
+import type { RateLimiter } from '../ports/index.js';
+
+export interface RateLimitInput {
+  key: string;
+  limit: number;
+  windowMs: number;
+}
+
+export async function enforceRateLimit(
+  input: RateLimitInput,
+  deps: { limiter: RateLimiter },
+): Promise<Result<{ remaining: number; resetMs: number }>> {
+  const r = deps.limiter.check(input.key, { limit: input.limit, windowMs: input.windowMs });
+  if (r.ok) return ok({ remaining: r.remaining, resetMs: r.resetMs });
+  return err(new RateLimitedError('Rate limit exceeded', r.retryAfterMs));
+}

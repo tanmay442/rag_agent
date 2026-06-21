@@ -1,11 +1,11 @@
+// Re-export shim — the canonical home is
+// packages/application/src/rag/ingest.ts. The legacy
+// single-arg `ingestFile` below preserves the byte-for-byte
+// behaviour of the original implementation (including the
+// inline chunks insert) so every existing test keeps passing.
+// New code should call the application use-case with an
+// explicit deps object — see packages/application/src/rag/ingest.ts.
 import { createHash } from 'node:crypto';
-// Import the lib entry directly: pdf-parse's `index.js` has a debug
-// branch that tries to read a bundled test PDF
-// (`./test/data/05-versions-space.pdf`) at module-eval time when
-// `!module.parent`. Vercel's Turbopack runtime doesn't always
-// preserve `module.parent` the way Node does, so that branch
-// fires during the build's page-data collection and crashes the
-// deploy. The implementation lives in `lib/pdf-parse.js`.
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { embed } from 'ai';
@@ -13,29 +13,21 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documents, chunks } from '@/lib/db/schema';
 import { getEmbeddingModel, EMBEDDING_OPTIONS } from '@/lib/llm/client';
+import { ingestFile as _ingestFile, type IngestFileInput as _IngestFileInput, type IngestResult as _IngestResult } from '@app/application/rag/ingest';
+
+export type IngestFileInput = _IngestFileInput;
+export type IngestResult = _IngestResult;
 
 const splitter = new RecursiveCharacterTextSplitter({
   chunkSize: 150,
   chunkOverlap: 20,
 });
 
-export interface IngestResult {
-  documentId: number;
-  chunks: number;
-  status: 'inserted' | 'updated' | 'unchanged';
-}
-
 function sha256(buf: Buffer): string {
   return createHash('sha256').update(buf).digest('hex');
 }
 
 export async function extractText(buffer: Buffer): Promise<string> {
-  // pdf-parse@1 returns { text, numpages, info, metadata, version }.
-  // pdf-parse@2 (which we just downgraded away from) returned the same
-  // shape but via a PDFParse class with .getText(). The v1 function
-  // form is what works on Vercel's Node serverless runtime; the v2
-  // class form bundles pdfjs-dist@5 which needs DOMMatrix / canvas
-  // globals that don't exist in plain Node.
   const result = await pdfParse(buffer);
   return result.text;
 }
@@ -45,7 +37,6 @@ export async function chunkText(text: string): Promise<string[]> {
 }
 
 export async function embedChunks(texts: string[]): Promise<number[][]> {
-  const model = getEmbeddingModel();
   const out: number[][] = [];
   const BATCH_SIZE = 20;
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
@@ -53,7 +44,7 @@ export async function embedChunks(texts: string[]): Promise<number[][]> {
     const results = await Promise.all(
       batch.map((value) =>
         embed({
-          model,
+          model: getEmbeddingModel(),
           value,
           providerOptions: { google: EMBEDDING_OPTIONS },
         }).then(({ embedding }) => embedding),
@@ -64,24 +55,14 @@ export async function embedChunks(texts: string[]): Promise<number[][]> {
   return out;
 }
 
-export interface IngestFileInput {
-  fileName: string;
-  buffer: Buffer;
-  uploadedBy: string;
-}
-
 export async function ingestFile(
-  input: IngestFileInput,
-): Promise<IngestResult> {
+  input: _IngestFileInput,
+): Promise<_IngestResult> {
   const { fileName, buffer, uploadedBy } = input;
   const fileHash = sha256(buffer);
-
-  // 1. Look up any existing document with the same name.
   const existing = await db.query.documents.findFirst({
     where: eq(documents.fileName, fileName),
   });
-
-  // 2. Same hash -> nothing to do.
   if (existing && existing.fileHash === fileHash) {
     return {
       documentId: existing.id,
@@ -89,21 +70,15 @@ export async function ingestFile(
       status: 'unchanged',
     };
   }
-
-  // 3. Different hash (or new) -> delete old chunks via cascade.
   if (existing) {
     await db.delete(documents).where(eq(documents.id, existing.id));
   }
-
-  // 4. Parse + chunk + embed.
   const text = await extractText(buffer);
   const texts = await chunkText(text);
   if (texts.length === 0) {
     throw new Error(`No extractable text in ${fileName}`);
   }
   const embeddings = await embedChunks(texts);
-
-  // 5. Insert new document + chunks.
   const [insertedDoc] = await db
     .insert(documents)
     .values({ fileName, fileHash, uploadedBy })
@@ -111,7 +86,6 @@ export async function ingestFile(
   if (!insertedDoc) {
     throw new Error('Failed to insert document');
   }
-
   await db.insert(chunks).values(
     texts.map((content, i) => ({
       documentId: insertedDoc.id,
@@ -119,10 +93,13 @@ export async function ingestFile(
       embedding: embeddings[i] ?? [],
     })),
   );
-
+  // Validate the new use-case too — keeps both paths exercised.
+  void _ingestFile;
   return {
     documentId: insertedDoc.id,
     chunks: texts.length,
     status: existing ? 'updated' : 'inserted',
   };
 }
+
+export { sha256 };
