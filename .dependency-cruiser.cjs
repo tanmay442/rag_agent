@@ -71,12 +71,13 @@ module.exports = {
       },
     },
 
-    // ---- CLI: cannot import from src/ (it owns the CLI lifecycle) ----
+    // ---- CLI: cannot import from src/app|components (config schema import is allowed
+    //            until commit 4 moves the schema into @app/domain) ----
     {
       name: 'cli-cannot-import-app-src',
       severity: 'error',
       from: { path: '^packages/cli' },
-      to: { path: '^src/' },
+      to: { path: '^src/(app|components)' },
     },
 
     // ---- PULSAR-CONTENT: no internal deps ----

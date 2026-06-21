@@ -153,7 +153,21 @@ importers:
 
   packages/application: {}
 
-  packages/cli: {}
+  packages/cli:
+    dependencies:
+      '@app/pulsar-content':
+        specifier: workspace:*
+        version: link:../pulsar-content
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+    devDependencies:
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/domain: {}
 
