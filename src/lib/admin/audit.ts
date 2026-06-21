@@ -122,7 +122,7 @@ export async function listAudit(
         ticket_id: string | null;
         actor_id: string;
         action: string;
-        at: Date;
+        at: string | Date;
       }>;
     }
   ).rows ?? [];
@@ -134,7 +134,7 @@ export async function listAudit(
     actorId: r.actor_id,
     actorName: null,
     action: r.action,
-    at: r.at,
+    at: r.at instanceof Date ? r.at : new Date(r.at),
   }));
 
   // Resolve actor names in a single follow-up query.
