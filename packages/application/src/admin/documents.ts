@@ -8,9 +8,9 @@ import {
   GoneError,
   ValidationError,
 } from '@app/domain';
-import type { DocumentRepository, ChunkRepository, AuditLog } from '../ports/index.js';
-import { ingestFile } from '../rag/ingest.js';
-import type { IngestDeps, IngestResult } from '../rag/ingest.js';
+import type { DocumentRepository, ChunkRepository, AuditLog } from '../ports/index';
+import { ingestFile } from '../rag/ingest';
+import type { IngestDeps, IngestResult } from '../rag/ingest';
 
 export interface ListDocumentsInput {
   search?: string;

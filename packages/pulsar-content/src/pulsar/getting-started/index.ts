@@ -2,8 +2,8 @@
 // render-to-disk helper that drops the file into `outDir`. The
 // default `outDir` is `./documents` so `pnpm seed` picks the
 // file up without extra configuration.
-import { renderPdf } from '../../render-pdf.js';
-import { lines } from './lines.js';
+import { renderPdf } from '../../render-pdf';
+import { lines } from './lines';
 
 export { lines };
 export const fileName = '01-getting-started.pdf';

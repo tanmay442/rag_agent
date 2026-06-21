@@ -12,7 +12,7 @@ import { appConfig } from '@/lib/config';
 import { buildSystemPrompt } from '@/lib/prompt/build-system-prompt';
 import type { MyUIMessage } from '@/lib/chat/types';
 import { NextResponse } from 'next/server';
-import { ChatRequestSchema } from './request-schema.js';
+import { ChatRequestSchema } from './request-schema';
 
 export async function POST(req: Request) {
   const { userId } = await auth();

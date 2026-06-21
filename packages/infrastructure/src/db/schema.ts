@@ -7,8 +7,8 @@ import {
   index, check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { vector } from './schema-vector.js';
-import { byteaBlob } from '../storage/bytea-blob.js';
+import { vector } from './schema-vector';
+import { byteaBlob } from '../storage/bytea-blob';
 
 export const documents = pgTable('documents', {
   id: serial('id').primaryKey(),

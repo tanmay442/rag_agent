@@ -1,4 +1,4 @@
-export * as Db from './db/index.js';
-export * as Llm from './llm/index.js';
-export * as Pdf from './pdf/index.js';
-export * as Auth from './auth/index.js';
+export * as Db from './db/index';
+export * as Llm from './llm/index';
+export * as Pdf from './pdf/index';
+export * as Auth from './auth/index';

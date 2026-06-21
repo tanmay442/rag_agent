@@ -9,11 +9,11 @@
 // the error message; commit 7 will introduce the mapping
 // helper).
 import { err, ok, type Result, ValidationError, ExternalServiceError } from '@app/domain';
-import type { DocumentRepository } from '../ports/index.js';
-import type { EmbeddingService } from '../ports/index.js';
-import type { Hasher } from '../ports/index.js';
-import type { PdfParser } from '../ports/index.js';
-import type { TextSplitter } from '../ports/index.js';
+import type { DocumentRepository } from '../ports/index';
+import type { EmbeddingService } from '../ports/index';
+import type { Hasher } from '../ports/index';
+import type { PdfParser } from '../ports/index';
+import type { TextSplitter } from '../ports/index';
 
 export interface IngestFileInput {
   fileName: string;

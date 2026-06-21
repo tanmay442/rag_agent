@@ -7,7 +7,7 @@ import { join } from 'node:path';
 // does not try to read the host's .env files when this test imports it.
 vi.mock('dotenv/config', () => ({}));
 
-import { copyPdfsFromDir, upsertAdminEmails } from '../commands/init.js';
+import { copyPdfsFromDir, upsertAdminEmails } from '../commands/init';
 
 let work: string;
 
