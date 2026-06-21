@@ -13,9 +13,28 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import 'dotenv/config';
 
-import { ingestFile } from '../src/lib/rag/ingest';
+// Dynamic import to avoid tsx/esbuild eagerly bundling pdf-parse's
+// internal pdfjs-dist, which breaks PDF parsing in the tsx runtime.
+// When imported statically, esbuild resolves a stricter pdfjs version
+// that rejects valid PDFs with "bad XRef entry".
+let ingestFile: typeof import('../src/lib/rag/ingest').ingestFile | undefined;
+
+async function getIngestFile() {
+  if (!ingestFile) {
+    const mod = await import('../src/lib/rag/ingest');
+    ingestFile = mod.ingestFile;
+  }
+  return ingestFile;
+}
+
+// Load .env.local so DATABASE_URL and AI_STUDIO_KEY are available
+// when running via `pnpm seed` (CLI entry point below).
+try {
+  process.loadEnvFile('.env.local');
+} catch {
+  // .env.local may not exist; rely on env vars from the caller.
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..');
@@ -54,7 +73,7 @@ export interface SeedOptions {
 export async function runSeed(opts: SeedOptions = {}): Promise<void> {
   const userId = opts.userId ?? 'seed-script';
   const fixturesDir = opts.fixturesDir ?? FIXTURES;
-  const ingest = opts.ingest ?? ingestFile;
+  const ingest = opts.ingest ?? (await getIngestFile());
   let files: string[];
   try {
     files = readdirSync(fixturesDir).filter((f) => f.toLowerCase().endsWith('.pdf'));
