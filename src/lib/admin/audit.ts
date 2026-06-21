@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { documentAudit, ticketAudit, users } from '@/lib/db/schema';
 
@@ -32,83 +32,97 @@ export async function listAudit(
   const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
   const offset = Math.max(params.offset ?? 0, 0);
 
-  const docFilter = params.documentId
-    ? [eq(documentAudit.documentId, params.documentId)] as const
-    : [];
-  const tixFilter = params.ticketId
-    ? [eq(ticketAudit.ticketId, params.ticketId)] as const
-    : [];
-
-  // Read both tables in parallel. We merge in code so the response can
-  // include both kinds in a single, stable order.
   const wantDoc = !params.ticketId || params.documentId !== undefined;
   const wantTix = !params.documentId || params.ticketId !== undefined;
 
-  const [docRows, tixRows] = await Promise.all([
+  // Run real COUNT(*) queries for accurate pagination totals.
+  const [docCount, tixCount] = await Promise.all([
     wantDoc
       ? db
-          .select({
-            id: documentAudit.id,
-            kind: sql<'document'>`'document'`.as('kind'),
-            documentId: documentAudit.documentId,
-            ticketId: sql<string | null>`NULL`.as('ticket_id'),
-            actorId: documentAudit.actorId,
-            action: documentAudit.action,
-            at: documentAudit.at,
-          })
+          .select({ count: sql<number>`count(*)::int` })
           .from(documentAudit)
-          .where(docFilter.length > 0 ? and(...docFilter) : undefined)
-          .orderBy(desc(documentAudit.at))
-          .limit(limit + offset)
-      : Promise.resolve([] as Array<{
-          id: number;
-          kind: 'document';
-          documentId: number | null;
-          ticketId: string | null;
-          actorId: string;
-          action: string;
-          at: Date;
-        }>),
+          .where(
+            params.documentId
+              ? eq(documentAudit.documentId, params.documentId)
+              : undefined,
+          )
+          .then((r) => r[0]?.count ?? 0)
+      : Promise.resolve(0),
     wantTix
       ? db
-          .select({
-            id: ticketAudit.id,
-            kind: sql<'ticket'>`'ticket'`.as('kind'),
-            documentId: sql<number | null>`NULL`.as('document_id'),
-            ticketId: ticketAudit.ticketId,
-            actorId: ticketAudit.actorId,
-            action: ticketAudit.action,
-            at: ticketAudit.at,
-          })
+          .select({ count: sql<number>`count(*)::int` })
           .from(ticketAudit)
-          .where(tixFilter.length > 0 ? and(...tixFilter) : undefined)
-          .orderBy(desc(ticketAudit.at))
-          .limit(limit + offset)
-      : Promise.resolve([] as Array<{
-          id: number;
-          kind: 'ticket';
-          documentId: number | null;
-          ticketId: string | null;
-          actorId: string;
-          action: string;
-          at: Date;
-        }>),
+          .where(
+            params.ticketId
+              ? eq(ticketAudit.ticketId, params.ticketId)
+              : undefined,
+          )
+          .then((r) => r[0]?.count ?? 0)
+      : Promise.resolve(0),
   ]);
+  const total = docCount + tixCount;
 
-  const merged: AuditEvent[] = [...docRows, ...tixRows]
-    .map((r) => ({
-      id: r.id,
-      kind: r.kind as 'document' | 'ticket',
-      documentId: r.documentId ?? null,
-      ticketId: r.ticketId ?? null,
-      actorId: r.actorId,
-      actorName: null as string | null,
-      action: r.action,
-      at: r.at,
-    }))
-    .sort((a, b) => b.at.getTime() - a.at.getTime());
-  const total = merged.length;
-  const events = merged.slice(offset, offset + limit);
+  // UNION ALL with global ORDER BY for stable, correct pagination.
+  const docWhere = params.documentId
+    ? sql`WHERE document_id = ${params.documentId}`
+    : wantDoc
+      ? sql``
+      : sql`WHERE 1 = 0`;
+  const tixWhere = params.ticketId
+    ? sql`WHERE ticket_id = ${params.ticketId}`
+    : wantTix
+      ? sql``
+      : sql`WHERE 1 = 0`;
+
+  const rows = await db.execute<{
+    id: number;
+    kind: string;
+    document_id: number | null;
+    ticket_id: string | null;
+    actor_id: string;
+    action: string;
+    at: Date;
+  }>(sql`
+    SELECT * FROM (
+      SELECT
+        id,
+        'document' AS kind,
+        document_id,
+        NULL::text AS ticket_id,
+        actor_id,
+        action,
+        at
+      FROM document_audit
+      ${docWhere}
+
+      UNION ALL
+
+      SELECT
+        id,
+        'ticket' AS kind,
+        NULL::int AS document_id,
+        ticket_id,
+        actor_id,
+        action,
+        at
+      FROM ticket_audit
+      ${tixWhere}
+    ) combined
+    ORDER BY at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `);
+
+  const events: AuditEvent[] = rows.rows.map((r) => ({
+    id: r.id,
+    kind: r.kind as 'document' | 'ticket',
+    documentId: r.document_id ?? null,
+    ticketId: r.ticket_id ?? null,
+    actorId: r.actor_id,
+    actorName: null,
+    action: r.action,
+    at: r.at,
+  }));
 
   // Resolve actor names in a single follow-up query.
   const actorIds = Array.from(new Set(events.map((e) => e.actorId)));

@@ -121,7 +121,7 @@ function buildPersonaBlock(config: AppConfig): string {
     `You are a customer support representative for ${config.orgName}.${nameClause}`,
     `Your job is to help ${config.audience} find answers in the ${config.orgName} official documentation.`,
     '',
-    'Greet the user by name (\u201CHi, I\u2019m Astra\u201D) on the first turn of a new conversation, and never on follow-up turns.',
+    `Greet the user by name (\u201CHi, I\u2019m ${config.agentPersona.name ?? 'Astra'}\u201D) on the first turn of a new conversation, and never on follow-up turns.`,
     '',
     '# Tone',
     '',
