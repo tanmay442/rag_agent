@@ -9,6 +9,8 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { MyUIMessage } from '@/lib/chat/types';
 
 const QUICK_PROMPTS: Array<{ label: string; text: string }> = [
@@ -224,10 +226,10 @@ export function ChatInterface() {
                   ) : (
                     <div
                       key={i}
-                      className="max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/80 px-4 py-3 text-[14.5px] leading-relaxed text-[var(--foreground)] shadow-sm"
+                      className="chat-markdown max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-bl-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/80 px-4 py-3 text-[14.5px] leading-relaxed text-[var(--foreground)] shadow-sm"
                       data-testid="chat-text"
                     >
-                      {part.text}
+                      <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
                     </div>
                   );
                 }
