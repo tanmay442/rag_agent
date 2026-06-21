@@ -28,6 +28,16 @@ async function getIngestFile() {
   return ingestFile;
 }
 
+// Lazy-load the db + schema so the seed script writes the raw PDF bytes
+// into the blob column (same as uploadPdf does), enabling preview and
+// download from the admin documents UI.
+async function saveBlob(documentId: number, buffer: Buffer) {
+  const { db } = await import('../src/lib/db/client');
+  const { documents } = await import('../src/lib/db/schema');
+  const { eq } = await import('drizzle-orm');
+  await db.update(documents).set({ blob: buffer }).where(eq(documents.id, documentId));
+}
+
 // Load .env.local so DATABASE_URL and AI_STUDIO_KEY are available
 // when running via `pnpm seed` (CLI entry point below).
 try {
@@ -88,6 +98,11 @@ export async function runSeed(opts: SeedOptions = {}): Promise<void> {
   for (const name of files) {
     const buffer = readFileSync(join(fixturesDir, name));
     const result = await ingest({ fileName: name, buffer, uploadedBy: userId });
+    // Write the raw PDF bytes into the blob column so the admin UI can
+    // preview and download the document (mirrors uploadPdf() behavior).
+    // Always write — even on unchanged — because legacy rows may have
+    // a null blob from before this column was populated.
+    await saveBlob(result.documentId, buffer);
     console.log(
       `${name}: status=${result.status} documentId=${result.documentId} chunks=${result.chunks}`,
     );
