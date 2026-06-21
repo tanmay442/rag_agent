@@ -6,6 +6,25 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./ports": "./src/ports/index.ts",
+    "./rag": "./src/rag/index.ts",
+    "./rag/ingest": "./src/rag/ingest.ts",
+    "./rag/search": "./src/rag/search.ts",
+    "./auth": "./src/auth/index.ts",
+    "./auth/sync-user": "./src/auth/sync-user.ts",
+    "./auth/audit": "./src/auth/audit.ts",
+    "./auth/rate-limit": "./src/auth/rate-limit.ts",
+    "./auth/query-stats": "./src/auth/query-stats.ts",
+    "./auth/users": "./src/auth/users.ts",
+    "./admin": "./src/admin/index.ts",
+    "./admin/documents": "./src/admin/documents.ts",
+    "./admin/tickets": "./src/admin/tickets.ts",
+    "./prompt": "./src/prompt/index.ts",
+    "./prompt/build-system-prompt": "./src/prompt/build-system-prompt.ts"
+  },
+  "dependencies": {
+    "@app/domain": "workspace:*",
+    "zod": "^4.4.3"
   }
 }
