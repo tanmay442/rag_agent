@@ -11,6 +11,8 @@ import { recordQuery } from '@/lib/auth/query-stats';
 import { appConfig } from '@/lib/config';
 import { buildSystemPrompt } from '@/lib/prompt/build-system-prompt';
 import type { MyUIMessage } from '@/lib/chat/types';
+import { NextResponse } from 'next/server';
+import { ChatRequestSchema } from './request-schema.js';
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -25,7 +27,13 @@ export async function POST(req: Request) {
     });
   }
 
-  const { messages }: { messages: MyUIMessage[] } = await req.json();
+  // Zod-validated request body. Fail fast on malformed input.
+  const raw = await req.json().catch(() => null);
+  const parsed = ChatRequestSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'invalid_request', issues: parsed.error.issues }, { status: 400 });
+  }
+  const messages = parsed.data.messages as unknown as MyUIMessage[];
   const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
   const lastUserText = lastUserMessage
     ? lastUserMessage.parts
