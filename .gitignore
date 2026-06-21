@@ -51,3 +51,7 @@ next-env.d.ts
 # Seed PDFs dropped by `pnpm setup`. Comment out to commit your
 # corpus (e.g. for a small fixture set you want version-controlled).
 /documents/
+
+# Workspace package build outputs
+/dist/
+/packages/*/dist/
