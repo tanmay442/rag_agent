@@ -78,6 +78,21 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@app/application':
+        specifier: workspace:*
+        version: link:packages/application
+      '@app/cli':
+        specifier: workspace:*
+        version: link:packages/cli
+      '@app/domain':
+        specifier: workspace:*
+        version: link:packages/domain
+      '@app/infrastructure':
+        specifier: workspace:*
+        version: link:packages/infrastructure
+      '@app/pulsar-content':
+        specifier: workspace:*
+        version: link:packages/pulsar-content
       '@playwright/test':
         specifier: ^1.61.0
         version: 1.61.0
@@ -169,7 +184,11 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/infrastructure: {}
 

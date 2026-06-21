@@ -12,7 +12,7 @@ export default defineConfig({
       'scripts/**/*.{test,test-d}.{ts,tsx}',
       'packages/**/*.{test,test-d}.{ts,tsx}',
     ],
-    exclude: ['e2e/**', 'node_modules/**', '.next/**'],
+    exclude: ['e2e/**', 'node_modules/**', '.next/**', '**/node_modules/**'],
     globals: true,
     css: false,
   },
