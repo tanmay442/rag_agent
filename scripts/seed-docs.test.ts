@@ -6,6 +6,15 @@ vi.mock('../src/lib/rag/ingest', () => ({
   ingestFile: ingestFileMock,
 }));
 
+// Mock the db update that saveBlob calls after ingestion so tests
+// don't need a real database connection.
+const { dbUpdateMock } = vi.hoisted(() => ({ dbUpdateMock: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../src/lib/db/client', () => ({
+  db: { update: dbUpdateMock.mockReturnValue({ set: () => ({ where: async () => undefined }) }) },
+}));
+vi.mock('../src/lib/db/schema', () => ({ documents: {} }));
+vi.mock('drizzle-orm', () => ({ eq: () => undefined }));
+
 // We mock dotenv so importing the script (which calls `import 'dotenv/config'`)
 // does not try to read the host's .env files.
 vi.mock('dotenv/config', () => ({}));
