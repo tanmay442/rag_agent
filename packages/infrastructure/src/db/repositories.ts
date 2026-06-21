@@ -4,7 +4,7 @@
 // for documents/chunks/tickets/users; AuditRepo /
 // UserRepo / TicketRepo aliases for the application).
 import { eq, desc, ilike, or, sql, inArray, isNull, and, isNotNull } from 'drizzle-orm';
-import { db } from './client.js';
+import { db } from './client';
 import {
   documents,
   chunks,
@@ -16,7 +16,7 @@ import {
   type Chunk,
   type Ticket,
   type User,
-} from './schema.js';
+} from './schema';
 
 // ---- Documents / Chunks ----
 
@@ -242,7 +242,7 @@ export const userRepo = {
     return row?.count ?? 0;
   },
   async syncClerkRole(clerkUserId: string, role: 'admin' | 'user'): Promise<void> {
-    const { clerkClient } = await import('../auth/clerk-session.js');
+    const { clerkClient } = await import('../auth/clerk-session');
     const client = await clerkClient();
     await client.users.updateUserMetadata(clerkUserId, {
       publicMetadata: { role },

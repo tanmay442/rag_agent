@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPdf, writeStudentHandbook } from '../school/student-handbook.js';
+import { buildPdf, writeStudentHandbook } from '../school/student-handbook';
 
 // We don't run `pdf-parse` in this test. It works fine in pure
 // Node but blows up in jsdom (the test environment) because

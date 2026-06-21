@@ -2,7 +2,7 @@
 // Honours ADMIN_EMAILS from env for the bootstrap path.
 // Source: src/lib/auth/users.ts (syncUserFromClerk).
 import { ok, type Result } from '@app/domain';
-import type { UserRepository } from '../ports/index.js';
+import type { UserRepository } from '../ports/index';
 
 export interface SyncUserInput {
   clerkUserId: string;

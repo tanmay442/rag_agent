@@ -3,8 +3,8 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import 'dotenv/config';
-import * as schema from './schema.js';
-import { attachDatabasePool } from './pool.js';
+import * as schema from './schema';
+import { attachDatabasePool } from './pool';
 
 export { schema };
 export const db = drizzle(buildPool(), { schema });

@@ -3,7 +3,7 @@
 // 20-element batches to keep the in-flight request count
 // predictable).
 import { embed } from 'ai';
-import { getEmbeddingModel, EMBEDDING_OPTIONS } from './google-embedding-service.js';
+import { getEmbeddingModel, EMBEDDING_OPTIONS } from './google-embedding-service';
 import type { EmbeddingService } from '@app/application/ports';
 
 const BATCH_SIZE = 20;

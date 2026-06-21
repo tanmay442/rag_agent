@@ -1,6 +1,6 @@
 // Admin ticket use-cases. Source: src/lib/admin/tickets.ts.
 import { err, ok, type Result, NotFoundError, ValidationError } from '@app/domain';
-import type { TicketRepository, AuditLog } from '../ports/index.js';
+import type { TicketRepository, AuditLog } from '../ports/index';
 
 export const TICKET_STATUSES = ['created', 'in_progress', 'closed'] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
