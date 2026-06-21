@@ -74,7 +74,7 @@ export async function listAudit(
       ? sql``
       : sql`WHERE 1 = 0`;
 
-  const rows = await db.execute<{
+  const result = await db.execute<{
     id: number;
     kind: string;
     document_id: number | null;
@@ -113,7 +113,20 @@ export async function listAudit(
     OFFSET ${offset}
   `);
 
-  const events: AuditEvent[] = rows.rows.map((r) => ({
+  const rawRows = (
+    result as unknown as {
+      rows?: Array<{
+        id: number;
+        kind: string;
+        document_id: number | null;
+        ticket_id: string | null;
+        actor_id: string;
+        action: string;
+        at: Date;
+      }>;
+    }
+  ).rows ?? [];
+  const events: AuditEvent[] = rawRows.map((r) => ({
     id: r.id,
     kind: r.kind as 'document' | 'ticket',
     documentId: r.document_id ?? null,
