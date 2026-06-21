@@ -20,7 +20,8 @@
     "teardown-test-db": "tsx scripts/teardown-test-db.ts",
     "typecheck": "tsc --noEmit",
     "setup": "tsx scripts/setup.ts",
-    "test:ci:run": "vitest run --reporter=dot && playwright test"
+    "test:ci:run": "vitest run --reporter=dot && playwright test",
+    "lint:arch": "dependency-cruiser --config .dependency-cruiser.cjs packages src"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.83",
@@ -60,6 +61,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/ui": "^4.1.9",
+    "dependency-cruiser": "^17.4.3",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.4",
@@ -71,5 +73,6 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.9"
-  }
+  },
+  "packageManager": "pnpm@10.33.2"
 }
