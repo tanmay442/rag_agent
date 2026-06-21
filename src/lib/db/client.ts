@@ -23,9 +23,19 @@ export type Database = NodePgDatabase<Schema>;
  * before; the export shape is unchanged.
  */
 function buildPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
+  let connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     return makeMissingDatabasePool();
+  }
+  // Silence the pg v9 deprecation warning about SSL mode aliases.
+  // 'prefer', 'require', and 'verify-ca' are currently treated as
+  // 'verify-full' by pg-connection-string; normalize to the explicit
+  // form so the warning stops and the secure behavior is preserved.
+  if (
+    !connectionString.includes('sslmode=') &&
+    !connectionString.includes('uselibpqcompat=')
+  ) {
+    connectionString += '&sslmode=verify-full';
   }
   return new Pool({ connectionString, max: 10 });
 }
