@@ -197,7 +197,54 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/infrastructure: {}
+  packages/infrastructure:
+    dependencies:
+      '@ai-sdk/google':
+        specifier: ^3.0.83
+        version: 3.0.83(zod@4.4.3)
+      '@ai-sdk/openai':
+        specifier: ^3.0.73
+        version: 3.0.73(zod@4.4.3)
+      '@ai-sdk/provider':
+        specifier: ^3.0.10
+        version: 3.0.10
+      '@app/application':
+        specifier: workspace:*
+        version: link:../application
+      '@app/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@clerk/nextjs':
+        specifier: ^7.5.6
+        version: 7.5.6(next@16.2.9(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@langchain/textsplitters':
+        specifier: ^1.0.1
+        version: 1.0.1(@langchain/core@1.2.0(@opentelemetry/api@1.9.1))
+      '@neondatabase/serverless':
+        specifier: ^1.1.0
+        version: 1.1.0
+      ai:
+        specifier: ^6.0.208
+        version: 6.0.208(zod@4.4.3)
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.21.0)
+      pdf-parse:
+        specifier: 1.1.1
+        version: 1.1.1
+      pg:
+        specifier: ^8.21.0
+        version: 8.21.0
+    devDependencies:
+      '@types/pdf-parse':
+        specifier: ^1.1.5
+        version: 1.1.5
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
 
   packages/pulsar-content:
     dependencies:
