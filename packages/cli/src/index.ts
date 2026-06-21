@@ -5,8 +5,8 @@
 // When tsx is run against this file directly, process.argv
 // looks like: ['node', 'index.ts', 'init', ...]. We strip the
 // first two to get the sub-command and its args.
-import { runInit } from './commands/init.js';
-import { runFixtures } from './commands/fixtures.js';
+import { runInit } from './commands/init';
+import { runFixtures } from './commands/fixtures';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

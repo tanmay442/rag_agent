@@ -23,7 +23,7 @@ import {
   askYesNo,
   askMultiLine,
   type PromptOption,
-} from '../prompts/index.js';
+} from '../prompts/index';
 
 export interface PdfCopyOutcome {
   copied: string[];
@@ -91,7 +91,7 @@ export function upsertAdminEmails(envPath: string, emails: string[]): void {
 // The config schema lives in src/lib/config/schema.ts today
 // (commit 4 will move it to @app/domain). Import the JSON shape
 // and reuse it here so the CLI keeps working.
-import { appConfigSchema, type AppConfig, type Tone } from '../../../../src/lib/config/schema.js';
+import { appConfigSchema, type AppConfig, type Tone } from '../../../../src/lib/config/schema';
 
 const TONE_OPTIONS: ReadonlyArray<PromptOption<Tone>> = [
   { value: 'friendly', label: 'Friendly', blurb: 'warm, conversational, a few sentences' },

@@ -1,5 +1,5 @@
 import type { AppConfig } from '@app/domain';
-import type { RetrievedChunk } from '../rag/search.js';
+import type { RetrievedChunk } from '../rag/search';
 
 // The tool-contract block. This is the **only** place that describes
 // the AI SDK tool-use contract to the model: which tools exist, when

@@ -8,7 +8,7 @@
 // a value" — only absence of a value because of a known
 // failure. Use `value: undefined` for an explicit no-value
 // success.
-import type { DomainError } from './errors.js';
+import type { DomainError } from './errors';
 
 export type Result<T, E = DomainError> =
   | { ok: true; value: T }

@@ -1,7 +1,7 @@
 // Use-case: enforce a per-user rate limit on the chat route.
 // Source: src/lib/auth/ratelimit.ts (enforceRateLimit).
 import { err, ok, type Result, RateLimitedError } from '@app/domain';
-import type { RateLimiter } from '../ports/index.js';
+import type { RateLimiter } from '../ports/index';
 
 export interface RateLimitInput {
   key: string;

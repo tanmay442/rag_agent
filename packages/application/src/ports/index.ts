@@ -11,7 +11,7 @@ import type {
   Chunk,
   Ticket,
   User as DbUser,
-} from '../../../../src/lib/db/schema.js';
+} from '../../../../src/lib/db/schema';
 
 // ---- Documents & Chunks ----
 

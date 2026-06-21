@@ -4,7 +4,7 @@
 // the (similarity, content) pairs the rest of the system
 // consumes.
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
-import type { ChunkRepository, EmbeddingService } from '../ports/index.js';
+import type { ChunkRepository, EmbeddingService } from '../ports/index';
 
 export interface RetrievedChunk {
   content: string;
