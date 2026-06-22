@@ -27,11 +27,11 @@ const { appConfigMock } = vi.hoisted(() => ({
   appConfigMock: {
     prefetchFirstTurn: false,
     orgName: 'Pulsar Analytics',
-    orgShortName: 'Pulsar Support',
+    orgShortName: 'RAG Support',
     audience: 'Pulsar Analytics customers and prospects',
     agentPersona: { name: 'Astra', tone: 'friendly' as const },
     outOfScopeTopics: [],
-    branding: { title: 'Pulsar Support', description: '' },
+    branding: { title: 'RAG Support', description: '' },
     seedDocsDir: './documents',
     adminEmails: [],
     customInstructions: undefined,

@@ -17,6 +17,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: appConfig.branding.title,
   description: appConfig.branding.description,
+  icons: {
+    icon: '/icon',
+    apple: '/apple-icon',
+  },
+  openGraph: {
+    title: appConfig.branding.title,
+    description: appConfig.branding.description,
+    images: ['/opengraph-image'],
+  },
 };
 
 export default function RootLayout({
