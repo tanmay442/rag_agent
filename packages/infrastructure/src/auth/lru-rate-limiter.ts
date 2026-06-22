@@ -4,7 +4,6 @@
 // matches the application's RateLimiter port.
 import type { RateLimiter } from '@app/application/ports';
 
-const WINDOW_MS = 60_000;
 const MAX_KEYS = 5_000;
 
 interface Bucket { timestamps: number[]; lastTouched: number; }

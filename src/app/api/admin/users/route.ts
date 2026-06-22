@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
-import { listUsers } from '@/lib/auth/users';
+import { requireAdminGet, parseQueryPagination } from '@/composition';
 
 export async function GET(req: Request) {
-  try { await requireAdmin(); } catch (err) {
-      if (err instanceof ForbiddenError) {
-        return new NextResponse('Forbidden', { status: 403 });
-      }
-      throw err;
-    }
-  const url = new URL(req.url);
+  const auth = await requireAdminGet(req);
+  if (!auth.ok) return auth.response;
+  const { comp, url } = auth;
   const search = url.searchParams.get('search') ?? undefined;
-  const limit = Number(url.searchParams.get('limit') ?? 25);
-  const offset = Number(url.searchParams.get('offset') ?? 0);
-  const result = await listUsers({ search, limit, offset });
+  const { limit, offset } = parseQueryPagination(url);
+  const result = await comp.listUsers({ search, limit, offset });
   return NextResponse.json(result);
 }

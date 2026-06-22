@@ -1,5 +1,5 @@
 import { ChatInterface } from '@/components/ChatInterface';
-import { requireSession } from '@/lib/auth/session';
+import { requireSession } from '@/composition';
 
 export default async function ChatPage() {
   // requireSession() is the auth guard — it throws/redirects when

@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
-import { listAudit } from '@/lib/admin/audit';
+import { requireAdminGet, parseQueryPagination } from '@/composition';
 
 export async function GET(req: Request) {
-  try { await requireAdmin(); } catch (err) {
-      if (err instanceof ForbiddenError) {
-        return new NextResponse('Forbidden', { status: 403 });
-      }
-      throw err;
-    }
-  const url = new URL(req.url);
+  const auth = await requireAdminGet(req);
+  if (!auth.ok) return auth.response;
+  const { comp, url } = auth;
   const documentId = url.searchParams.get('documentId');
   const ticketId = url.searchParams.get('ticketId');
-  const limit = Number(url.searchParams.get('limit') ?? 50);
-  const offset = Number(url.searchParams.get('offset') ?? 0);
-  const result = await listAudit({
+  const { limit, offset } = parseQueryPagination(url, { limit: 50 });
+  const result = await comp.listAudit({
     documentId: documentId ? Number(documentId) : undefined,
     ticketId: ticketId ?? undefined,
     limit,

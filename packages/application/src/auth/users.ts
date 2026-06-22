@@ -7,11 +7,11 @@ import type { AuditLog } from '../ports/index';
 export async function listUsers(
   input: { search?: string; limit?: number; offset?: number },
   deps: { users: UserRepository },
-): Promise<Result<{ users: Array<{ clerkUserId: string; email: string; name: string | null; role: string }>; total: number }>> {
+): Promise<Result<{ users: Array<{ clerkUserId: string; email: string; name: string | null; role: string; lastSeenAt: Date | null; createdAt: Date }>; total: number }>> {
   const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
   const offset = Math.max(input.offset ?? 0, 0);
   const r = await deps.users.list({ search: input.search, limit, offset });
-  return ok({ users: r.rows as any, total: r.total });
+  return ok({ users: r.rows, total: r.total });
 }
 
 export async function setUserRole(

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getDocumentById } from '@/lib/admin/documents';
+import { getComposition } from '@/composition';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ export default async function PreviewPage({
   const { id } = await params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) notFound();
-  const doc = await getDocumentById(docId);
+  const doc = await getComposition().getDocumentById(docId);
   if (!doc) notFound();
   return (
     <section className="flex flex-col gap-3" data-testid="document-preview">
