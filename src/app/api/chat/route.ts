@@ -2,15 +2,9 @@ import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageS
 import { z } from 'zod';
 import { desc } from 'drizzle-orm';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { db } from '@/lib/db/client';
-import { tickets } from '@/lib/db/schema';
-import { getChatModel } from '@/lib/llm/client';
-import { searchChunks, type RetrievedChunk } from '@/lib/rag/search';
-import { rateLimit } from '@/lib/auth/ratelimit';
-import { recordQuery } from '@/lib/auth/query-stats';
-import { appConfig } from '@/lib/config';
-import { buildSystemPrompt } from '@/lib/prompt/build-system-prompt';
-import type { MyUIMessage } from '@/lib/chat/types';
+import { getComposition, appConfig, type MyUIMessage } from '@/composition';
+import type { RetrievedChunk } from '@app/application/rag/search';
+import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
 import { ChatRequestSchema } from './request-schema';
 
@@ -19,7 +13,8 @@ export async function POST(req: Request) {
   if (!userId) {
     return new Response('Unauthorized', { status: 401 });
   }
-  const limit = rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });
+  const comp = getComposition();
+  const limit = comp.rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });
   if (!limit.ok) {
     return new Response('Too Many Requests', {
       status: 429,
@@ -43,7 +38,7 @@ export async function POST(req: Request) {
     : '';
 
   if (lastUserText) {
-    recordQuery(userId, lastUserText);
+    comp.recordQuery(userId, lastUserText);
   }
 
   // Chunks that produced citations on the assistant message. Two
@@ -78,7 +73,7 @@ export async function POST(req: Request) {
   let prefetch: RetrievedChunk[] | null = null;
   if (appConfig.prefetchFirstTurn && isFirstTurn && lastUserText.trim() !== '') {
     try {
-      prefetch = await searchChunks(lastUserText);
+      prefetch = await comp.searchChunks(lastUserText, {});
     } catch (err) {
       console.error('First-turn pre-fetch failed:', err);
       prefetch = null;
@@ -102,7 +97,7 @@ export async function POST(req: Request) {
   // question plus a couple of reformulated searches without runaway
   // loops.
   const result = streamText({
-    model: getChatModel(),
+    model: comp.getChatModel(),
     system: buildSystemPrompt(appConfig, prefetch),
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
@@ -130,7 +125,7 @@ export async function POST(req: Request) {
         execute: async ({ query, limit }) => {
           const TOOL_CONTENT_CAP = 800;
           try {
-            const matches = await searchChunks(query, { limit });
+            const matches = await comp.searchChunks(query, { limit });
             const capped = matches.map((m) => ({
               content:
                 m.content.length > TOOL_CONTENT_CAP
@@ -208,10 +203,10 @@ export async function POST(req: Request) {
           // validates the parsed number to handle legacy/non-standard IDs.
           let ticketId = '';
           for (let attempt = 0; attempt < 5; attempt++) {
-            const [latest] = await db
-              .select({ id: tickets.id, ticketId: tickets.ticketId })
-              .from(tickets)
-              .orderBy(desc(tickets.id))
+            const [latest] = await comp.db
+              .select({ id: comp.schema.tickets.id, ticketId: comp.schema.tickets.ticketId })
+              .from(comp.schema.tickets)
+              .orderBy(desc(comp.schema.tickets.id))
               .limit(1);
             let nextNum: number;
             if (latest) {
@@ -222,7 +217,7 @@ export async function POST(req: Request) {
             }
             ticketId = `TKT-${nextNum}`;
             try {
-              await db.insert(tickets).values({
+              await comp.db.insert(comp.schema.tickets).values({
                 ticketId,
                 userId,
                 name: realName,

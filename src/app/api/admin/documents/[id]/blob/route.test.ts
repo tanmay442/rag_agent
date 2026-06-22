@@ -1,25 +1,49 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { requireAdminMock, getDocumentByIdMock } = vi.hoisted(() => ({
-  requireAdminMock: vi.fn(),
-  getDocumentByIdMock: vi.fn(),
-}));
+const { requireAdminMock, getDocumentByIdMock, requireAdminDocumentMock } = vi.hoisted(() => {
+  const requireAdminMock = vi.fn();
+  const getDocumentByIdMock = vi.fn();
+  const requireAdminDocumentMock = vi.fn(
+    async (context: { params: Promise<{ id: string }> }, opts: { allowDeleted?: boolean } = {}) => {
+      try {
+        await requireAdminMock();
+      } catch (err) {
+        if (err instanceof Error && err.constructor.name === 'ForbiddenError') {
+          return { ok: false, response: new Response('Forbidden', { status: 403 }) };
+        }
+        throw err;
+      }
+      const { id } = await context.params;
+      const docId = Number(id);
+      if (!Number.isInteger(docId)) {
+        return { ok: false, response: new Response('Invalid id', { status: 400 }) };
+      }
+      const doc = await getDocumentByIdMock(docId);
+      if (!doc) return { ok: false, response: new Response('Not found', { status: 404 }) };
+      if (!opts.allowDeleted && doc.deletedAt) {
+        return { ok: false, response: new Response('Gone', { status: 410 }) };
+      }
+      if (!doc.blob) {
+        return { ok: false, response: new Response('File unavailable', { status: 404 }) };
+      }
+      return { ok: true, document: doc };
+    },
+  );
+  return { requireAdminMock, getDocumentByIdMock, requireAdminDocumentMock };
+});
 
-vi.mock('@/lib/auth/session', () => ({
+vi.mock('@/composition', () => ({
   requireAdmin: requireAdminMock,
+  requireAdminDocument: requireAdminDocumentMock,
   requireSession: requireAdminMock,
   getAppSession: vi.fn(),
-  getSession: vi.fn(),
   ForbiddenError: class ForbiddenError extends Error {
     status = 403;
   },
+  getComposition: () => ({ getDocumentById: getDocumentByIdMock }),
 }));
 
-vi.mock('@/lib/admin/documents', () => ({
-  getDocumentById: getDocumentByIdMock,
-}));
-
-import { ForbiddenError } from '@/lib/auth/session';
+import { ForbiddenError } from '@/composition';
 import * as route from './route';
 
 beforeEach(() => {

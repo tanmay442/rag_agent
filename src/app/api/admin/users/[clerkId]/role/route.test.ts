@@ -1,25 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { requireAdminMock, setUserRoleMock } = vi.hoisted(() => ({
-  requireAdminMock: vi.fn(),
-  setUserRoleMock: vi.fn(),
-}));
+const { requireAdminMock, setUserRoleMock, requireAdminRouteMock } = vi.hoisted(() => {
+  const requireAdminMock = vi.fn();
+  const setUserRoleMock = vi.fn();
+  const requireAdminRouteMock = vi.fn(async () => {
+    try {
+      const session = await requireAdminMock();
+      return { ok: true as const, session, comp: { setUserRole: setUserRoleMock } };
+    } catch (err) {
+      if (err instanceof Error && err.constructor.name === 'ForbiddenError') {
+        return { ok: false as const, response: new Response('Forbidden', { status: 403 }) };
+      }
+      throw err;
+    }
+  });
+  return { requireAdminMock, setUserRoleMock, requireAdminRouteMock };
+});
 
-vi.mock('@/lib/auth/session', () => ({
+vi.mock('@/composition', () => ({
   requireAdmin: requireAdminMock,
+  requireAdminRoute: requireAdminRouteMock,
   requireSession: requireAdminMock,
   getAppSession: vi.fn(),
-  getSession: vi.fn(),
   ForbiddenError: class ForbiddenError extends Error {
     status = 403;
   },
+  getComposition: () => ({ setUserRole: setUserRoleMock }),
 }));
 
-vi.mock('@/lib/auth/users', () => ({
-  setUserRole: setUserRoleMock,
-}));
-
-import { ForbiddenError } from '@/lib/auth/session';
+import { ForbiddenError } from '@/composition';
 import * as route from './route';
 
 beforeEach(() => {

@@ -17,5 +17,3 @@ export const ChatRequestSchema = z.object({
     }).passthrough(),
   ),
 });
-
-export type ChatRequest = z.infer<typeof ChatRequestSchema>;

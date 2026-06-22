@@ -3,7 +3,7 @@
 // application expects (Drizzle's $inferSelect row types
 // for documents/chunks/tickets/users; AuditRepo /
 // UserRepo / TicketRepo aliases for the application).
-import { eq, desc, ilike, or, sql, inArray, isNull, and, isNotNull } from 'drizzle-orm';
+import { eq, desc, ilike, or, sql, inArray, isNull, and } from 'drizzle-orm';
 import { db } from './client';
 import {
   documents,
@@ -13,7 +13,6 @@ import {
   documentAudit,
   ticketAudit,
   type Document,
-  type Chunk,
   type Ticket,
   type User,
 } from './schema';
@@ -109,6 +108,34 @@ export async function recountChunksForAll(): Promise<Array<{ documentId: number;
     .from(chunks)
     .groupBy(chunks.documentId);
   return rows;
+}
+
+export async function listDocuments(opts: {
+  search?: string;
+  includeDeleted?: boolean;
+  limit: number;
+  offset: number;
+}): Promise<{ documents: Document[]; total: number }> {
+  const whereParts = [] as ReturnType<typeof eq>[];
+  if (!opts.includeDeleted) whereParts.push(isNull(documents.deletedAt));
+  if (opts.search) whereParts.push(ilike(documents.fileName, `%${opts.search}%`));
+  const where = whereParts.length === 0
+    ? undefined
+    : whereParts.length === 1
+      ? whereParts[0]
+      : and(...whereParts);
+  const rows = (await db
+    .select()
+    .from(documents)
+    .where(where)
+    .orderBy(desc(documents.uploadedAt))
+    .limit(opts.limit)
+    .offset(opts.offset)) as Document[];
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(documents)
+    .where(where);
+  return { documents: rows, total: totalRow?.count ?? 0 };
 }
 
 // ---- Tickets ----
@@ -312,10 +339,10 @@ export const auditRepo = {
       LIMIT ${input.limit}
       OFFSET ${input.offset}
     `);
-    const rawRows = (result as unknown as { rows?: Array<any> }).rows ?? [];
+    const rawRows = (result as unknown as { rows?: Array<{ id: number; kind: string; document_id: number | null; ticket_id: string | null; actor_id: string; action: string; at: Date }> }).rows ?? [];
     const events = rawRows.map((r) => ({
       id: r.id,
-      kind: r.kind,
+      kind: r.kind as 'document' | 'ticket',
       documentId: r.document_id ?? null,
       ticketId: r.ticket_id ?? null,
       actorId: r.actor_id,

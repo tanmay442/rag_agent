@@ -41,10 +41,10 @@ cp .env.example .env.local
 #    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, ADMIN_EMAILS
 
 # 3. Apply schema + the new columns on pre-existing tables
-node scripts/apply-migration.mjs
+pnpm cli db-migrate
 
 # 4. Seed sample docs (optional)
-pnpm seed
+pnpm cli seed
 
 # 5. Run the app
 pnpm dev
@@ -105,12 +105,12 @@ The app boots on <http://localhost:3000>.
 
 ## Rate limit
 
-`src/lib/auth/ratelimit.ts` is a single-instance, in-memory LRU keyed
-by `chat:${userId}`. Default budget: 30 requests / 60 s, max 5 000
-keys, evicts the least-recently-touched. The 31st request returns
-HTTP 429 with a `Retry-After` header. When the app moves to a
-multi-region deployment, swap this for an Upstash hash; the call sites
-do not need to change.
+`packages/application/src/auth/rate-limit.ts` is a single-instance,
+in-memory LRU keyed by `chat:${userId}`. Default budget: 30 requests /
+60 s, max 5 000 keys, evicts the least-recently-touched. The 31st
+request returns HTTP 429 with a `Retry-After` header. When the app
+moves to a multi-region deployment, swap this for an Upstash hash; the
+call sites do not need to change.
 
 ## Scripts
 
@@ -126,17 +126,14 @@ do not need to change.
 | `pnpm e2e` | Playwright smoke tests |
 | `pnpm test:ci` | Full CI pipeline (setup → vitest → playwright → teardown) |
 | `pnpm db:push` | Apply the Drizzle schema to the configured DB (interactive) |
-| `pnpm db:generate` | Generate SQL migrations from `src/lib/db/schema.ts` |
+| `pnpm db:generate` | Generate SQL migrations from `packages/infrastructure/src/db/schema.ts` |
 | `pnpm db:studio` | Drizzle Studio |
-| `pnpm setup` | Interactive first-time setup: org name, agent persona, admin emails, seed PDFs. Writes `config/app.config.ts` and re-seeds. |
-| `pnpm seed` | Ingest every PDF in `scripts/fixtures/` |
+| `pnpm cli init` | Interactive first-time setup: org name, agent persona, admin emails, seed PDFs. Writes `config/app.config.ts` and re-seeds. |
+| `pnpm cli seed` | Ingest every PDF in `scripts/fixtures/` |
+| `pnpm cli db-migrate` | Apply the Drizzle schema + add-column migrations to the configured DB |
+| `pnpm cli fixtures` | Manage PDF fixtures |
 | `pnpm setup-test-db` | Provision a `dev-test` Neon branch and write `DATABASE_URL` to `.env.test` |
 | `pnpm teardown-test-db` | Delete the `dev-test` branch |
-
-For a non-interactive migration, run `node scripts/apply-migration.mjs`
-directly. It plays the generated SQL plus the
-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements for the new
-columns on the pre-existing `documents` and `tickets` tables.
 
 ## Tests
 
@@ -145,21 +142,6 @@ columns on the pre-existing `documents` and `tickets` tables.
 164 tests across 23 files (plus Playwright e2e when run with `pnpm test:ci`). Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
-- `src/lib/db/schema.test-d.ts` — Drizzle type inference
-- `src/lib/rag/ingest.test.ts` — PDF → chunks → embed pipeline with
-  mocked `embed` and `pdf-parse`
-- `src/lib/rag/search.test.ts` — cosine similarity search with stubbed
-  `db.execute`
-- `src/lib/admin/documents.test.ts` — admin document helpers (list,
-  upload, replace, soft/restore/hard delete, recount)
-- `src/lib/llm/client.test.ts` — env-var wiring for the Google
-  embedding model and the OpenAI-compatible chat model
-- `src/lib/auth/users.test.ts` — Clerk-mirror `users` table, role
-  transitions, pagination
-- `src/lib/auth/ratelimit.test.ts` — 30 / 60 s budget, LRU eviction,
-  429 surface
-- `src/lib/auth/audit.test.ts` — audit row inserts (document + ticket)
-- `src/lib/auth/query-stats.test.ts` — per-user top-queries counter
 - `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
   `searchDocumentation` and `createSupportTicket` tool wiring
   (searchChunks shape, 800-char cap, user-supplied limit, captured-
@@ -223,7 +205,8 @@ src/
 │   ├── app/AppSidebar.tsx  # Unified sidebar + mobile drawer (Client)
 │   ├── landing/            # LandingHeader, LandingCard, LandingFooter
 │   └── icons/GithubIcon.tsx
-├── lib/{auth,admin,chat,db,llm,rag,config,prompt}/
+├── lib/http.ts             # respond() helper — maps DomainError → HTTP status
+├── lib/config/             # App-level config types
 ├── proxy.ts                # clerkMiddleware (Next 16 convention)
 └── …
 scripts/                   # setup, seed, e2e fixtures
@@ -262,9 +245,7 @@ packages/
 
 `src/` is the Next.js app shell. `src/composition.ts` is the only
 place where adapters are instantiated; routes import from
-`@/composition` and call the use-cases. `src/lib/` is currently a
-set of re-export shims that delegate to `@app/*`; the shims are
-scheduled for removal in a follow-up.
+`@/composition` and call the use-cases.
 
 ### Layer rules (enforced by `pnpm lint:arch`)
 
@@ -273,7 +254,7 @@ scheduled for removal in a follow-up.
 | `domain`         | zod                                       | application, infrastructure, cli, pulsar-content, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
 | `application`    | domain, its own port interfaces           | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
 | `infrastructure` | domain, application, drizzle, @ai-sdk, clerk, pdf-parse, pg, pdf-lib | src/app, src/components, next |
-| `src/app`, `src/components` | application, domain, the (shimmed) src/lib helpers | drizzle, @ai-sdk, pdf-parse, infrastructure |
+| `src/app`, `src/components` | application, domain, src/lib/http, src/lib/config | drizzle, @ai-sdk, pdf-parse, infrastructure |
 | `cli`            | application, pulsar-content, infrastructure, dotenv | src/app, src/components |
 | `pulsar-content` | pdf-lib                                   | any other internal package |
 

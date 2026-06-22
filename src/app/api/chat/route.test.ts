@@ -47,39 +47,36 @@ vi.mock('@clerk/nextjs/server', () => ({
   currentUser: currentUserMock,
 }));
 
-vi.mock('@/lib/auth/ratelimit', () => ({
-  rateLimit: () => rateLimitResult,
-}));
-
-vi.mock('@/lib/auth/query-stats', () => ({
-  recordQuery: vi.fn(),
-}));
-
-vi.mock('@/lib/rag/search', () => ({
-  searchChunks: async () => searchValue,
-}));
-vi.mock('@/lib/llm/client', () => ({
-  getChatModel: () => ({ modelId: 'mock' }),
-  getEmbeddingModel: () => ({ modelId: 'mock-embed' }),
-}));
-vi.mock('@/lib/db/client', () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        orderBy: () => ({
-          limit: async () => [],
+const { compositionMock } = vi.hoisted(() => ({
+  compositionMock: {
+    rateLimit: () => rateLimitResult,
+    searchChunks: vi.fn(async () => searchValue),
+    db: {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          orderBy: vi.fn(() => ({
+            limit: vi.fn(async () => []),
+          })),
+        })),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn((v: Record<string, unknown>) => {
+          ticketInsertedValues.push(v);
+          return { returning: async () => [ticketInserted] };
         }),
-      }),
-    }),
-    insert: () => ({
-      values: (v: Record<string, unknown>) => {
-        ticketInsertedValues.push(v);
-        return {
-          returning: async () => [ticketInserted],
-        };
-      },
-    }),
+      })),
+    },
+    schema: { tickets: {} },
+    recordQuery: vi.fn(),
+    getChatModel: vi.fn(() => ({ modelId: 'mock' })),
+    getEmbeddingModel: vi.fn(() => ({ modelId: 'mock-embed' })),
+    logTicketEvent: vi.fn(),
   },
+}));
+
+vi.mock('@/composition', () => ({
+  getComposition: () => compositionMock,
+  appConfig: appConfigMock,
 }));
 
 // Mock the AI SDK so we don't actually hit any model providers.
@@ -99,6 +96,30 @@ function makeUIMessageStream(): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) { controller.close(); },
   });
+}
+
+/**
+ * Wire streamTextImpl so the next call to POST captures the
+ * `tools` argument. Returns the captured tools object after
+ * the request resolves. Used by every test that needs to invoke
+ * a tool's `execute` method.
+ */
+async function captureToolsFromStreamText<T>(): Promise<T | undefined> {
+  authMock.mockResolvedValue({ userId: 'user_test' });
+  let captured: T | undefined;
+  streamTextImpl.mockImplementation((opts: { tools?: unknown }) => {
+    captured = opts?.tools as T;
+    return { toUIMessageStream: () => makeUIMessageStream() };
+  });
+  const res = await appHandler.POST(
+    new Request('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages: [] }),
+    }),
+  );
+  expect(res.status).toBe(200);
+  expect(streamTextImpl).toHaveBeenCalled();
+  return captured;
 }
 
 beforeEach(() => {
@@ -164,31 +185,12 @@ describe('/api/chat createSupportTicket tool', () => {
     email: string;
     issue: string;
   }) {
-    authMock.mockResolvedValue({ userId: 'user_test' });
-    let capturedTools:
-      | {
-          createSupportTicket: {
-            execute: (args: {
-              name: string;
-              email: string;
-              issue: string;
-            }) => Promise<unknown>;
-          };
-        }
-      | undefined;
-    streamTextImpl.mockImplementation((opts: { tools?: unknown }) => {
-      capturedTools = opts?.tools as typeof capturedTools;
-      return { toUIMessageStream: () => makeUIMessageStream() };
-    });
-    const res = await appHandler.POST(
-      new Request('http://localhost/api/chat', {
-        method: 'POST',
-        body: JSON.stringify({ messages: [] }),
-      }),
-    );
-    expect(res.status).toBe(200);
-    expect(streamTextImpl).toHaveBeenCalled();
-    const tool = capturedTools?.createSupportTicket;
+    const tools = await captureToolsFromStreamText<{
+      createSupportTicket: {
+        execute: (args: { name: string; email: string; issue: string }) => Promise<unknown>;
+      };
+    }>();
+    const tool = tools?.createSupportTicket;
     expect(tool).toBeDefined();
     return tool!.execute(overrides);
   }
@@ -210,28 +212,15 @@ describe('/api/chat createSupportTicket tool', () => {
   });
 
   it('retries on a unique-constraint collision and surfaces a new ticket id', async () => {
-    authMock.mockResolvedValue({ userId: 'user_test' });
-    let capturedTools:
-      | {
-          createSupportTicket: {
-            execute: (args: { name: string; email: string; issue: string }) => Promise<unknown>;
-          };
-        }
-      | undefined;
-    streamTextImpl.mockImplementation((opts: { tools?: unknown }) => {
-      capturedTools = opts?.tools as typeof capturedTools;
-      return { toUIMessageStream: () => makeUIMessageStream() };
-    });
     // Make the db.insert throw once with a "unique" error message,
     // then succeed on the retry. The route's retry loop should
     // re-query the latest ticket id and bump it.
     let inserted = 0;
     const realInsert = ticketInsertedValues.push.bind(ticketInsertedValues);
     ticketInsertedValues.length = 0;
-    const { db } = await import('@/lib/db/client');
-    const originalInsert = (db as unknown as { insert: unknown }).insert;
-    (db as unknown as { insert: () => unknown }).insert = () => ({
-      values: (v: Record<string, unknown>) => {
+    const originalInsert = compositionMock.db.insert;
+    compositionMock.db.insert = vi.fn(() => ({
+      values: vi.fn((v: Record<string, unknown>) => {
         if (inserted === 0) {
           inserted++;
           const err = new Error(
@@ -241,17 +230,15 @@ describe('/api/chat createSupportTicket tool', () => {
         }
         realInsert(v);
         return { returning: async () => [{ id: 'TKT-1002' }] };
-      },
-    });
+      }),
+    }));
     try {
-      const res = await appHandler.POST(
-        new Request('http://localhost/api/chat', {
-          method: 'POST',
-          body: JSON.stringify({ messages: [] }),
-        }),
-      );
-      expect(res.status).toBe(200);
-      const out = await capturedTools!.createSupportTicket.execute({
+      const tools = await captureToolsFromStreamText<{
+        createSupportTicket: {
+          execute: (args: { name: string; email: string; issue: string }) => Promise<unknown>;
+        };
+      }>();
+      const out = await tools!.createSupportTicket.execute({
         name: 'x',
         email: 'x@x.com',
         issue: 'collision test',
@@ -259,48 +246,26 @@ describe('/api/chat createSupportTicket tool', () => {
       expect(out).toEqual({ ticketId: 'TKT-1001', status: 'created' });
       expect(ticketInsertedValues.length).toBe(1);
     } finally {
-      (db as unknown as { insert: unknown }).insert = originalInsert;
+      compositionMock.db.insert = originalInsert;
     }
   });
 });
 
 describe('/api/chat searchDocumentation tool', () => {
-  async function captureTools(): Promise<{
-    tools: {
+  async function captureTools() {
+    const tools = await captureToolsFromStreamText<{
       searchDocumentation: {
         execute: (args: { query: string; limit?: number }) => Promise<unknown>;
       };
-    } | null;
-  }> {
-    authMock.mockResolvedValue({ userId: 'user_test' });
-    let capturedTools:
-      | {
-          searchDocumentation: {
-            execute: (args: { query: string; limit?: number }) => Promise<unknown>;
-          };
-        }
-      | undefined;
-    streamTextImpl.mockImplementation((opts: { tools?: unknown }) => {
-      capturedTools = opts?.tools as typeof capturedTools;
-      return { toUIMessageStream: () => makeUIMessageStream() };
-    });
-    const res = await appHandler.POST(
-      new Request('http://localhost/api/chat', {
-        method: 'POST',
-        body: JSON.stringify({ messages: [] }),
-      }),
-    );
-    expect(res.status).toBe(200);
-    return { tools: capturedTools ?? null };
+    }>();
+    return { tools: tools ?? null };
   }
 
   it('returns up to 800 chars per chunk and a 150-char snippet per citation', async () => {
     const longContent = 'x'.repeat(2000);
-    const { searchChunks } = await import('@/lib/rag/search');
     const searchChunksSpy = vi
-      .spyOn(await import('@/lib/rag/search'), 'searchChunks')
+      .spyOn(compositionMock, 'searchChunks')
       .mockResolvedValueOnce([{ content: longContent, similarity: 0.8 }]);
-    void searchChunks;
     const { tools } = await captureTools();
     const result = (await tools?.searchDocumentation?.execute({ query: 'q' })) as Array<{
       content: string;
@@ -312,7 +277,7 @@ describe('/api/chat searchDocumentation tool', () => {
 
   it('passes a user-supplied limit through to searchChunks', async () => {
     const searchChunksSpy = vi
-      .spyOn(await import('@/lib/rag/search'), 'searchChunks')
+      .spyOn(compositionMock, 'searchChunks')
       .mockResolvedValueOnce([]);
     const { tools } = await captureTools();
     await tools?.searchDocumentation?.execute({ query: 'q', limit: 5 });

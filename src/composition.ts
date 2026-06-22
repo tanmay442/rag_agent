@@ -26,12 +26,25 @@ import {
   restoreDocument,
   listTickets,
   updateTicket,
+  isTicketStatus,
+  TICKET_STATUSES,
+  getDocumentById,
+  hardDeleteDocument,
+  replacePdf,
+  recountChunksForDocument,
+  recountChunksForAllDocuments,
+  getAnalyticsSummary,
+  listAudit,
   type IngestDeps,
   type SearchDeps,
   type RateLimitDeps,
 } from '@app/application';
 import { Db, Llm, Auth, Pdf } from '@app/infrastructure';
+import { requireAdmin, requireSession, getAppSession, ForbiddenError } from '@app/infrastructure/auth';
+import { type MyUIMessage } from '@app/domain';
 import { createHash } from 'node:crypto';
+import { appConfig } from './lib/config';
+import { unwrap } from '@app/domain';
 
 const systemClock = { now: () => new Date() };
 
@@ -50,6 +63,9 @@ const documentRepo = {
   updateBlob: (id: number, blob: Buffer) => Db.updateDocumentBlob(id, blob),
   searchByVector: (embedding: number[], opts: { threshold: number; limit: number }) =>
     Db.searchChunksByVector(embedding, opts),
+  list: Db.listDocuments,
+  countChunksForDocuments: Db.countChunksForDocuments,
+  countChunksForAll: Db.countChunksForAll,
 };
 
 const chunkRepo = {
@@ -78,38 +94,52 @@ const searchDeps: SearchDeps = {
 
 const rateLimitDeps: RateLimitDeps = { limiter: Auth.lruRateLimiter };
 
-export function createComposition() {
+function createComposition() {
   return {
-    ingestFile: (input: Parameters<typeof ingestFile>[0]) => ingestFile(input, ingestDeps),
+    ingestFile: (input: Parameters<typeof ingestFile>[0]) => ingestFile(input, ingestDeps).then(unwrap),
     searchChunks: (query: string, opts: Parameters<typeof searchChunks>[1]) =>
-      searchChunks(query, opts, searchDeps),
-    listUsers: (input: Parameters<typeof listUsers>[0]) => listUsers(input, { users: Db.userRepo }),
+      searchChunks(query, opts, searchDeps).then(unwrap),
+    listUsers: (input: Parameters<typeof listUsers>[0]) => listUsers(input, { users: Db.userRepo }).then(unwrap),
     setUserRole: (input: Parameters<typeof setUserRole>[0]) =>
-      setUserRole(input, { users: Db.userRepo, audit: Db.auditRepo }),
-    touchLastSeen: (clerkUserId: string) => touchLastSeen(clerkUserId, { users: Db.userRepo }),
+      setUserRole(input, { users: Db.userRepo, audit: Db.auditRepo }).then(unwrap),
+    touchLastSeen: (clerkUserId: string) => touchLastSeen(clerkUserId, { users: Db.userRepo }).then(unwrap),
     getUserByClerkId: (clerkUserId: string) =>
-      getUserByClerkId(clerkUserId, { users: Db.userRepo }),
+      getUserByClerkId(clerkUserId, { users: Db.userRepo }).then(unwrap),
     logDocumentEvent: (input: Parameters<typeof logDocumentEvent>[0]) =>
-      logDocumentEvent(input, { audit: Db.auditRepo }),
+      logDocumentEvent(input, { audit: Db.auditRepo }).then(unwrap),
     logTicketEvent: (input: Parameters<typeof logTicketEvent>[0]) =>
-      logTicketEvent(input, { audit: Db.auditRepo }),
+      logTicketEvent(input, { audit: Db.auditRepo }).then(unwrap),
     recordQuery: (userId: string, query: string) =>
-      recordQuery(userId, query, { stats: Auth.inMemoryQueryStats }),
-    getTopQueries: (limit: number) => getTopQueries(limit, { stats: Auth.inMemoryQueryStats }),
+      unwrap(recordQuery(userId, query, { stats: Auth.inMemoryQueryStats })),
+    getTopQueries: (limit: number) => unwrap(getTopQueries(limit, { stats: Auth.inMemoryQueryStats })),
     enforceRateLimit: (input: Parameters<typeof enforceRateLimit>[0]) =>
-      enforceRateLimit(input, rateLimitDeps),
+      enforceRateLimit(input, rateLimitDeps).then(unwrap),
     listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
-      listDocuments(input, { documents: documentRepo, chunks: chunkRepo }),
+      listDocuments(input, { documents: documentRepo, chunks: chunkRepo }).then(unwrap),
     uploadPdf: (input: Parameters<typeof uploadPdf>[0]) =>
-      uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo }),
+      uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
     softDeleteDocument: (input: Parameters<typeof softDeleteDocument>[0]) =>
-      softDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }),
+      softDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
     restoreDocument: (id: number, actorId: string) =>
-      restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock }),
+      restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock }).then(unwrap),
     listTickets: (input: Parameters<typeof listTickets>[0]) =>
-      listTickets(input, { tickets: Db.ticketRepo }),
+      listTickets(input, { tickets: Db.ticketRepo }).then(unwrap),
     updateTicket: (input: Parameters<typeof updateTicket>[0]) =>
-      updateTicket(input, { tickets: Db.ticketRepo, audit: Db.auditRepo }),
+      updateTicket(input, { tickets: Db.ticketRepo, audit: Db.auditRepo }).then(unwrap),
+    getDocumentById: (id: number) =>
+      getDocumentById(id, { documents: documentRepo }).then((r) => unwrap(r).document),
+    hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
+      hardDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
+    replacePdf: (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) =>
+      replacePdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
+    recountChunksForDocument: (id: number) =>
+      recountChunksForDocument(id, { chunks: chunkRepo }).then(unwrap),
+    recountChunksForAllDocuments: () =>
+      recountChunksForAllDocuments({ chunks: chunkRepo }).then(unwrap),
+    getAnalyticsSummary: () =>
+      getAnalyticsSummary({ documents: documentRepo, chunks: chunkRepo, tickets: Db.ticketRepo, users: Db.userRepo, stats: Auth.inMemoryQueryStats }).then(unwrap),
+    listAudit: (input: { documentId?: number; ticketId?: string; limit?: number; offset?: number }) =>
+      listAudit(input, { audit: Db.auditRepo }).then(unwrap),
     // Adapter singletons (used by code that still needs them,
     // e.g. the chat route, the seed script, and server actions).
     db: Db.db,
@@ -117,8 +147,13 @@ export function createComposition() {
     getEmbeddingModel: Llm.getEmbeddingModel,
     getChatModel: Llm.getChatModel,
     session: Auth.clerkSessionStore,
+    rateLimit: (key: string, opts: { limit: number; windowMs: number }) =>
+      Auth.lruRateLimiter.check(key, opts),
   };
 }
+
+export { appConfig, isTicketStatus, TICKET_STATUSES, type MyUIMessage };
+export { requireAdmin, requireSession, getAppSession, ForbiddenError };
 
 export type Composition = ReturnType<typeof createComposition>;
 
@@ -126,4 +161,91 @@ let _composition: Composition | null = null;
 export function getComposition(): Composition {
   if (!_composition) _composition = createComposition();
   return _composition;
+}
+
+/**
+ * Shorthand for admin API routes. Returns either the session +
+ * composition or a 403 NextResponse. Eliminates the try/catch
+ * boilerplate that every admin route repeats.
+ */
+export async function requireAdminRoute(): Promise<
+  | { ok: true; session: Awaited<ReturnType<typeof requireAdmin>>; comp: Composition }
+  | { ok: false; response: Response }
+> {
+  try {
+    const session = await requireAdmin();
+    return { ok: true, session, comp: getComposition() };
+  } catch (err) {
+    if (err instanceof ForbiddenError) {
+      return { ok: false, response: new Response('Forbidden', { status: 403 }) };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Parse `limit` and `offset` query params with sensible defaults.
+ * Used by the list endpoints (audit, tickets, users) to avoid
+ * repeating the same Number(...) boilerplate in every route.
+ */
+export function parseQueryPagination(
+  url: URL,
+  defaults: { limit?: number; offset?: number } = {},
+): { limit: number; offset: number } {
+  return {
+    limit: Number(url.searchParams.get('limit') ?? defaults.limit ?? 25),
+    offset: Number(url.searchParams.get('offset') ?? defaults.offset ?? 0),
+  };
+}
+
+/**
+ * One-liner for admin GET routes: runs the auth check, parses
+ * the request URL, and returns either the composition + URL or
+ * a 403 response. Eliminates the 6-line auth+url boilerplate
+ * that audit/tickets/users repeat.
+ */
+export async function requireAdminGet(
+  req: Request,
+): Promise<
+  | { ok: true; comp: Composition; url: URL }
+  | { ok: false; response: Response }
+> {
+  const auth = await requireAdminRoute();
+  if (!auth.ok) return auth;
+  return { ok: true, comp: auth.comp, url: new URL(req.url) };
+}
+
+/**
+ * One-liner for admin document routes: auth + parse id param +
+ * fetch the document. Returns either the session+document or a
+ * 403/400/404/410 response. Used by the blob and download routes.
+ */
+export async function requireAdminDocument(
+  context: { params: Promise<{ id: string }> },
+  opts: { allowDeleted?: boolean } = {},
+): Promise<
+  | {
+      ok: true;
+      session: Awaited<ReturnType<typeof requireAdmin>>;
+      comp: Composition;
+      document: NonNullable<Awaited<ReturnType<Composition['getDocumentById']>>>;
+    }
+  | { ok: false; response: Response }
+> {
+  const auth = await requireAdminRoute();
+  if (!auth.ok) return auth;
+  const { id } = await context.params;
+  const docId = Number(id);
+  if (!Number.isInteger(docId)) {
+    return { ok: false, response: new Response('Invalid id', { status: 400 }) };
+  }
+  const doc = await auth.comp.getDocumentById(docId);
+  if (!doc) return { ok: false, response: new Response('Not found', { status: 404 }) };
+  if (!opts.allowDeleted && doc.deletedAt) {
+    return { ok: false, response: new Response('Gone', { status: 410 }) };
+  }
+  if (!doc.blob) {
+    return { ok: false, response: new Response('File unavailable', { status: 404 }) };
+  }
+  return { ok: true, session: auth.session, comp: auth.comp, document: doc };
 }

@@ -5,8 +5,6 @@ import {
   ok,
   type Result,
   NotFoundError,
-  GoneError,
-  ValidationError,
 } from '@app/domain';
 import type { DocumentRepository, ChunkRepository, AuditLog } from '../ports/index';
 import { ingestFile } from '../rag/ingest';
@@ -39,13 +37,22 @@ export async function listDocuments(
   }>;
   total: number;
 }>> {
-  // For brevity in this commit, the legacy listDocuments SQL
-  // still lives in src/lib/admin/documents.ts; the shim
-  // below delegates to it. Commit 6 will replace this with
-  // a real repository implementation.
-  const { listDocuments: legacyList } = await import('../../../../src/lib/admin/documents.js');
-  const r = await legacyList(input);
-  return ok(r);
+  const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const { documents, total } = await deps.documents.list({
+    search: input.search,
+    includeDeleted: input.includeDeleted,
+    limit,
+    offset,
+  });
+  const ids = documents.map((d) => d.id);
+  const chunkCounts = ids.length > 0 ? await deps.chunks.countForDocuments(ids) : new Map<number, number>();
+  const result = documents.map((d) => ({
+    ...d,
+    uploaderName: null as string | null,
+    chunkCount: chunkCounts.get(d.id) ?? 0,
+  }));
+  return ok({ documents: result, total });
 }
 
 export async function uploadPdf(
@@ -102,4 +109,60 @@ export async function restoreDocument(
   await deps.documents.restore(documentId);
   await deps.audit.logDocumentEvent({ action: 'restore', documentId, actorId });
   return ok({ ok: true });
+}
+
+export async function getDocumentById(
+  documentId: number,
+  deps: { documents: DocumentRepository },
+): Promise<Result<{ document: import('../ports/index').DocumentRow | null }>> {
+  const doc = await deps.documents.findById(documentId);
+  return ok({ document: doc });
+}
+
+export async function hardDeleteDocument(
+  input: { documentId: number; actorId: string },
+  deps: { documents: DocumentRepository; audit: AuditLog },
+): Promise<Result<void>> {
+  await deps.audit.logDocumentEvent({
+    action: 'delete',
+    documentId: input.documentId,
+    actorId: input.actorId,
+  });
+  await deps.documents.deleteById(input.documentId);
+  return ok(undefined);
+}
+
+export async function replacePdf(
+  input: { documentId: number; fileName: string; buffer: Buffer; actorId: string },
+  deps: IngestDeps & { audit: AuditLog },
+): Promise<Result<IngestResult>> {
+  const r = await ingestFile(
+    { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
+    deps,
+  );
+  if (!r.ok) return r;
+  await deps.documents.updateBlob(r.value.documentId, input.buffer);
+  if (r.value.status !== 'unchanged') {
+    await deps.audit.logDocumentEvent({
+      action: 'replace',
+      documentId: r.value.documentId,
+      actorId: input.actorId,
+    });
+  }
+  return r;
+}
+
+export async function recountChunksForDocument(
+  documentId: number,
+  deps: { chunks: ChunkRepository },
+): Promise<Result<{ documentId: number; count: number }>> {
+  const count = await deps.chunks.countForDocument(documentId);
+  return ok({ documentId, count });
+}
+
+export async function recountChunksForAllDocuments(
+  deps: { chunks: ChunkRepository },
+): Promise<Result<Array<{ documentId: number; count: number }>>> {
+  const rows = await deps.chunks.recountAll();
+  return ok(rows);
 }
