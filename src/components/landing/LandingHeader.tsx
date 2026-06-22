@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { GithubIcon } from '@/components/icons/GithubIcon';
+import { BrandMark } from '@/components/icons/BrandMark';
 
 /**
  * Landing-page-only header. Intentionally minimal: brand on the
@@ -19,23 +20,7 @@ export function LandingHeader() {
           className="group inline-flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-[var(--foreground)]"
           data-testid="landing-header-brand"
         >
-          <span
-            aria-hidden
-            className="relative inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[var(--accent)]/15 text-[var(--accent)] ring-1 ring-inset ring-[var(--accent)]/25"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-3.5 w-3.5"
-              aria-hidden
-            >
-              <path d="M4 4h16v12H7l-3 4V4z" />
-            </svg>
-          </span>
+          <BrandMark size="sm" />
           <span>RAG Support</span>
         </Link>
 

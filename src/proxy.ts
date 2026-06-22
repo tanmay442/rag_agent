@@ -1,13 +1,15 @@
 import { clerkClient, clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-// Public routes: landing, sign-in / sign-up, Next internals, favicon,
-// and any static asset.
+// Public routes: landing, sign-in / sign-up, Next internals, app
+// icons, and any static asset.
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/favicon.ico',
+  '/icon',
+  '/apple-icon',
+  '/opengraph-image',
 ]);
 
 // Routes that require a signed-in user. Clerk's `auth.protect()` will

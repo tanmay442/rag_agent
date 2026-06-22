@@ -19,7 +19,7 @@ export type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
 
 export const appConfigSchema = z.object({
   orgName: z.string().min(1).default('Pulsar Analytics'),
-  orgShortName: z.string().min(1).default('Pulsar Support'),
+  orgShortName: z.string().min(1).default('RAG Support'),
   audience: z
     .string()
     .min(1)
@@ -73,7 +73,7 @@ export const appConfigSchema = z.object({
   adminEmails: z.array(z.string().email()).default([]),
   branding: z
     .object({
-      title: z.string().min(1).default('Pulsar Support'),
+      title: z.string().min(1).default('RAG Support'),
       description: z
         .string()
         .min(1)
@@ -82,7 +82,7 @@ export const appConfigSchema = z.object({
         ),
     })
     .default({
-      title: 'Pulsar Support',
+      title: 'RAG Support',
       description:
         'AI customer support agent for Pulsar Analytics, with grounded citations.',
     }),

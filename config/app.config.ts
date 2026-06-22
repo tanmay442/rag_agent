@@ -19,7 +19,7 @@ const config: AppConfig = {
   orgName: 'Pulsar Analytics',
 
   // Short brand shown in the top nav and mobile sheet.
-  orgShortName: 'Pulsar Support',
+  orgShortName: 'RAG Support',
 
   // Who the agent is talking to. Phrased as a noun phrase; the
   // system prompt builds "help <audience> find answers ...".
@@ -89,7 +89,7 @@ const config: AppConfig = {
 
   // Browser tab title + meta description.
   branding: {
-    title: 'Pulsar Support',
+    title: 'RAG Support',
     description: 'AI customer support agent for Pulsar Analytics, with grounded citations.',
   },
 
