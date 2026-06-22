@@ -1,9 +1,13 @@
 // Admin ticket use-cases. Source: src/lib/admin/tickets.ts.
-import { err, ok, type Result, NotFoundError, ValidationError } from '@app/domain';
-import type { TicketRepository, AuditLog } from '../ports/index';
+import { ok, type Result } from '@app/domain';
+import type { TicketRepository, AuditLog, TicketRow } from '../ports/index';
 
 export const TICKET_STATUSES = ['created', 'in_progress', 'closed'] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
+
+export function isTicketStatus(value: string): value is TicketStatus {
+  return (TICKET_STATUSES as readonly string[]).includes(value);
+}
 
 const VALID_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
   created: ['in_progress', 'closed'],
@@ -20,12 +24,17 @@ export async function listTickets(
     offset?: number;
   },
   deps: { tickets: TicketRepository },
-): Promise<Result<{ tickets: unknown[]; total: number }>> {
-  // The legacy listTickets SQL is preserved in src/lib/admin/tickets.ts
-  // until commit 6 lands the drizzle ticket repository.
-  const { listTickets: legacyList } = await import('../../../../src/lib/admin/tickets.js');
-  const r = await legacyList(input);
-  return ok({ tickets: r.tickets, total: r.total });
+): Promise<Result<{ tickets: TicketRow[]; total: number }>> {
+  const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const r = await deps.tickets.list({
+    status: input.status,
+    assignee: input.assignee,
+    search: input.search,
+    limit,
+    offset,
+  });
+  return ok({ tickets: r.rows, total: r.total });
 }
 
 export interface UpdateTicketInput {
@@ -51,12 +60,18 @@ export async function updateTicket(
   if (input.status && !VALID_TRANSITIONS[existing.status as TicketStatus].includes(input.status)) {
     return ok({ ok: false, reason: 'invalid_transition' });
   }
-  // Defer the actual write to the legacy SQL until commit 6.
-  const { updateTicket: legacyUpdate } = await import('../../../../src/lib/admin/tickets.js');
-  const r = await legacyUpdate(input);
-  if (!r.ok) {
-    if (r.reason === 'not_found') return ok({ ok: false, reason: 'not_found' });
-    return ok({ ok: false, reason: 'invalid_transition' });
+  const patch: Partial<{ status: string; assignedTo: string | null; notes: string }> = {};
+  if (input.status) patch.status = input.status;
+  if (input.assignedTo !== undefined) patch.assignedTo = input.assignedTo;
+  if (input.note) {
+    patch.notes = existing.notes ? `${existing.notes}\n\n${input.note}` : input.note;
   }
-  return ok({ ok: true, ticket: r.ticket });
+  const updated = await deps.tickets.update(input.ticketId, patch);
+  if (!updated) return ok({ ok: false, reason: 'not_found' });
+  await deps.audit.logTicketEvent({
+    action: 'status_change',
+    ticketId: input.ticketId,
+    actorId: input.actorId,
+  });
+  return ok({ ok: true, ticket: updated });
 }

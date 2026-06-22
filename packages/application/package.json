@@ -24,7 +24,6 @@
     "./prompt/build-system-prompt": "./src/prompt/build-system-prompt.ts"
   },
   "dependencies": {
-    "@app/domain": "workspace:*",
-    "zod": "^4.4.3"
+    "@app/domain": "workspace:*"
   }
 }

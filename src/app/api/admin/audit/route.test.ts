@@ -1,23 +1,42 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { requireAdminMock, listAuditMock } = vi.hoisted(() => ({
-  requireAdminMock: vi.fn(),
-  listAuditMock: vi.fn(),
-}));
+const { requireAdminMock, listAuditMock, requireAdminRouteMock, requireAdminGetMock } = vi.hoisted(() => {
+  const requireAdminMock = vi.fn();
+  const listAuditMock = vi.fn();
+  const requireAdminRouteMock = vi.fn(async () => {
+    try {
+      const session = await requireAdminMock();
+      return { ok: true as const, session, comp: { listAudit: listAuditMock } };
+    } catch (err) {
+      if (err instanceof Error && err.constructor.name === 'ForbiddenError') {
+        return { ok: false as const, response: new Response('Forbidden', { status: 403 }) };
+      }
+      throw err;
+    }
+  });
+  const requireAdminGetMock = vi.fn(async (req: Request) => {
+    const auth = await requireAdminRouteMock();
+    if (!auth.ok) return auth;
+    return { ok: true as const, comp: auth.comp, url: new URL(req.url) };
+  });
+  return { requireAdminMock, listAuditMock, requireAdminRouteMock, requireAdminGetMock };
+});
 
-vi.mock('@/lib/auth/session', () => ({
-  requireAdmin: requireAdminMock,
-  requireSession: requireAdminMock,
-  getAppSession: vi.fn(),
-  getSession: vi.fn(),
-  ForbiddenError: class ForbiddenError extends Error {
-    status = 403;
-  },
-}));
-
-vi.mock('@/lib/admin/audit', () => ({
-  listAudit: listAuditMock,
-}));
+vi.mock('@/composition', async () => {
+  const actual = await vi.importActual<typeof import('@/composition')>('@/composition');
+  return {
+    ...actual,
+    requireAdmin: requireAdminMock,
+    requireAdminRoute: requireAdminRouteMock,
+    requireAdminGet: requireAdminGetMock,
+    requireSession: requireAdminMock,
+    getAppSession: vi.fn(),
+    ForbiddenError: class ForbiddenError extends Error {
+      status = 403;
+    },
+    getComposition: () => ({ listAudit: listAuditMock }),
+  };
+});
 
 import * as route from './route';
 
@@ -36,7 +55,7 @@ function makeReq(params: Record<string, string> = {}) {
 
 describe('GET /api/admin/audit', () => {
   it('returns 403 for non-admin', async () => {
-    const { ForbiddenError } = await import('@/lib/auth/session');
+    const { ForbiddenError } = await import('@/composition');
     requireAdminMock.mockRejectedValue(new ForbiddenError());
     const res = await route.GET(makeReq());
     expect(res.status).toBe(403);

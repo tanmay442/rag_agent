@@ -4,16 +4,6 @@ const { requireAdminMock } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/session', () => ({
-  requireAdmin: requireAdminMock,
-  requireSession: requireAdminMock,
-  getAppSession: vi.fn(),
-  getSession: vi.fn(),
-  ForbiddenError: class ForbiddenError extends Error {
-    status = 403;
-  },
-}));
-
 const {
   uploadPdfMock,
   replacePdfMock,
@@ -24,6 +14,7 @@ const {
   recountChunksForAllDocumentsMock,
   setUserRoleMock,
   updateTicketMock,
+  logTicketEventMock,
   clerkClientMock,
   revalidatePathMock,
   redirectMock,
@@ -37,31 +28,31 @@ const {
   recountChunksForAllDocumentsMock: vi.fn(),
   setUserRoleMock: vi.fn(),
   updateTicketMock: vi.fn(),
+  logTicketEventMock: vi.fn(),
   clerkClientMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   redirectMock: vi.fn(),
 }));
 
-vi.mock('@/lib/admin/documents', () => ({
-  uploadPdf: uploadPdfMock,
-  replacePdf: replacePdfMock,
-  softDeleteDocument: softDeleteDocumentMock,
-  restoreDocument: restoreDocumentMock,
-  hardDeleteDocument: hardDeleteDocumentMock,
-  recountChunksForDocument: recountChunksForDocumentMock,
-  recountChunksForAllDocuments: recountChunksForAllDocumentsMock,
-}));
-
-vi.mock('@/lib/admin/tickets', () => ({
-  updateTicket: updateTicketMock,
-}));
-
-vi.mock('@/lib/auth/users', () => ({
-  setUserRole: setUserRoleMock,
-}));
-
-vi.mock('@/lib/auth/audit', () => ({
-  logTicketEvent: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/composition', () => ({
+  requireAdmin: requireAdminMock,
+  requireSession: requireAdminMock,
+  getAppSession: vi.fn(),
+  ForbiddenError: class ForbiddenError extends Error {
+    status = 403;
+  },
+  getComposition: () => ({
+    uploadPdf: uploadPdfMock,
+    replacePdf: replacePdfMock,
+    softDeleteDocument: softDeleteDocumentMock,
+    restoreDocument: restoreDocumentMock,
+    hardDeleteDocument: hardDeleteDocumentMock,
+    recountChunksForDocument: recountChunksForDocumentMock,
+    recountChunksForAllDocuments: recountChunksForAllDocumentsMock,
+    setUserRole: setUserRoleMock,
+    updateTicket: updateTicketMock,
+    logTicketEvent: logTicketEventMock,
+  }),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -147,7 +138,7 @@ describe('admin actions', () => {
     });
     softDeleteDocumentMock.mockResolvedValue(undefined);
     const result = await deleteDocumentAction(42);
-    expect(softDeleteDocumentMock).toHaveBeenCalledWith(42, 'admin_1');
+    expect(softDeleteDocumentMock).toHaveBeenCalledWith({ documentId: 42, actorId: 'admin_1' });
     expect(result).toEqual({});
   });
 
@@ -187,7 +178,7 @@ describe('admin actions', () => {
       role: 'admin',
     } as never);
     const result = await setRoleAction('user_1', 'admin');
-    expect(setUserRoleMock).toHaveBeenCalledWith('user_1', 'admin', 'admin_1');
+    expect(setUserRoleMock).toHaveBeenCalledWith({ clerkUserId: 'user_1', role: 'admin', actorId: 'admin_1' });
     expect(result).toEqual({});
   });
 

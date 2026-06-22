@@ -1,4 +1,4 @@
-import type { AppConfig } from '../src/lib/config/schema';
+import type { AppConfig } from '@app/domain/app-config';
 
 // Runtime configuration for this deployment of the RAG Support Agent.
 //

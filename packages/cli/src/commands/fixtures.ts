@@ -2,7 +2,7 @@
 // PDFs and the school student-handbook into the supplied output
 // directory (default: ./scripts/fixtures). Pure file writes; no
 // network or DB access.
-import { dirname, join, isAbsolute, resolve } from 'node:path';
+import { join, isAbsolute, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import {
   gettingStarted,
@@ -49,15 +49,9 @@ export async function runFixtures(opts: FixturesOptions): Promise<{
   return { written };
 }
 
-const invokedDirectly = (() => {
-  try {
-    return import.meta.url === `file://${process.argv[1]}`;
-  } catch {
-    return false;
-  }
-})();
+import { isMainModule } from '../is-main-module';
 
-if (invokedDirectly) {
+if (isMainModule()) {
   const outDir = process.argv[2] || './scripts/fixtures';
   runFixtures({ outDir, repoRoot: process.cwd() })
     .then(({ written }) => {

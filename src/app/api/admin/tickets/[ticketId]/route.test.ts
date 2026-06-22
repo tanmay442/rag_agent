@@ -1,28 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { requireAdminMock, updateTicketMock } = vi.hoisted(() => ({
-  requireAdminMock: vi.fn(),
-  updateTicketMock: vi.fn(),
-}));
+const { requireAdminMock, updateTicketMock, requireAdminRouteMock } = vi.hoisted(() => {
+  const requireAdminMock = vi.fn();
+  const updateTicketMock = vi.fn();
+  const requireAdminRouteMock = vi.fn(async () => {
+    try {
+      const session = await requireAdminMock();
+      return { ok: true as const, session, comp: { updateTicket: updateTicketMock } };
+    } catch (err) {
+      if (err instanceof Error && err.constructor.name === 'ForbiddenError') {
+        return { ok: false as const, response: new Response('Forbidden', { status: 403 }) };
+      }
+      throw err;
+    }
+  });
+  return { requireAdminMock, updateTicketMock, requireAdminRouteMock };
+});
 
-vi.mock('@/lib/auth/session', () => ({
+vi.mock('@/composition', () => ({
   requireAdmin: requireAdminMock,
+  requireAdminRoute: requireAdminRouteMock,
   requireSession: requireAdminMock,
   getAppSession: vi.fn(),
-  getSession: vi.fn(),
   ForbiddenError: class ForbiddenError extends Error {
     status = 403;
   },
-}));
-
-vi.mock('@/lib/admin/tickets', () => ({
-  updateTicket: updateTicketMock,
+  getComposition: () => ({ updateTicket: updateTicketMock }),
   TICKET_STATUSES: ['created', 'in_progress', 'closed'],
-  isTicketStatus: (s: string) =>
-    ['created', 'in_progress', 'closed'].includes(s),
+  isTicketStatus: (s: string) => ['created', 'in_progress', 'closed'].includes(s),
 }));
 
-import { ForbiddenError } from '@/lib/auth/session';
+import { ForbiddenError } from '@/composition';
 import * as route from './route';
 
 beforeEach(() => {

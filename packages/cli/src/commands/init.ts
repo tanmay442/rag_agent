@@ -91,9 +91,9 @@ export function upsertAdminEmails(envPath: string, emails: string[]): void {
 // The config schema lives in src/lib/config/schema.ts today
 // (commit 4 will move it to @app/domain). Import the JSON shape
 // and reuse it here so the CLI keeps working.
-import { appConfigSchema, type AppConfig, type Tone } from '../../../../src/lib/config/schema';
+import { appConfigSchema, type AppConfig } from '@app/domain';
 
-const TONE_OPTIONS: ReadonlyArray<PromptOption<Tone>> = [
+const TONE_OPTIONS: ReadonlyArray<PromptOption<AppConfig['agentPersona']['tone']>> = [
   { value: 'friendly', label: 'Friendly', blurb: 'warm, conversational, a few sentences' },
   { value: 'formal', label: 'Formal', blurb: 'measured, professional, no contractions' },
   { value: 'casual', label: 'Casual', blurb: 'relaxed, plain language, short replies' },
@@ -290,7 +290,7 @@ function writeConfigFile(configPath: string, config: AppConfig): void {
 
 function renderConfigFile(config: AppConfig): string {
   const body = JSON.stringify(config, null, 2).replace(/"([^"]+)":/g, '$1:');
-  return `import type { AppConfig } from '../../src/lib/config/schema';
+  return `import type { AppConfig } from '@app/domain';
 
 // Runtime configuration for this deployment of the RAG Support Agent.
 // Edit any field, or run \`pnpm setup\` to be walked through the values
@@ -325,15 +325,9 @@ function runSeedIfPossible(repoRoot: string, destDir: string): { ran: boolean; r
 }
 
 // CLI entry — only run when this module is the program root.
-const invokedDirectly = (() => {
-  try {
-    return import.meta.url === `file://${process.argv[1]}`;
-  } catch {
-    return false;
-  }
-})();
+import { isMainModule } from '../is-main-module';
 
-if (invokedDirectly) {
+if (isMainModule()) {
   const repoRoot = process.cwd();
   runInit({ repoRoot }).catch((err) => {
     console.error('init failed:', err);

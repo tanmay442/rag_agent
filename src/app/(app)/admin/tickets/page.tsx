@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { listTickets, TICKET_STATUSES } from '@/lib/admin/tickets';
-import { listUsers } from '@/lib/auth/users';
+import { getComposition, TICKET_STATUSES } from '@/composition';
 import { TicketOverlay, type TicketRow } from './ticket-overlay';
 
 export const dynamic = 'force-dynamic';
@@ -23,15 +22,16 @@ export default async function TicketsPage({
   const search = params.q?.trim() || undefined;
   const page = Math.max(1, Number(params.page ?? 1));
   const offset = (page - 1) * PAGE_SIZE;
+  const comp = getComposition();
   const [result, userList] = await Promise.all([
-    listTickets({
+    comp.listTickets({
       status: status ?? undefined,
       assignee: assignee === undefined ? undefined : assignee,
       search,
       limit: PAGE_SIZE,
       offset,
     }),
-    listUsers({ limit: 100 }),
+    comp.listUsers({ limit: 100 }),
   ]);
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   // Build a clerkUserId -> { name, email } index for display. Tickets

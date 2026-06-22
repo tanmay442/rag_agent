@@ -6,25 +6,66 @@
 // the Clean Architecture dependency rule: use-cases know
 // nothing about HOW the work is done, only WHAT they need.
 
-import type {
-  Document,
-  Chunk,
-  Ticket,
-  User as DbUser,
-} from '../../../../src/lib/db/schema';
+export interface DocumentRow {
+  id: number;
+  fileName: string;
+  fileHash: string;
+  uploadedBy: string;
+  uploadedAt: Date;
+  blob: Buffer | null;
+  deletedAt: Date | null;
+}
+
+export interface ChunkRow {
+  id: number;
+  documentId: number;
+  content: string;
+  embedding: number[];
+}
+
+export interface TicketRow {
+  id: number;
+  ticketId: string;
+  userId: string;
+  name: string;
+  email: string;
+  issue: string;
+  status: string;
+  createdAt: Date;
+  assignedTo: string | null;
+  notes: string | null;
+}
+
+export interface UserRow {
+  clerkUserId: string;
+  email: string;
+  name: string | null;
+  imageUrl: string | null;
+  role: string;
+  lastSeenAt: Date | null;
+  createdAt: Date;
+}
 
 // ---- Documents & Chunks ----
 
 export interface DocumentRepository {
-  findByName(fileName: string): Promise<Document | null>;
-  findById(id: number): Promise<Document | null>;
+  findByName(fileName: string): Promise<DocumentRow | null>;
+  findById(id: number): Promise<DocumentRow | null>;
   saveBlob(id: number, blob: Buffer): Promise<void>;
-  insert(input: { fileName: string; fileHash: string; uploadedBy: string }): Promise<Document>;
+  insert(input: { fileName: string; fileHash: string; uploadedBy: string }): Promise<DocumentRow>;
   deleteById(id: number): Promise<void>;
-  softDelete(id: number, at: Date): Promise<Document | null>;
-  restore(id: number): Promise<Document | null>;
-  listDeletedSince(at: Date): Promise<Array<Pick<Document, 'id'>>>;
+  softDelete(id: number, at: Date): Promise<DocumentRow | null>;
+  restore(id: number): Promise<DocumentRow | null>;
+  listDeletedSince(at: Date): Promise<Array<Pick<DocumentRow, 'id'>>>;
   updateBlob(id: number, blob: Buffer): Promise<void>;
+  list(opts: {
+    search?: string;
+    includeDeleted?: boolean;
+    limit: number;
+    offset: number;
+  }): Promise<{ documents: DocumentRow[]; total: number }>;
+  countChunksForDocuments(documentIds: number[]): Promise<Map<number, number>>;
+  countChunksForAll(): Promise<number>;
 }
 
 export interface ChunkRepository {
@@ -37,14 +78,12 @@ export interface ChunkRepository {
   countForAll(): Promise<number>;
   countForDocument(documentId: number): Promise<number>;
   recountAll(): Promise<Array<{ documentId: number; count: number }>>;
-  // Re-exporting the schema type for callers that need the full
-  // Chunk shape.
 }
 
 // ---- Tickets ----
 
 export interface TicketRepository {
-  findByTicketId(ticketId: string): Promise<Ticket | null>;
+  findByTicketId(ticketId: string): Promise<TicketRow | null>;
   list(
     opts: {
       status?: string;
@@ -53,7 +92,7 @@ export interface TicketRepository {
       limit: number;
       offset: number;
     },
-  ): Promise<{ rows: Ticket[]; total: number }>;
+  ): Promise<{ rows: TicketRow[]; total: number }>;
   latest(): Promise<{ id: number; ticketId: string } | null>;
   insert(input: {
     ticketId: string;
@@ -61,11 +100,11 @@ export interface TicketRepository {
     name: string;
     email: string;
     issue: string;
-  }): Promise<Ticket>;
+  }): Promise<TicketRow>;
   update(
     ticketId: string,
-    patch: Partial<Pick<Ticket, 'status' | 'assignedTo' | 'notes'>>,
-  ): Promise<Ticket | null>;
+    patch: Partial<Pick<TicketRow, 'status' | 'assignedTo' | 'notes'>>,
+  ): Promise<TicketRow | null>;
   countAll(): Promise<number>;
   countOpen(): Promise<number>;
 }
@@ -79,15 +118,15 @@ export interface UserRepository {
     name?: string | null;
     imageUrl?: string | null;
     role: 'admin' | 'user';
-  }): Promise<DbUser>;
-  findByClerkId(clerkUserId: string): Promise<DbUser | null>;
-  setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<DbUser | null>;
+  }): Promise<UserRow>;
+  findByClerkId(clerkUserId: string): Promise<UserRow | null>;
+  setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<UserRow | null>;
   touchLastSeen(clerkUserId: string): Promise<void>;
   list(opts: {
     search?: string;
     limit: number;
     offset: number;
-  }): Promise<{ rows: DbUser[]; total: number }>;
+  }): Promise<{ rows: UserRow[]; total: number }>;
   countAll(): Promise<number>;
   syncClerkRole(clerkUserId: string, role: 'admin' | 'user'): Promise<void>;
 }

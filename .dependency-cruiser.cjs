@@ -53,6 +53,12 @@ module.exports = {
         path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-parse|pdf-lib|pg|@neondatabase|drizzle-kit|ai/)',
       },
     },
+    {
+      name: 'no-application-importing-src-lib',
+      severity: 'error',
+      from: { path: '^packages/(application|cli)' },
+      to: { path: '^src/lib' },
+    },
 
     // ---- INFRASTRUCTURE: no Next, no src/app ----
     {
@@ -71,8 +77,7 @@ module.exports = {
       },
     },
 
-    // ---- CLI: cannot import from src/app|components (config schema import is allowed
-    //            until commit 4 moves the schema into @app/domain) ----
+    // ---- CLI: cannot import from src/app|components ----
     {
       name: 'cli-cannot-import-app-src',
       severity: 'error',

@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth/session';
+import { requireAdmin } from '@/composition';
 
 /**
  * Admin subtree layout. The sidebar/drawer chrome is provided

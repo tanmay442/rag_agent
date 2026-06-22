@@ -1,21 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { ForbiddenError } from '@/lib/auth/session';
-import { redirect } from 'next/navigation';
-import { requireAdmin } from '@/lib/auth/session';
-import {
-  uploadPdf,
-  replacePdf,
-  softDeleteDocument,
-  restoreDocument,
-  hardDeleteDocument,
-  recountChunksForDocument,
-  recountChunksForAllDocuments,
-} from '@/lib/admin/documents';
-import { updateTicket, type TicketStatus } from '@/lib/admin/tickets';
-import { setUserRole, type AppRole } from '@/lib/auth/users';
-import { logTicketEvent } from '@/lib/auth/audit';
+import { getComposition, requireAdmin, ForbiddenError } from '@/composition';
+import type { TicketStatus } from '@app/application/admin/tickets';
+import type { AppRole } from '@app/infrastructure/auth';
 
 async function requireAdminOrError(): Promise<
   | { user: { id: string; email: string; name: string; imageUrl: string | null; role: 'admin' | 'user' } }
@@ -68,7 +56,7 @@ export async function uploadPdfAction(
   }
   const buffer = Buffer.from(await file.arrayBuffer());
   try {
-    const result = await uploadPdf({
+    const result = await getComposition().uploadPdf({
       fileName: file.name,
       buffer,
       actorId: session.user.id,
@@ -88,53 +76,13 @@ export async function uploadPdfAction(
   }
 }
 
-export interface ReplaceState {
-  error?: string;
-  status?: 'inserted' | 'updated' | 'unchanged';
-  chunks?: number;
-}
-
-export async function replacePdfAction(
-  documentId: number,
-  _prev: ReplaceState,
-  formData: FormData,
-): Promise<ReplaceState> {
-  const session = await requireAdminOrError();
-  if ('error' in session) return session;
-  const file = formData.get('file');
-  if (!(file instanceof File)) {
-    return { error: 'No PDF uploaded.' };
-  }
-  if (file.size > 20 * 1024 * 1024) {
-    return { error: 'File too large (max 20 MB).' };
-  }
-  const buffer = Buffer.from(await file.arrayBuffer());
-  try {
-    const result = await replacePdf({
-      documentId,
-      fileName: file.name,
-      buffer,
-      actorId: session.user.id,
-    });
-    revalidatePath('/admin/documents');
-    revalidatePath(`/admin/documents/${documentId}/preview`);
-    return {
-      status: result.status,
-      chunks: result.chunks,
-    };
-  } catch (err) {
-    console.error('replacePdfAction failed', err);
-    return { error: (err as Error).message ?? 'Replace failed.' };
-  }
-}
-
 export async function deleteDocumentAction(
   documentId: number,
 ): Promise<{ error?: string }> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    await softDeleteDocument(documentId, session.user.id);
+    await getComposition().softDeleteDocument({ documentId, actorId: session.user.id });
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
@@ -149,7 +97,7 @@ export async function restoreDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await restoreDocument(documentId, session.user.id);
+    const result = await getComposition().restoreDocument(documentId, session.user.id);
     if (!result.ok) {
       return { error: `Restore failed: ${result.reason}` };
     }
@@ -167,7 +115,7 @@ export async function hardDeleteDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    await hardDeleteDocument(documentId, session.user.id);
+    await getComposition().hardDeleteDocument({ documentId, actorId: session.user.id });
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
@@ -190,7 +138,7 @@ export async function setRoleAction(
     return { error: 'Invalid role' };
   }
   try {
-    await setUserRole(clerkUserId, role, session.user.id);
+    await getComposition().setUserRole({ clerkUserId, role, actorId: session.user.id });
     revalidatePath('/admin/users');
     return {};
   } catch (err) {
@@ -212,7 +160,7 @@ export async function updateTicketAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await updateTicket({
+    const result = await getComposition().updateTicket({
       ticketId,
       status: patch.status,
       assignedTo: patch.assignedTo,
@@ -243,7 +191,7 @@ export async function impersonateUserAction(
     const signInToken = await client.signInTokens.createSignInToken({
       userId: clerkUserId, expiresInSeconds: 600,
     });
-    await logTicketEvent({
+    await getComposition().logTicketEvent({
       action: 'impersonation',
       ticketId: `user:${clerkUserId}`,
       actorId: session.user.id,
@@ -271,7 +219,7 @@ export async function recountChunksAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await recountChunksForDocument(documentId);
+    const result = await getComposition().recountChunksForDocument(documentId);
     revalidatePath('/admin/documents');
     return { count: result.count };
   } catch (err) {
@@ -295,7 +243,7 @@ export async function recountAllChunksAction(): Promise<RecountAllChunksResult> 
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const results = await recountChunksForAllDocuments();
+    const results = await getComposition().recountChunksForAllDocuments();
     const total = results.reduce((acc, r) => acc + r.count, 0);
     revalidatePath('/admin/documents');
     return { documents: results.length, total };
@@ -305,8 +253,4 @@ export async function recountAllChunksAction(): Promise<RecountAllChunksResult> 
   }
 }
 
-// Internal redirect helper used by the admin client pages so the form
-// buttons can return success and a follow-up navigation happens.
-export async function redirectTo(path: string): Promise<never> {
-  redirect(path);
-}
+

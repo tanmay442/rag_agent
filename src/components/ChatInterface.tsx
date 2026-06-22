@@ -11,7 +11,7 @@ import {
 } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { MyUIMessage } from '@/lib/chat/types';
+import type { MyUIMessage } from '@/composition';
 
 const QUICK_PROMPTS: Array<{ label: string; text: string }> = [
   {

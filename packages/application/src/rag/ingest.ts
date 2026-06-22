@@ -60,9 +60,8 @@ export async function ingestFile(
   if (texts.length === 0) {
     return err(new ValidationError(`No extractable text in ${fileName}`));
   }
-  let embeddings: number[][];
   try {
-    embeddings = await deps.embeddings.embedBatch(texts);
+    await deps.embeddings.embedBatch(texts);
   } catch (cause) {
     return err(new ExternalServiceError('Embedding API failed', cause));
   }
