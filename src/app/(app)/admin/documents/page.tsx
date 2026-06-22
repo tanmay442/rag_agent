@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listDocuments } from '@/lib/admin/documents';
+import { getComposition } from '@/composition';
 import { DocumentRowActions } from './document-row-actions';
 import { RecountAllButton } from './recount-all-button';
 
@@ -38,7 +38,7 @@ export default async function DocumentsPage({
     !Number.isNaN(recountedDocs) &&
     recountedTotal !== null &&
     !Number.isNaN(recountedTotal);
-  const result = await listDocuments({
+  const result = await getComposition().listDocuments({
     search: search || undefined,
     includeDeleted: true,
     limit: PAGE_SIZE,

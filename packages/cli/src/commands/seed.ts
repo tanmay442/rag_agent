@@ -65,10 +65,42 @@ export async function runSeed(opts: SeedOptions = {}): Promise<void> {
   // real database adapter.
   const { ingestFile } = opts.ingest
     ? { ingestFile: opts.ingest }
-    : await import('../../../../src/lib/rag/ingest.js');
+    : await (async () => {
+        const { ingestFile: rawIngest } = await import('@app/application/rag/ingest');
+        const { Db, Llm, Pdf } = await import('@app/infrastructure');
+        const { createHash } = await import('node:crypto');
+        const ingestDeps = {
+          documents: {
+            findByName: (n: string) => Db.findDocumentByName(n),
+            findById: (id: number) => Db.findDocumentById(id),
+            saveBlob: (id: number, b: Buffer) => Db.updateDocumentBlob(id, b),
+            insert: (i: { fileName: string; fileHash: string; uploadedBy: string }) => Db.insertDocument(i),
+            deleteById: (id: number) => Db.deleteDocumentById(id),
+            softDelete: (id: number, at: Date) => Db.softDeleteDocument(id, at),
+            restore: (id: number) => Db.restoreDocument(id),
+            listDeletedSince: () => Promise.resolve([]),
+            updateBlob: (id: number, b: Buffer) => Db.updateDocumentBlob(id, b),
+            list: Db.listDocuments,
+            countChunksForDocuments: Db.countChunksForDocuments,
+            countChunksForAll: Db.countChunksForAll,
+          },
+          embeddings: Llm.googleEmbeddingService,
+          hasher: { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') },
+          pdfParser: Pdf.pdfParseParser,
+          textSplitter: Pdf.langchainSplitter,
+        };
+        return {
+          ingestFile: (input: { fileName: string; buffer: Buffer; uploadedBy: string }) =>
+            rawIngest(input, ingestDeps).then((r) => {
+              if (!r.ok) throw r.error;
+              return r.value;
+            }),
+        };
+      })();
   const saveBlob = opts.saveBlob ?? (async (documentId: number, buffer: Buffer) => {
-    const { db } = await import('../../../../src/lib/db/client.js');
-    const { documents } = await import('../../../../src/lib/db/schema.js');
+    const { Db } = await import('@app/infrastructure');
+    const { db } = Db;
+    const { documents } = Db.schema;
     const { eq } = await import('drizzle-orm');
     await db.update(documents).set({ blob: buffer }).where(eq(documents.id, documentId));
   });

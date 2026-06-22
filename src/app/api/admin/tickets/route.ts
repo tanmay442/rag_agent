@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
-import { listTickets, isTicketStatus } from '@/lib/admin/tickets';
+import { getComposition, requireAdmin, ForbiddenError, isTicketStatus } from '@/composition';
 
 export async function GET(req: Request) {
+  const comp = getComposition();
   try { await requireAdmin(); } catch (err) {
       if (err instanceof ForbiddenError) {
         return new NextResponse('Forbidden', { status: 403 });
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const search = url.searchParams.get('search') ?? undefined;
   const limit = Number(url.searchParams.get('limit') ?? 25);
   const offset = Number(url.searchParams.get('offset') ?? 0);
-  const result = await listTickets({
+  const result = await comp.listTickets({
     status: status && isTicketStatus(status) ? status : undefined,
     assignee: assignee === null ? undefined : assignee,
     search,

@@ -47,39 +47,36 @@ vi.mock('@clerk/nextjs/server', () => ({
   currentUser: currentUserMock,
 }));
 
-vi.mock('@/lib/auth/ratelimit', () => ({
-  rateLimit: () => rateLimitResult,
-}));
-
-vi.mock('@/lib/auth/query-stats', () => ({
-  recordQuery: vi.fn(),
-}));
-
-vi.mock('@/lib/rag/search', () => ({
-  searchChunks: async () => searchValue,
-}));
-vi.mock('@/lib/llm/client', () => ({
-  getChatModel: () => ({ modelId: 'mock' }),
-  getEmbeddingModel: () => ({ modelId: 'mock-embed' }),
-}));
-vi.mock('@/lib/db/client', () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        orderBy: () => ({
-          limit: async () => [],
+const { compositionMock } = vi.hoisted(() => ({
+  compositionMock: {
+    rateLimit: () => rateLimitResult,
+    searchChunks: vi.fn(async () => searchValue),
+    db: {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          orderBy: vi.fn(() => ({
+            limit: vi.fn(async () => []),
+          })),
+        })),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn((v: Record<string, unknown>) => {
+          ticketInsertedValues.push(v);
+          return { returning: async () => [ticketInserted] };
         }),
-      }),
-    }),
-    insert: () => ({
-      values: (v: Record<string, unknown>) => {
-        ticketInsertedValues.push(v);
-        return {
-          returning: async () => [ticketInserted],
-        };
-      },
-    }),
+      })),
+    },
+    schema: { tickets: {} },
+    recordQuery: vi.fn(),
+    getChatModel: vi.fn(() => ({ modelId: 'mock' })),
+    getEmbeddingModel: vi.fn(() => ({ modelId: 'mock-embed' })),
+    logTicketEvent: vi.fn(),
   },
+}));
+
+vi.mock('@/composition', () => ({
+  getComposition: () => compositionMock,
+  appConfig: appConfigMock,
 }));
 
 // Mock the AI SDK so we don't actually hit any model providers.
@@ -228,10 +225,9 @@ describe('/api/chat createSupportTicket tool', () => {
     let inserted = 0;
     const realInsert = ticketInsertedValues.push.bind(ticketInsertedValues);
     ticketInsertedValues.length = 0;
-    const { db } = await import('@/lib/db/client');
-    const originalInsert = (db as unknown as { insert: unknown }).insert;
-    (db as unknown as { insert: () => unknown }).insert = () => ({
-      values: (v: Record<string, unknown>) => {
+    const originalInsert = compositionMock.db.insert;
+    compositionMock.db.insert = vi.fn(() => ({
+      values: vi.fn((v: Record<string, unknown>) => {
         if (inserted === 0) {
           inserted++;
           const err = new Error(
@@ -241,8 +237,8 @@ describe('/api/chat createSupportTicket tool', () => {
         }
         realInsert(v);
         return { returning: async () => [{ id: 'TKT-1002' }] };
-      },
-    });
+      }),
+    }));
     try {
       const res = await appHandler.POST(
         new Request('http://localhost/api/chat', {
@@ -259,7 +255,7 @@ describe('/api/chat createSupportTicket tool', () => {
       expect(out).toEqual({ ticketId: 'TKT-1001', status: 'created' });
       expect(ticketInsertedValues.length).toBe(1);
     } finally {
-      (db as unknown as { insert: unknown }).insert = originalInsert;
+      compositionMock.db.insert = originalInsert;
     }
   });
 });
@@ -296,11 +292,9 @@ describe('/api/chat searchDocumentation tool', () => {
 
   it('returns up to 800 chars per chunk and a 150-char snippet per citation', async () => {
     const longContent = 'x'.repeat(2000);
-    const { searchChunks } = await import('@/lib/rag/search');
     const searchChunksSpy = vi
-      .spyOn(await import('@/lib/rag/search'), 'searchChunks')
+      .spyOn(compositionMock, 'searchChunks')
       .mockResolvedValueOnce([{ content: longContent, similarity: 0.8 }]);
-    void searchChunks;
     const { tools } = await captureTools();
     const result = (await tools?.searchDocumentation?.execute({ query: 'q' })) as Array<{
       content: string;
@@ -312,7 +306,7 @@ describe('/api/chat searchDocumentation tool', () => {
 
   it('passes a user-supplied limit through to searchChunks', async () => {
     const searchChunksSpy = vi
-      .spyOn(await import('@/lib/rag/search'), 'searchChunks')
+      .spyOn(compositionMock, 'searchChunks')
       .mockResolvedValueOnce([]);
     const { tools } = await captureTools();
     await tools?.searchDocumentation?.execute({ query: 'q', limit: 5 });

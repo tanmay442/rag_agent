@@ -5,21 +5,17 @@ const { requireAdminMock, getDocumentByIdMock } = vi.hoisted(() => ({
   getDocumentByIdMock: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/session', () => ({
+vi.mock('@/composition', () => ({
   requireAdmin: requireAdminMock,
   requireSession: requireAdminMock,
   getAppSession: vi.fn(),
-  getSession: vi.fn(),
   ForbiddenError: class ForbiddenError extends Error {
     status = 403;
   },
+  getComposition: () => ({ getDocumentById: getDocumentByIdMock }),
 }));
 
-vi.mock('@/lib/admin/documents', () => ({
-  getDocumentById: getDocumentByIdMock,
-}));
-
-import { ForbiddenError } from '@/lib/auth/session';
+import { ForbiddenError } from '@/composition';
 import * as route from './route';
 
 beforeEach(() => {

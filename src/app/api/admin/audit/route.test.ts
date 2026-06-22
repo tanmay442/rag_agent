@@ -5,18 +5,14 @@ const { requireAdminMock, listAuditMock } = vi.hoisted(() => ({
   listAuditMock: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/session', () => ({
+vi.mock('@/composition', () => ({
   requireAdmin: requireAdminMock,
   requireSession: requireAdminMock,
   getAppSession: vi.fn(),
-  getSession: vi.fn(),
   ForbiddenError: class ForbiddenError extends Error {
     status = 403;
   },
-}));
-
-vi.mock('@/lib/admin/audit', () => ({
-  listAudit: listAuditMock,
+  getComposition: () => ({ listAudit: listAuditMock }),
 }));
 
 import * as route from './route';
@@ -36,7 +32,7 @@ function makeReq(params: Record<string, string> = {}) {
 
 describe('GET /api/admin/audit', () => {
   it('returns 403 for non-admin', async () => {
-    const { ForbiddenError } = await import('@/lib/auth/session');
+    const { ForbiddenError } = await import('@/composition');
     requireAdminMock.mockRejectedValue(new ForbiddenError());
     const res = await route.GET(makeReq());
     expect(res.status).toBe(403);

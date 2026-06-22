@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
-import { updateTicket, isTicketStatus, TICKET_STATUSES } from '@/lib/admin/tickets';
+import { getComposition, requireAdmin, ForbiddenError, isTicketStatus, TICKET_STATUSES } from '@/composition';
 
 const PatchSchema = z.object({
   status: z.enum(TICKET_STATUSES).optional(),
@@ -14,6 +13,7 @@ export async function PATCH(
   context: { params: Promise<{ ticketId: string }> },
 ) {
   let session;
+  const comp = getComposition();
   try { session = await requireAdmin(); } catch (err) {
     if (err instanceof ForbiddenError) {
       return new NextResponse('Forbidden', { status: 403 });
@@ -29,7 +29,7 @@ export async function PATCH(
   if (parsed.data.status && !isTicketStatus(parsed.data.status)) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
-  const result = await updateTicket({
+  const result = await comp.updateTicket({
     ticketId,
     status: parsed.data.status,
     assignedTo: parsed.data.assignedTo,

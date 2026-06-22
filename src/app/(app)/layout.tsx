@@ -1,4 +1,4 @@
-import { getAppSession } from '@/lib/auth/session';
+import { getAppSession } from '@/composition';
 import { AppSidebar, type AppRole } from '@/components/app/AppSidebar';
 
 /**

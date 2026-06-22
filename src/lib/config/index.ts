@@ -1,6 +1,6 @@
 import 'server-only';
 import rawConfig from '../../../config/app.config';
-import { appConfigSchema, type AppConfig } from './schema';
+import { appConfigSchema, type AppConfig } from '@app/domain/app-config';
 
 // Validate the imported config at module load. If a required field
 // is missing, an env-var lookup is wrong, or a string is empty, we

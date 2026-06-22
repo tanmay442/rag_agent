@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
-import { getDocumentById } from '@/lib/admin/documents';
+import { getComposition, requireAdmin, ForbiddenError } from '@/composition';
 
 export async function GET(
   _req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const comp = getComposition();
   try { await requireAdmin(); } catch (err) {
       if (err instanceof ForbiddenError) {
         return new NextResponse('Forbidden', { status: 403 });
@@ -17,7 +17,7 @@ export async function GET(
   if (!Number.isInteger(docId)) {
     return new NextResponse('Invalid id', { status: 400 });
   }
-  const doc = await getDocumentById(docId);
+  const doc = await comp.getDocumentById(docId);
   if (!doc) return new NextResponse('Not found', { status: 404 });
   if (!doc.blob) {
     return new NextResponse('File unavailable', { status: 404 });

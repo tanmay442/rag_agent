@@ -1,11 +1,5 @@
 export * as Ports from './ports/index';
-export * from './rag/ingest';
-export * from './rag/search';
-export * from './auth/sync-user';
-export * from './auth/audit';
-export * from './auth/rate-limit';
-export * from './auth/query-stats';
-export * from './auth/users';
-export * from './admin/documents';
-export * from './admin/tickets';
-export * from './prompt/build-system-prompt';
+export * from './rag';
+export * from './auth';
+export * from './admin';
+export * from './prompt';

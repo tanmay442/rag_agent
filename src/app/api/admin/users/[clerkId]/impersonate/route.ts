@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin, ForbiddenError } from '@/lib/auth/session';
-import { logTicketEvent } from '@/lib/auth/audit';
+import { getComposition, requireAdmin, ForbiddenError } from '@/composition';
 
 export async function POST(
   req: Request,
   context: { params: Promise<{ clerkId: string }> },
 ) {
   let session;
+  const comp = getComposition();
   try { session = await requireAdmin(); } catch (err) {
     if (err instanceof ForbiddenError) {
       return new NextResponse('Forbidden', { status: 403 });
@@ -20,7 +20,7 @@ export async function POST(
     const signInToken = await client.signInTokens.createSignInToken({
       userId: clerkId, expiresInSeconds: 600,
     });
-    await logTicketEvent({
+    await comp.logTicketEvent({
       action: 'impersonation',
       ticketId: `user:${clerkId}`,
       actorId: session.user.id,

@@ -1,25 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { ingestFileMock } = vi.hoisted(() => ({ ingestFileMock: vi.fn() }));
+const { ingestFileMock, saveBlobMock } = vi.hoisted(() => ({
+  ingestFileMock: vi.fn(),
+  saveBlobMock: vi.fn().mockResolvedValue(undefined),
+}));
 
-vi.mock('../src/lib/rag/ingest', () => ({
+vi.mock('@app/application/rag/ingest', () => ({
   ingestFile: ingestFileMock,
 }));
 
-// Mock the db update that saveBlob calls after ingestion so tests
-// don't need a real database connection.
-const { dbUpdateMock } = vi.hoisted(() => ({ dbUpdateMock: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('../src/lib/db/client', () => ({
-  db: { update: dbUpdateMock.mockReturnValue({ set: () => ({ where: async () => undefined }) }) },
+vi.mock('@app/infrastructure', () => ({
+  Db: {
+    db: {},
+    schema: { documents: {} },
+  },
+  Llm: {},
+  Pdf: {},
+  Auth: {},
 }));
-vi.mock('../src/lib/db/schema', () => ({ documents: {} }));
-vi.mock('drizzle-orm', () => ({ eq: () => undefined }));
+
+vi.mock('drizzle-orm', () => ({
+  eq: () => undefined,
+  sql: Object.assign(
+    (strings: TemplateStringsArray, ...values: unknown[]) => ({ sql: strings.join('?'), values }),
+    { raw: (s: string) => s },
+  ),
+}));
 
 // We mock dotenv so importing the script (which calls `import 'dotenv/config'`)
 // does not try to read the host's .env files.
 vi.mock('dotenv/config', () => ({}));
 
-import { runSeed, parseArgs } from './seed-docs';
+import { runSeed, parseArgs, type SeedOptions } from './seed-docs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -42,6 +54,8 @@ const PULSAR_FIXTURES = [
 
 beforeEach(() => {
   ingestFileMock.mockReset();
+  saveBlobMock.mockReset();
+  saveBlobMock.mockResolvedValue(undefined);
 });
 
 describe('seed-docs', () => {
@@ -58,7 +72,7 @@ describe('seed-docs', () => {
     const original = console.log;
     console.log = (...args) => logs.push(args.join(' '));
     try {
-      await runSeed({ fixturesDir: FIXTURES });
+      await runSeed({ fixturesDir: FIXTURES, ingest: ingestFileMock as SeedOptions['ingest'], saveBlob: saveBlobMock });
     } finally {
       console.log = original;
     }
@@ -94,7 +108,7 @@ describe('seed-docs', () => {
       }
       return { documentId: 1, chunks: 3, status: 'updated' as const, fileHash: String(hash) };
     });
-    await runSeed({ fixturesDir: join(FIXTURES, '..', 'fixtures'), userId: 'bi-test' });
+    await runSeed({ fixturesDir: join(FIXTURES, '..', 'fixtures'), userId: 'bi-test', ingest: ingestFileMock as SeedOptions['ingest'], saveBlob: saveBlobMock });
     // Each fixture must have been seen at least once.
     for (const f of PULSAR_FIXTURES) {
       expect(calls).toContain(f);
@@ -109,7 +123,7 @@ describe('seed-docs', () => {
         status: 'unchanged',
       });
     }
-    await runSeed({ fixturesDir: FIXTURES, userId: 'admin-user-1' });
+    await runSeed({ fixturesDir: FIXTURES, userId: 'admin-user-1', ingest: ingestFileMock as SeedOptions['ingest'], saveBlob: saveBlobMock });
     const arg = ingestFileMock.mock.calls[0]?.[0] as { uploadedBy: string };
     expect(arg.uploadedBy).toBe('admin-user-1');
   });

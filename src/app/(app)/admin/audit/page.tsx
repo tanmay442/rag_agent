@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listAudit } from '@/lib/admin/audit';
+import { getComposition } from '@/composition';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export default async function AuditPage({
   const offset = (page - 1) * PAGE_SIZE;
   const documentId = params.documentId ? Number(params.documentId) : undefined;
   const ticketId = params.ticketId;
-  const result = await listAudit({
+  const result = await getComposition().listAudit({
     documentId: Number.isFinite(documentId) ? documentId : undefined,
     ticketId,
     limit: PAGE_SIZE,
