@@ -43,7 +43,7 @@ import { Db, Llm, Auth, Pdf } from '@app/infrastructure';
 import { requireAdmin, requireSession, getAppSession, ForbiddenError } from '@app/infrastructure/auth';
 import { type MyUIMessage } from '@app/domain';
 import { createHash } from 'node:crypto';
-import appConfig from '../config/app.config';
+import { appConfig } from './lib/config';
 import { unwrap } from '@app/domain';
 
 const systemClock = { now: () => new Date() };
