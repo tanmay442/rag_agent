@@ -11,5 +11,5 @@ export function getChatModel(): LanguageModelV3 {
   }
   const provider = createOpenAI({ apiKey, baseURL });
   const modelId = process.env.LLM_MODEL || 'custom-chat-model';
-  return provider(modelId) as LanguageModelV3;
+  return provider.chat(modelId) as LanguageModelV3;
 }
