@@ -39,17 +39,9 @@ import { dirname } from 'node:path';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, 'fixtures');
 
-// The Pulsar Analytics fixture corpus — 7 PDFs in scripts/fixtures/.
-// Keep this list in lockstep with the fixture files.
-const PULSAR_FIXTURES = [
-  '01-getting-started.pdf',
-  '02-admin-guide.pdf',
-  '03-api-reference.pdf',
-  '04-billing-and-plans.pdf',
-  '05-account-and-security.pdf',
-  '06-troubleshooting.pdf',
-  '07-data-and-integrations.pdf',
-];
+// The fixture corpus used by these tests. Change this array when
+// adding/removing files from scripts/fixtures/.
+const FIXTURE_PDFS = ['sample.pdf'];
 
 beforeEach(() => {
   ingestFileMock.mockReset();
@@ -58,8 +50,8 @@ beforeEach(() => {
 });
 
 describe('seed-docs', () => {
-  it('passes every Pulsar fixture PDF to ingestFile and prints status', async () => {
-    for (let i = 0; i < PULSAR_FIXTURES.length; i++) {
+  it('passes every fixture PDF to ingestFile and prints status', async () => {
+    for (let i = 0; i < FIXTURE_PDFS.length; i++) {
       ingestFileMock.mockResolvedValueOnce({
         documentId: i + 1,
         chunks: 3,
@@ -76,20 +68,20 @@ describe('seed-docs', () => {
       console.log = original;
     }
 
-    expect(ingestFileMock).toHaveBeenCalledTimes(PULSAR_FIXTURES.length);
+    expect(ingestFileMock).toHaveBeenCalledTimes(FIXTURE_PDFS.length);
     const arg = ingestFileMock.mock.calls[0]?.[0] as {
       fileName: string;
       buffer: Buffer;
       uploadedBy: string;
     };
-    expect(PULSAR_FIXTURES).toContain(arg.fileName);
+    expect(FIXTURE_PDFS).toContain(arg.fileName);
     expect(arg.buffer.length).toBeGreaterThan(0);
     expect(arg.buffer.slice(0, 4).toString('utf8')).toBe('%PDF');
     expect(arg.uploadedBy).toBe('seed-script');
-    expect(logs.join('\n')).toMatch(/01-getting-started\.pdf: status=inserted/);
+    expect(logs.join('\n')).toMatch(/sample\.pdf: status=inserted/);
   });
 
-  it('ingests a single Pulsar fixture end-to-end through the production path', async () => {
+  it('ingests a single fixture end-to-end through the production path', async () => {
     // One canonical fixture, three calls: insert, hash-dedup re-seed,
     // replace. Each status is reported back through `result.status`
     // and surfaced in the CLI log. This exercises the full pipeline
@@ -109,13 +101,13 @@ describe('seed-docs', () => {
     });
     await runSeed({ fixturesDir: join(FIXTURES, '..', 'fixtures'), userId: 'bi-test', ingest: ingestFileMock as SeedOptions['ingest'], saveBlob: saveBlobMock });
     // Each fixture must have been seen at least once.
-    for (const f of PULSAR_FIXTURES) {
+    for (const f of FIXTURE_PDFS) {
       expect(calls).toContain(f);
     }
   });
 
   it('passes a custom userId when given via opts', async () => {
-    for (let i = 0; i < PULSAR_FIXTURES.length; i++) {
+    for (let i = 0; i < FIXTURE_PDFS.length; i++) {
       ingestFileMock.mockResolvedValueOnce({
         documentId: i + 1,
         chunks: 1,
