@@ -7,8 +7,10 @@ import {
   index, check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { vector } from './schema-vector';
+import { createVectorType } from './schema-vector';
 import { byteaBlob } from '../storage/bytea-blob';
+
+const vector = createVectorType(768);
 
 export const documents = pgTable('documents', {
   id: serial('id').primaryKey(),

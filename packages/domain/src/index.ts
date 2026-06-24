@@ -4,5 +4,6 @@
 export * from './result';
 export * from './errors';
 export * from './app-config';
+export * from './embedding-providers';
 export * as Chat from './chat/types';
 export { type MyUIMessage } from './chat/types';
