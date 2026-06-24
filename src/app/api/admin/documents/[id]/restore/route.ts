@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
 import { requireAdminRoute } from '@/composition';
+import { respond } from '@/lib/http';
+import { ValidationError, NotFoundError, GoneError } from '@app/domain';
 
 export async function POST(
   _req: Request,
@@ -11,12 +12,13 @@ export async function POST(
   const { id } = await context.params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    return respond(new ValidationError('Invalid id'));
   }
   const result = await comp.restoreDocument(docId, session.user.id);
   if (!result.ok) {
-    const status = result.reason === 'not_found' ? 404 : 410;
-    return NextResponse.json({ error: result.reason }, { status });
+    return result.reason === 'not_found'
+      ? respond(new NotFoundError('Document not found'))
+      : respond(new GoneError('Document is gone'));
   }
-  return NextResponse.json({ ok: true });
+  return respond({ ok: true });
 }

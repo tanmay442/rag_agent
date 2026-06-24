@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getComposition, requireAdmin, ForbiddenError } from '@/composition';
 import type { TicketStatus } from '@app/application/admin/tickets';
 import type { AppRole } from '@app/infrastructure/auth';
+import { toSafeError } from '@/lib/http';
 
 async function requireAdminOrError(): Promise<
   | { user: { id: string; email: string; name: string; imageUrl: string | null; role: 'admin' | 'user' } }
@@ -72,7 +73,7 @@ export async function uploadPdfAction(
     };
   } catch (err) {
     console.error('uploadPdfAction failed', err);
-    return { error: (err as Error).message ?? 'Upload failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -87,7 +88,7 @@ export async function deleteDocumentAction(
     return {};
   } catch (err) {
     console.error('deleteDocumentAction failed', err);
-    return { error: (err as Error).message ?? 'Delete failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -105,7 +106,7 @@ export async function restoreDocumentAction(
     return {};
   } catch (err) {
     console.error('restoreDocumentAction failed', err);
-    return { error: (err as Error).message ?? 'Restore failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -120,7 +121,7 @@ export async function hardDeleteDocumentAction(
     return {};
   } catch (err) {
     console.error('hardDeleteDocumentAction failed', err);
-    return { error: (err as Error).message ?? 'Delete failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -143,7 +144,7 @@ export async function setRoleAction(
     return {};
   } catch (err) {
     console.error('setRoleAction failed', err);
-    return { error: (err as Error).message ?? 'Role change failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -174,7 +175,7 @@ export async function updateTicketAction(
     return {};
   } catch (err) {
     console.error('updateTicketAction failed', err);
-    return { error: (err as Error).message ?? 'Update failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -199,7 +200,7 @@ export async function impersonateUserAction(
     return { url: signInToken.url };
   } catch (err) {
     console.error('impersonateUserAction failed', err);
-    return { error: (err as Error).message ?? 'Impersonation failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -224,7 +225,7 @@ export async function recountChunksAction(
     return { count: result.count };
   } catch (err) {
     console.error('recountChunksAction failed', err);
-    return { error: (err as Error).message ?? 'Recount failed.' };
+    return toSafeError(err);
   }
 }
 
@@ -249,7 +250,7 @@ export async function recountAllChunksAction(): Promise<RecountAllChunksResult> 
     return { documents: results.length, total };
   } catch (err) {
     console.error('recountAllChunksAction failed', err);
-    return { error: (err as Error).message ?? 'Recount failed.' };
+    return toSafeError(err);
   }
 }
 

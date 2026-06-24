@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { requireAdminRoute } from '@/composition';
+import { respond } from '@/lib/http';
 
 export async function POST(
   _req: Request,
@@ -20,11 +20,8 @@ export async function POST(
       ticketId: `user:${clerkId}`,
       actorId: session.user.id,
     });
-    return NextResponse.json({ url: signInToken.url });
+    return respond({ url: signInToken.url });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message ?? 'Impersonation failed' },
-      { status: 500 },
-    );
+    return respond(err);
   }
 }
