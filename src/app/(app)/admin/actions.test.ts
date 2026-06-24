@@ -125,7 +125,8 @@ describe('admin actions', () => {
       chunks: 12,
     });
     const fd = new FormData();
-    fd.append('file', new File(['x'], 'a.pdf', { type: 'application/pdf' }));
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x20, 0x74, 0x65, 0x73, 0x74]);
+    fd.append('file', new File([pdfBytes], 'a.pdf', { type: 'application/pdf' }));
     const result = await uploadPdfAction({}, fd);
     expect(result.status).toBe('inserted');
     expect(result.chunks).toBe(12);
