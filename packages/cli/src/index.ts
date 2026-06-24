@@ -51,6 +51,16 @@ async function main(): Promise<void> {
       process.exit(result.status ?? 0);
     }
     case 'db-migrate': {
+      // Run the apply-migration script which enables pgvector
+      // extension and applies any pending SQL migrations first.
+      const pre = spawnSync('node', ['scripts/apply-migration.mjs'], {
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? '' },
+      });
+      if (pre.status !== 0) {
+        process.exit(pre.status ?? 1);
+      }
       // Prompts for confirmation before destructive ops.
       if (rest.includes('--force')) {
         const result = spawnSync('pnpm', ['exec', 'drizzle-kit', 'push', ...rest], {
@@ -59,7 +69,7 @@ async function main(): Promise<void> {
         });
         process.exit(result.status ?? 0);
       }
-      console.log('About to run \`drizzle-kit push\` against the database in DATABASE_URL.');
+      console.log('About to run `drizzle-kit push` against the database in DATABASE_URL.');
       console.log('Re-run with --force to skip this confirmation.');
       const result = spawnSync('pnpm', ['exec', 'drizzle-kit', 'push', '--force', ...rest], {
         cwd: REPO_ROOT,

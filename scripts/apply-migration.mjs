@@ -13,6 +13,8 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
+const EXTENSION_SQL = 'CREATE EXTENSION IF NOT EXISTS vector;';
+
 // SQL the migrator plays in addition to the Drizzle files. These
 // are additive ALTERs that bring pre-existing tables up to the
 // current schema. All use `IF NOT EXISTS` so re-runs are safe.
@@ -68,6 +70,11 @@ export async function applyMigrations({
   logger.log(`applying ${files.length} migration(s)...`);
 
   try {
+    // Enable pgvector extension before any schema operations.
+    logger.log('-- enabling pgvector extension...');
+    await pool.query(EXTENSION_SQL);
+    logger.log('  ok');
+
     for (const sql of ADD_COLUMNS) {
       logger.log('-- add column:', sql);
       try {
