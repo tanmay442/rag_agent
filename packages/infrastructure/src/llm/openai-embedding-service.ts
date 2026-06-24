@@ -11,11 +11,11 @@ export function getOpenAiEmbeddingService(def: EmbeddingProviderDef): EmbeddingS
 
   return {
     async embed(value: string): Promise<number[]> {
-      const { embedding } = await embed({ model, value });
+      const { embedding } = await embed({ model, value, providerOptions: { openai: { dimensions: def.defaultDimension } } });
       return embedding;
     },
     async embedBatch(values: string[]): Promise<number[][]> {
-      const { embeddings } = await embedMany({ model, values });
+      const { embeddings } = await embedMany({ model, values, providerOptions: { openai: { dimensions: def.defaultDimension } } });
       return embeddings;
     },
   };
