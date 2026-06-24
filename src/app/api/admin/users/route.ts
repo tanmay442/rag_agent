@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { requireAdminGet, parseQueryPagination } from '@/composition';
+import { respond } from '@/lib/http';
 
 export async function GET(req: Request) {
   const auth = await requireAdminGet(req);
@@ -8,5 +8,5 @@ export async function GET(req: Request) {
   const search = url.searchParams.get('search') ?? undefined;
   const { limit, offset } = parseQueryPagination(url);
   const result = await comp.listUsers({ search, limit, offset });
-  return NextResponse.json(result);
+  return respond(result);
 }
