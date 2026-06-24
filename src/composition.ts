@@ -81,6 +81,7 @@ const chunkRepo = {
 
 const ingestDeps: IngestDeps = {
   documents: documentRepo,
+  chunks: chunkRepo,
   embeddings: Llm.googleEmbeddingService,
   hasher: systemHasher,
   pdfParser: Pdf.pdfParseParser,
@@ -192,9 +193,11 @@ export function parseQueryPagination(
   url: URL,
   defaults: { limit?: number; offset?: number } = {},
 ): { limit: number; offset: number } {
+  const rawLimit = Number(url.searchParams.get('limit') ?? defaults.limit ?? 25);
+  const rawOffset = Number(url.searchParams.get('offset') ?? defaults.offset ?? 0);
   return {
-    limit: Number(url.searchParams.get('limit') ?? defaults.limit ?? 25),
-    offset: Number(url.searchParams.get('offset') ?? defaults.offset ?? 0),
+    limit: Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25),
+    offset: Number.isFinite(rawOffset) ? rawOffset : (defaults.offset ?? 0),
   };
 }
 

@@ -15,6 +15,7 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { type Interface } from 'node:readline';
 import 'dotenv/config';
 import {
   makeRl,
@@ -88,8 +89,7 @@ export function upsertAdminEmails(envPath: string, emails: string[]): void {
   writeFileSync(envPath, next.join('\n'));
 }
 
-// The config schema lives in src/lib/config/schema.ts today
-// (commit 4 will move it to @app/domain). Import the JSON shape
+// The config schema is at @app/domain. Import the JSON shape
 // and reuse it here so the CLI keeps working.
 import { appConfigSchema, type AppConfig } from '@app/domain';
 
@@ -99,6 +99,9 @@ const TONE_OPTIONS: ReadonlyArray<PromptOption<AppConfig['agentPersona']['tone']
   { value: 'casual', label: 'Casual', blurb: 'relaxed, plain language, short replies' },
   { value: 'concise', label: 'Concise', blurb: 'direct, minimal, one or two sentences' },
 ];
+
+const banner = (s: string) => console.log(`\n\x1b[1m${s}\x1b[0m`);
+const ok = (s: string) => console.log(`\x1b[32m  ✓\x1b[0m ${s}`);
 
 async function loadCurrentDefaults(repoRoot: string, configPath: string): Promise<AppConfig> {
   if (existsSync(configPath)) {
@@ -130,21 +133,7 @@ export interface InitResult {
   seedReason?: string;
 }
 
-export async function runInit(opts: InitOptions): Promise<InitResult> {
-  const REPO_ROOT = opts.repoRoot;
-  const CONFIG_PATH = join(REPO_ROOT, 'config', 'app.config.ts');
-  const ENV_PATH = join(REPO_ROOT, '.env.local');
-
-  const rl = makeRl();
-  const defaults = await loadCurrentDefaults(REPO_ROOT, CONFIG_PATH);
-  let config: AppConfig = defaults;
-
-  console.log('\n\x1b[1mPulsar Analytics — first-time support agent setup\x1b[0m');
-  console.log('Press Enter to keep the current value shown in [brackets].\n');
-
-  const banner = (s: string) => console.log(`\n\x1b[1m${s}\x1b[0m`);
-  const ok = (s: string) => console.log(`\x1b[32m  ✓\x1b[0m ${s}`);
-
+export async function promptOrg(rl: Interface, config: AppConfig): Promise<void> {
   banner('Organisation');
   config.orgName = await ask(rl, 'Company / org name', config.orgName);
   config.orgShortName = await ask(rl, 'Short name (nav brand)', config.orgShortName);
@@ -153,7 +142,9 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
     'Who does the agent talk to? (e.g. "Pulsar Analytics customers and prospects")',
     config.audience,
   );
+}
 
+export async function promptPersona(rl: Interface, config: AppConfig): Promise<void> {
   banner('Agent persona');
   const personaNameInput = await ask(
     rl,
@@ -164,7 +155,9 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
     name: personaNameInput === '' ? undefined : personaNameInput,
     tone: await pickFromList(rl, 'Tone:', TONE_OPTIONS, config.agentPersona.tone),
   };
+}
 
+export async function promptOutOfScope(rl: Interface, config: AppConfig): Promise<void> {
   banner('Out-of-scope topics');
   console.log('Current list:');
   for (const t of config.outOfScopeTopics) {
@@ -189,7 +182,9 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
     }
     config.outOfScopeTopics = next;
   }
+}
 
+export async function promptCustomInstructions(rl: Interface, config: AppConfig): Promise<void> {
   banner('Custom instructions');
   console.log('Anything extra the agent should always do or never do?');
   const custom = await askMultiLine(
@@ -198,7 +193,9 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
     config.customInstructions ?? '',
   );
   config.customInstructions = custom === '' ? undefined : custom;
+}
 
+export async function promptAdmin(rl: Interface, config: AppConfig): Promise<void> {
   banner('Admin emails');
   console.log('Comma-separated. The first time one of these emails signs in via Clerk,');
   console.log('they are auto-promoted to admin.');
@@ -212,47 +209,49 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   config.adminEmails = parsedEmails;
+}
 
+export async function promptBranding(rl: Interface, config: AppConfig): Promise<void> {
   banner('Branding');
   config.branding = {
     title: await ask(rl, 'Browser tab title', config.branding.title),
     description: await ask(rl, 'Meta description', config.branding.description),
   };
+}
 
+export async function promptSeed(rl: Interface, config: AppConfig, repoRoot: string): Promise<string> {
   banner('Seed PDFs');
   const sourceDir = await ask(
     rl,
     'Path to a folder of PDFs to use as the RAG corpus',
     config.seedDocsDir,
   );
-  const absSource = isAbsolute(sourceDir) ? sourceDir : resolve(REPO_ROOT, sourceDir);
+  const absSource = isAbsolute(sourceDir) ? sourceDir : resolve(repoRoot, sourceDir);
   console.log(`  resolved: ${absSource}`);
+  return absSource;
+}
 
-  const validated = appConfigSchema.safeParse(config);
-  if (!validated.success) {
-    console.error('\nInvalid configuration:');
-    for (const i of validated.error.issues) {
-      console.error(`  - ${i.path.join('.') || '(root)'}: ${i.message}`);
-    }
-    rl.close();
-    process.exit(1);
-  }
-  config = validated.data;
+export async function writeOutputs(opts: {
+  repoRoot: string;
+  configPath: string;
+  envPath: string;
+  config: AppConfig;
+  absSource: string;
+  destDir: string;
+  rl: Interface;
+}): Promise<InitResult> {
+  const { repoRoot, configPath, envPath, config, absSource, destDir, rl } = opts;
 
-  const destDir = isAbsolute(config.seedDocsDir)
-    ? config.seedDocsDir
-    : resolve(REPO_ROOT, config.seedDocsDir);
-
-  writeConfigFile(CONFIG_PATH, config);
-  ok(`wrote ${relative(REPO_ROOT, CONFIG_PATH)}`);
-  upsertAdminEmails(ENV_PATH, config.adminEmails);
+  writeConfigFile(configPath, config);
+  ok(`wrote ${relative(repoRoot, configPath)}`);
+  upsertAdminEmails(envPath, config.adminEmails);
   if (config.adminEmails.length > 0) {
-    ok(`wrote ADMIN_EMAILS to ${relative(REPO_ROOT, ENV_PATH)}`);
+    ok(`wrote ADMIN_EMAILS to ${relative(repoRoot, envPath)}`);
   }
 
   const outcome = copyPdfsFromDir(absSource, destDir);
   if (outcome.copied.length > 0) {
-    ok(`copied ${outcome.copied.length} PDF(s) to ${relative(REPO_ROOT, destDir)}/`);
+    ok(`copied ${outcome.copied.length} PDF(s) to ${relative(repoRoot, destDir)}/`);
   } else {
     console.log(`  (no PDFs copied from ${absSource})`);
   }
@@ -263,7 +262,7 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
     console.log(`  Hint: the RAG pipeline only accepts .pdf files. ${outcome.skipped.length} non-PDF(s) ignored.`);
   }
 
-  const { ran, reason } = runSeedIfPossible(REPO_ROOT, destDir);
+  const { ran, reason } = runSeedIfPossible(repoRoot, destDir);
   if (ran) {
     ok('seeded PDFs into the database');
   } else {
@@ -273,8 +272,8 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
   rl.close();
   return {
     ok: true,
-    configPath: CONFIG_PATH,
-    envPath: ENV_PATH,
+    configPath,
+    envPath,
     destDir,
     copied: outcome.copied,
     skipped: outcome.skipped,
@@ -283,13 +282,94 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
   };
 }
 
-function writeConfigFile(configPath: string, config: AppConfig): void {
+export async function runInit(opts: InitOptions): Promise<InitResult> {
+  const REPO_ROOT = opts.repoRoot;
+  const CONFIG_PATH = join(REPO_ROOT, 'config', 'app.config.ts');
+  const ENV_PATH = join(REPO_ROOT, '.env.local');
+
+  const rl = makeRl();
+  const defaults = await loadCurrentDefaults(REPO_ROOT, CONFIG_PATH);
+  let config: AppConfig = defaults;
+
+  console.log('\n\x1b[1mPulsar Analytics — first-time support agent setup\x1b[0m');
+  console.log('Press Enter to keep the current value shown in [brackets].\n');
+
+  await promptOrg(rl, config);
+  await promptPersona(rl, config);
+  await promptOutOfScope(rl, config);
+  await promptCustomInstructions(rl, config);
+  await promptAdmin(rl, config);
+  await promptBranding(rl, config);
+  const absSource = await promptSeed(rl, config, REPO_ROOT);
+
+  const validated = appConfigSchema.safeParse(config);
+  if (!validated.success) {
+    console.error('\nInvalid configuration:');
+    for (const i of validated.error.issues) {
+      console.error(`  - ${i.path.join('.') || '(root)'}: ${i.message}`);
+    }
+    rl.close();
+    throw new Error('Invalid configuration');
+  }
+  config = validated.data;
+
+  const destDir = isAbsolute(config.seedDocsDir)
+    ? config.seedDocsDir
+    : resolve(REPO_ROOT, config.seedDocsDir);
+
+  return writeOutputs({
+    repoRoot: REPO_ROOT,
+    configPath: CONFIG_PATH,
+    envPath: ENV_PATH,
+    config,
+    absSource,
+    destDir,
+    rl,
+  });
+}
+
+export function writeConfigFile(configPath: string, config: AppConfig): void {
   mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, renderConfigFile(config));
 }
 
+function jsonToTs(obj: unknown, indent = 2): string {
+  const recurse = (val: unknown, depth: number): string => {
+    const pad = ' '.repeat(indent * depth);
+    const padInner = ' '.repeat(indent * (depth + 1));
+
+    if (val === null || val === undefined) return 'undefined';
+    if (typeof val === 'string') {
+      const escaped = val
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+      return `"${escaped}"`;
+    }
+    if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '[]';
+      const items = val.map((item) => `${padInner}${recurse(item, depth + 1)}`);
+      return `[\n${items.join(',\n')}\n${pad}]`;
+    }
+    if (typeof val === 'object') {
+      const keys = Object.keys(val as Record<string, unknown>);
+      if (keys.length === 0) return '{}';
+      const entries = keys.map((k) => {
+        const v = recurse((val as Record<string, unknown>)[k], depth + 1);
+        return `${padInner}${k}: ${v}`;
+      });
+      return `{\n${entries.join(',\n')}\n${pad}}`;
+    }
+    return String(val);
+  };
+  return recurse(obj, 0);
+}
+
 function renderConfigFile(config: AppConfig): string {
-  const body = JSON.stringify(config, null, 2).replace(/"([^"]+)":/g, '$1:');
+  const body = jsonToTs(config);
   return `import type { AppConfig } from '@app/domain';
 
 // Runtime configuration for this deployment of the RAG Support Agent.

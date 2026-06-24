@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
 import { requireAdminRoute } from '@/composition';
+import { respond } from '@/lib/http';
+import { ValidationError } from '@app/domain';
 
 export async function DELETE(
   _req: Request,
@@ -11,15 +12,12 @@ export async function DELETE(
   const { id } = await context.params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+    return respond(new ValidationError('Invalid id'));
   }
   try {
     await comp.hardDeleteDocument({ documentId: docId, actorId: session.user.id });
-    return NextResponse.json({ ok: true });
+    return respond({ ok: true });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message ?? 'Delete failed' },
-      { status: 500 },
-    );
+    return respond(err);
   }
 }

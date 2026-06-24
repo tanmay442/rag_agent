@@ -125,7 +125,8 @@ describe('admin actions', () => {
       chunks: 12,
     });
     const fd = new FormData();
-    fd.append('file', new File(['x'], 'a.pdf', { type: 'application/pdf' }));
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x20, 0x74, 0x65, 0x73, 0x74]);
+    fd.append('file', new File([pdfBytes], 'a.pdf', { type: 'application/pdf' }));
     const result = await uploadPdfAction({}, fd);
     expect(result.status).toBe('inserted');
     expect(result.chunks).toBe(12);
@@ -148,7 +149,7 @@ describe('admin actions', () => {
     });
     softDeleteDocumentMock.mockRejectedValue(new Error('boom'));
     const result = await deleteDocumentAction(42);
-    expect(result.error).toBe('boom');
+    expect(result.error).toBe('An unexpected error occurred');
   });
 
   it('restoreDocumentAction surfaces non-ok reasons', async () => {
@@ -232,7 +233,7 @@ describe('admin actions', () => {
     });
     recountChunksForDocumentMock.mockRejectedValue(new Error('db down'));
     const result = await recountChunksAction(42);
-    expect(result.error).toBe('db down');
+    expect(result.error).toBe('An unexpected error occurred');
   });
 
   it('recountAllChunksAction 403s when requireAdmin throws', async () => {
@@ -263,6 +264,6 @@ describe('admin actions', () => {
     });
     recountChunksForAllDocumentsMock.mockRejectedValue(new Error('nope'));
     const result = await recountAllChunksAction();
-    expect(result.error).toBe('nope');
+    expect(result.error).toBe('An unexpected error occurred');
   });
 });
