@@ -64,12 +64,12 @@ export async function searchChunksByVector(
   if (!Array.isArray(embedding) || embedding.length === 0 || !embedding.every((v) => Number.isFinite(v))) {
     throw new Error('Invalid embedding: must be a non-empty array of finite numbers');
   }
-  const vectorStr = `[${embedding.join(',')}]`;
+  const vectorLiteral = `[${embedding.join(',')}]`;
   const result = await db.execute(sql`
-    SELECT content, 1 - (embedding <=> ${vectorStr}::vector) AS similarity
+    SELECT content, 1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
     FROM chunks
-    WHERE 1 - (embedding <=> ${vectorStr}::vector) > ${opts.threshold}
-    ORDER BY embedding <=> ${vectorStr}::vector
+    WHERE 1 - (embedding <=> ${vectorLiteral}::vector) > ${opts.threshold}
+    ORDER BY embedding <=> ${vectorLiteral}::vector
     LIMIT ${opts.limit}
   `);
   const rows = (result as unknown as { rows?: Array<{ content: string; similarity: number }> })
