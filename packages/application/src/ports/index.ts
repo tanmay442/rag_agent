@@ -139,7 +139,8 @@ export type TicketAuditAction =
   | 'assign'
   | 'status_change'
   | 'note'
-  | 'impersonation';
+  | 'impersonation'
+  | 'role_change';
 
 export interface AuditLog {
   logDocumentEvent(input: {
