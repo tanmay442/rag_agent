@@ -19,7 +19,7 @@
     "setup-test-db": "tsx scripts/setup-test-db.ts",
     "teardown-test-db": "tsx scripts/teardown-test-db.ts",
     "typecheck": "tsc --noEmit",
-    "setup": "tsx scripts/setup.ts",
+    "setup": "tsx packages/cli/src/index.ts setup",
     "test:ci:run": "vitest run --reporter=dot && playwright test",
     "cli": "tsx packages/cli/src/index.ts",
     "cli:fixtures": "tsx packages/cli/src/index.ts fixtures",

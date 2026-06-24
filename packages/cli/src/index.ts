@@ -7,6 +7,7 @@
 // first two to get the sub-command and its args.
 import { runInit } from './commands/init';
 import { runFixtures } from './commands/fixtures';
+import { runSetup } from './commands/setup';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,8 @@ function usage(): void {
   console.log(`Usage: rag-agent <command> [args]
 
 Commands:
-  init               Interactive first-time setup. Same as \`pnpm setup\`.
+  init               Interactive setup (same as \`pnpm setup\`).
+  setup              One-command interactive first-run wizard.
   seed [--dir=...]   Ingest every PDF in the given dir.
   fixtures [outDir]  Regenerate the Pulsar + school PDF fixtures.
   db-migrate [args]  Run drizzle-kit push (or other migration command).
@@ -34,6 +36,9 @@ async function main(): Promise<void> {
   switch (cmd) {
     case 'init':
       await runInit({ repoRoot: REPO_ROOT });
+      return;
+    case 'setup':
+      await runSetup(REPO_ROOT);
       return;
     case 'fixtures': {
       const outDir = rest[0] ?? './scripts/fixtures';
