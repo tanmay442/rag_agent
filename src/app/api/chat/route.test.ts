@@ -69,7 +69,7 @@ const { compositionMock } = vi.hoisted(() => ({
     schema: { tickets: {} },
     recordQuery: vi.fn(),
     getChatModel: vi.fn(() => ({ modelId: 'mock' })),
-    getEmbeddingModel: vi.fn(() => ({ modelId: 'mock-embed' })),
+    getEmbeddingService: vi.fn(() => ({ modelId: 'mock-embed' })),
     logTicketEvent: vi.fn(),
   },
 }));

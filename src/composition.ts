@@ -82,7 +82,7 @@ const chunkRepo = {
 const ingestDeps: IngestDeps = {
   documents: documentRepo,
   chunks: chunkRepo,
-  embeddings: Llm.googleEmbeddingService,
+  embeddings: Llm.getEmbeddingService(),
   hasher: systemHasher,
   pdfParser: Pdf.pdfParseParser,
   textSplitter: Pdf.langchainSplitter,
@@ -90,7 +90,7 @@ const ingestDeps: IngestDeps = {
 
 const searchDeps: SearchDeps = {
   chunks: chunkRepo,
-  embeddings: Llm.googleEmbeddingService,
+  embeddings: Llm.getEmbeddingService(),
 };
 
 const rateLimitDeps: RateLimitDeps = { limiter: Auth.lruRateLimiter };
@@ -145,7 +145,7 @@ function createComposition() {
     // e.g. the chat route, the seed script, and server actions).
     db: Db.db,
     schema: Db.schema,
-    getEmbeddingModel: Llm.getEmbeddingModel,
+    getEmbeddingService: Llm.getEmbeddingService,
     getChatModel: Llm.getChatModel,
     session: Auth.clerkSessionStore,
     rateLimit: (key: string, opts: { limit: number; windowMs: number }) =>
