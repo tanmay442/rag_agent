@@ -72,8 +72,16 @@ export async function applyMigrations({
   try {
     // Enable pgvector extension before any schema operations.
     logger.log('-- enabling pgvector extension...');
-    await pool.query(EXTENSION_SQL);
-    logger.log('  ok');
+    try {
+      await pool.query(EXTENSION_SQL);
+      logger.log('  ok');
+    } catch (err) {
+      if (isBenignError(err)) {
+        logger.log('  skip:', err.message.split('\n')[0]);
+      } else {
+        throw err;
+      }
+    }
 
     for (const sql of ADD_COLUMNS) {
       logger.log('-- add column:', sql);
