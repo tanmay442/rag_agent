@@ -92,7 +92,7 @@ export async function runSeed(opts: SeedOptions = {}): Promise<void> {
             recountAll: () => Db.recountChunksForAll(),
             searchByVector: (embedding: number[], opts: { threshold: number; limit: number }) => Db.searchChunksByVector(embedding, opts),
           },
-          embeddings: Llm.getEmbeddingService(),
+          embeddings: Llm.googleEmbeddingService,
           hasher: { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') },
           pdfParser: Pdf.pdfParseParser,
           textSplitter: Pdf.langchainSplitter,
