@@ -47,6 +47,10 @@ async function findUserByClerkId(clerkUserId: string) {
 }
 
 async function touchLastSeen(clerkUserId: string): Promise<void> {
+  const user = await findUserByClerkId(clerkUserId);
+  if (user?.lastSeenAt && Date.now() - user.lastSeenAt.getTime() < 60_000) {
+    return;
+  }
   await db.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.clerkUserId, clerkUserId));
 }
 

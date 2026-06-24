@@ -21,7 +21,7 @@ export async function getAnalyticsSummary(
   },
 ): Promise<Result<AnalyticsSummary>> {
   const [docCount, chunkCount, ticketCount, openTicketCount, usersCount] = await Promise.all([
-    deps.documents.list({ limit: 0, offset: 0 }).then((r) => r.total),
+    deps.documents.list({ limit: 1, offset: 0 }).then((r) => r.total),
     deps.chunks.countForAll(),
     deps.tickets.countAll(),
     deps.tickets.countOpen(),
