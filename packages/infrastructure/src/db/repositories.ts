@@ -286,7 +286,7 @@ export const auditRepo = {
   async logDocumentEvent(input: { action: 'upload' | 'replace' | 'delete' | 'restore'; documentId: number; actorId: string }): Promise<void> {
     await db.insert(documentAudit).values(input);
   },
-  async logTicketEvent(input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation'; ticketId: string; actorId: string }): Promise<void> {
+  async logTicketEvent(input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change'; ticketId: string; actorId: string }): Promise<void> {
     await db.insert(ticketAudit).values(input);
   },
   async list(input: { documentId?: number; ticketId?: string; limit: number; offset: number }): Promise<{

@@ -123,12 +123,12 @@ export async function hardDeleteDocument(
   input: { documentId: number; actorId: string },
   deps: { documents: DocumentRepository; audit: AuditLog },
 ): Promise<Result<void>> {
+  await deps.documents.deleteById(input.documentId);
   await deps.audit.logDocumentEvent({
     action: 'delete',
     documentId: input.documentId,
     actorId: input.actorId,
   });
-  await deps.documents.deleteById(input.documentId);
   return ok(undefined);
 }
 

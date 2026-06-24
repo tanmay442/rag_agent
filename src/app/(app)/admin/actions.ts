@@ -49,13 +49,13 @@ export async function uploadPdfAction(
   if (!(file instanceof File)) {
     return { error: 'No PDF uploaded.' };
   }
-  if (!file.name.toLowerCase().endsWith('.pdf')) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.length < 4 || buffer.toString('utf8', 0, 4) !== '%PDF') {
     return { error: 'Only PDF files are supported.' };
   }
   if (file.size > 20 * 1024 * 1024) {
     return { error: 'File too large (max 20 MB).' };
   }
-  const buffer = Buffer.from(await file.arrayBuffer());
   try {
     const result = await getComposition().uploadPdf({
       fileName: file.name,
