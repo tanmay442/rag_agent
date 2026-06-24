@@ -81,6 +81,7 @@ const chunkRepo = {
 
 const ingestDeps: IngestDeps = {
   documents: documentRepo,
+  chunks: chunkRepo,
   embeddings: Llm.googleEmbeddingService,
   hasher: systemHasher,
   pdfParser: Pdf.pdfParseParser,
