@@ -14,9 +14,7 @@ import 'dotenv/config';
 import {
   makeRl,
   ask,
-  pickFromList,
   askYesNo,
-  type PromptOption,
 } from '../prompts/index';
 import {
   promptOrg,
@@ -31,8 +29,6 @@ import {
 import {
   appConfigSchema,
   type AppConfig,
-  EMBEDDING_PROVIDERS,
-  getProviderDef,
 } from '@app/domain';
 import { Llm } from '@app/infrastructure';
 import { runFixtures } from './fixtures';
@@ -136,16 +132,10 @@ async function validateDbUrl(url: string): Promise<string | null> {
 
 // ── Embedding test ─────────────────────────────────────────────
 
-async function testEmbedding(providerId: string): Promise<string | null> {
-  const def = getProviderDef(providerId);
-  const key = process.env[def.envVar];
-  if (!key) return `${def.envVar} is not set in environment`;
+async function testEmbedding(): Promise<string | null> {
+  if (!process.env.AI_STUDIO_KEY) return 'AI_STUDIO_KEY is not set in environment';
   try {
-    const svc =
-      def.provider === 'google'
-        ? Llm.getGoogleEmbeddingService(def)
-        : Llm.getOpenAiEmbeddingService(def);
-    const result = await svc.embed('validation-test-vector');
+    const result = await Llm.googleEmbeddingService.embed('validation-test-vector');
     if (!result || result.length === 0) return 'Embedding returned empty vector';
     return null;
   } catch (err: unknown) {
@@ -214,24 +204,8 @@ async function promptEnv(rl: Interface, envPath: string): Promise<void> {
       vars.CLERK_SECRET_KEY ?? '',
     );
 
-    banner('Embedding provider');
-    const providerOptions: ReadonlyArray<PromptOption<string>> = EMBEDDING_PROVIDERS.map((p) => ({
-      value: p.id,
-      label: p.label,
-      blurb: `${p.model} (${p.defaultDimension} dim)`,
-    }));
-    const storedProvider = existing.EMBEDDING_PROVIDER ?? 'gemini';
-    const providerId = await pickFromList(rl, 'Choose an embedding model:', providerOptions, storedProvider);
-    vars.EMBEDDING_PROVIDER = providerId;
-
-    const def = getProviderDef(providerId);
-    if (def.envVar === 'AI_STUDIO_KEY') {
-      vars.AI_STUDIO_KEY = await askSecret(rl, 'AI_STUDIO_KEY', vars.AI_STUDIO_KEY ?? '');
-      vars.OPENAI_API_KEY = vars.OPENAI_API_KEY ?? '';
-    } else {
-      vars.OPENAI_API_KEY = await askSecret(rl, 'OPENAI_API_KEY', vars.OPENAI_API_KEY ?? '');
-      vars.AI_STUDIO_KEY = vars.AI_STUDIO_KEY ?? '';
-    }
+    banner('Embedding (Google AI Studio)');
+    vars.AI_STUDIO_KEY = await askSecret(rl, 'AI_STUDIO_KEY', vars.AI_STUDIO_KEY ?? '');
 
     writeEnvFile(envPath, vars);
     applyToProcess(vars);
@@ -243,8 +217,8 @@ async function promptEnv(rl: Interface, envPath: string): Promise<void> {
     const dbErr = await validateDbUrl(process.env.DATABASE_URL ?? '');
     if (dbErr) errors.push(`DATABASE_URL: ${dbErr}`);
 
-    const embedErr = await testEmbedding(providerId);
-    if (embedErr) errors.push(`Embedding (${providerId}): ${embedErr}`);
+    const embedErr = await testEmbedding();
+    if (embedErr) errors.push(`Embedding: ${embedErr}`);
 
     const chatErr = validateChatVars();
     if (chatErr) errors.push(chatErr);
