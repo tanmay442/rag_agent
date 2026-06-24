@@ -1,33 +1,19 @@
-// Interesting fix (2026-06-24): Gemini's gemini-embedding-001
-// defaults to 3072 dimensions when outputDimensionality is omitted.
-// The old hardcoded service had EMBEDDING_OPTIONS = { outputDimensionality: 768 }
-// but it got lost during the provider-refactor. This caused pgvector to
-// reject searches with 'different vector dimensions 768 and 3072'.
-// Always pass providerOptions to pin the output dimension.
+// Google AI Studio embedding adapter. The factory and the
+// per-call options are exported so use-cases that need a
+// raw model (e.g. tests) can ask for one. In production
+// the application layer only sees the EmbeddingService port.
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { embed, embedMany } from 'ai';
-import type { EmbeddingProviderDef } from '@app/domain';
-import type { EmbeddingService } from '@app/application/ports';
+import type { EmbeddingModelV3 } from '@ai-sdk/provider';
 
-export function getGoogleEmbeddingService(def: EmbeddingProviderDef): EmbeddingService {
-  const apiKey = process.env[def.envVar];
-  if (!apiKey) throw new Error(`${def.envVar} is not set.`);
+export function getEmbeddingModel(): EmbeddingModelV3 {
+  const apiKey = process.env.AI_STUDIO_KEY;
+  if (!apiKey) {
+    throw new Error('AI_STUDIO_KEY is not set.');
+  }
   const google = createGoogleGenerativeAI({ apiKey });
-  const model = google.textEmbedding(def.model);
-
-  return {
-    async embed(value: string): Promise<number[]> {
-      const { embedding } = await embed({ model, value, providerOptions: { google: { outputDimensionality: def.defaultDimension } } });
-      return embedding;
-    },
-    async embedBatch(values: string[]): Promise<number[][]> {
-      const { embeddings } = await embedMany({ model, values, providerOptions: { google: { outputDimensionality: def.defaultDimension } } });
-      return embeddings;
-    },
-  };
+  return google.textEmbedding('gemini-embedding-001') as EmbeddingModelV3;
 }
 
-export const googleEmbeddingService: EmbeddingService = (() => {
-  const def: EmbeddingProviderDef = { id: 'gemini', label: 'Google Gemini Embedding', provider: 'google', model: 'gemini-embedding-001', defaultDimension: 768, envVar: 'AI_STUDIO_KEY' };
-  return getGoogleEmbeddingService(def);
-})();
+export const EMBEDDING_OPTIONS = {
+  outputDimensionality: 768,
+} as const;
