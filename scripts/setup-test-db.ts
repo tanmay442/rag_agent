@@ -198,18 +198,22 @@ export async function main() {
   writeFileSync(envPath, envText, 'utf8');
   console.log(`[setup-test-db] Wrote DATABASE_URL to ${envPath}`);
 
-  // 6. Apply migrations against the *test* branch URI. The
-  //    parent process loaded .env via dotenv/config which
-  //    points DATABASE_URL at the production branch, so we
-  //    must override it for the child process. The same
-  //    override is applied to `pnpm seed` below.
+  // 6. Enable pgvector extension and apply migrations against
+  //    the *test* branch URI. The parent process loaded .env via
+  //    dotenv/config which points DATABASE_URL at the production
+  //    branch, so we must override it for the child process.
+  //    The same override is applied to `pnpm seed` below.
   try {
+    execFileSync('node', ['scripts/apply-migration.mjs'], {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: connectionString },
+    });
     execFileSync('pnpm', ['db:push', '--force'], {
       stdio: 'inherit',
       env: { ...process.env, DATABASE_URL: connectionString },
     });
   } catch (err) {
-    console.error('[setup-test-db] pnpm db:push failed', err);
+    console.error('[setup-test-db] migration/push failed', err);
     process.exit(1);
   }
 
