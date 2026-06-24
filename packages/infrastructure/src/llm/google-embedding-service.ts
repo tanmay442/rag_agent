@@ -1,3 +1,9 @@
+// Interesting fix (2026-06-24): Gemini's gemini-embedding-001
+// defaults to 3072 dimensions when outputDimensionality is omitted.
+// The old hardcoded service had EMBEDDING_OPTIONS = { outputDimensionality: 768 }
+// but it got lost during the provider-refactor. This caused pgvector to
+// reject searches with 'different vector dimensions 768 and 3072'.
+// Always pass providerOptions to pin the output dimension.
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { embed, embedMany } from 'ai';
 import type { EmbeddingProviderDef } from '@app/domain';
