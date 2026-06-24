@@ -61,6 +61,9 @@ export async function searchChunksByVector(
   embedding: number[],
   opts: { threshold: number; limit: number },
 ): Promise<Array<{ content: string; similarity: number }>> {
+  if (!Array.isArray(embedding) || embedding.length === 0 || !embedding.every((v) => Number.isFinite(v))) {
+    throw new Error('Invalid embedding: must be a non-empty array of finite numbers');
+  }
   const vectorLiteral = `[${embedding.join(',')}]`;
   const result = await db.execute(sql`
     SELECT content, 1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
@@ -283,7 +286,7 @@ export const auditRepo = {
   async logDocumentEvent(input: { action: 'upload' | 'replace' | 'delete' | 'restore'; documentId: number; actorId: string }): Promise<void> {
     await db.insert(documentAudit).values(input);
   },
-  async logTicketEvent(input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation'; ticketId: string; actorId: string }): Promise<void> {
+  async logTicketEvent(input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change'; ticketId: string; actorId: string }): Promise<void> {
     await db.insert(ticketAudit).values(input);
   },
   async list(input: { documentId?: number; ticketId?: string; limit: number; offset: number }): Promise<{

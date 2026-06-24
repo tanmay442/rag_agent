@@ -37,7 +37,13 @@ export async function searchChunks(
   } catch (cause) {
     return err(new ExternalServiceError('Embedding API failed', cause));
   }
-  const rows = await deps.chunks.searchByVector(embedding, { threshold, limit });
+  let rows: Awaited<ReturnType<ChunkRepository['searchByVector']>>;
+  try {
+    rows = await deps.chunks.searchByVector(embedding, { threshold, limit });
+  } catch (cause) {
+    console.error('[searchChunks] Vector search failed:', cause);
+    return err(new ExternalServiceError('Vector search failed', cause));
+  }
   return ok(
     rows.map((r) => ({ content: r.content, similarity: Number(r.similarity) })),
   );

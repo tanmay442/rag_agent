@@ -29,19 +29,35 @@ opened only when the user explicitly asks for one.
 - **Tooling:** Vitest, Testing Library, Playwright, `drizzle-kit`
 - **UI:** Dark "obsidian slate" theme via CSS custom properties in `src/app/globals.css` (no light variant). Route groups split the app: `(marketing)` for the public landing, `(app)` for the unified sidebar + mobile-drawer shell that wraps `/chat` and `/admin/*`.
 
-## Local development
+## Quick start (recommended)
 
 ```bash
 # 1. Install
 pnpm install
 
-# 2. Copy env template
-cp .env.example .env.local
-# …then fill DATABASE_URL, AI_STUDIO_KEY, CUSTOM_LLM_*,
-#    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, ADMIN_EMAILS
+# 2. One-command interactive setup — prompts for every env var,
+#    validates connectivity, selects an embedding model, migrates
+#    the database, seeds sample documents, and runs an end-to-end
+#    smoke test.
+pnpm setup
 
-# 3. Apply schema + the new columns on pre-existing tables
-pnpm cli db-migrate
+# 3. Run the app
+pnpm dev
+```
+
+The app boots on <http://localhost:3000>.
+
+## Manual setup
+
+```bash
+# 1. Install
+pnpm install
+
+# 2. Copy env template then fill in real values
+cp .env.example .env.local
+
+# 3. Apply schema + enable pgvector + run migrations
+pnpm cli db-migrate --force
 
 # 4. Seed sample docs (optional)
 pnpm cli seed
@@ -49,8 +65,6 @@ pnpm cli seed
 # 5. Run the app
 pnpm dev
 ```
-
-The app boots on <http://localhost:3000>.
 
 ## Identity, auth, and roles
 

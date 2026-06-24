@@ -18,7 +18,10 @@ export const documents = pgTable('documents', {
   uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
   blob: byteaBlob('blob'),
   deletedAt: timestamp('deleted_at'),
-});
+}, (table) => [
+  index('documents_deleted_at_idx').on(table.deletedAt),
+  index('documents_uploaded_at_idx').on(table.uploadedAt.desc()),
+]);
 
 export const chunks = pgTable('chunks', {
   id: serial('id').primaryKey(),
@@ -27,6 +30,7 @@ export const chunks = pgTable('chunks', {
   embedding: vector('embedding').notNull(),
 }, (table) => [
   index('embedding_idx').using('hnsw', sql`${table.embedding} vector_cosine_ops`),
+  index('chunks_document_id_idx').on(table.documentId),
 ]);
 
 export const tickets = pgTable('tickets', {
@@ -40,7 +44,9 @@ export const tickets = pgTable('tickets', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   assignedTo: text('assigned_to'),
   notes: text('notes'),
-});
+}, (table) => [
+  index('tickets_status_idx').on(table.status),
+]);
 
 export const users = pgTable('users', {
   clerkUserId: text('clerk_user_id').primaryKey(),
@@ -71,7 +77,7 @@ export const ticketAudit = pgTable('ticket_audit', {
   action: text('action').notNull(),
   at: timestamp('at').defaultNow().notNull(),
 }, (table) => [
-  check('ticket_audit_action_check', sql`${table.action} IN ('create','assign','status_change','note','impersonation')`),
+  check('ticket_audit_action_check', sql`${table.action} IN ('create','assign','status_change','note','impersonation','role_change')`),
 ]);
 
 export type Document = typeof documents.$inferSelect;

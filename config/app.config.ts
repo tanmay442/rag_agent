@@ -3,15 +3,14 @@ import type { AppConfig } from '@app/domain/app-config';
 // Runtime configuration for this deployment of the RAG Support Agent.
 //
 // Edit any field, or run `pnpm setup` to be walked through the values
-// interactively. The schema in `src/lib/config/schema.ts` validates
+// interactively. The schema at `@app/domain` validates
 // this object on load; required fields have defaults so an empty
 // file is valid.
 //
 // Required externally: nothing. This file is the source of truth for
 // org name, agent persona, admin bootstrap emails, and the seed-PDFs
 // directory. The setup CLI also writes `ADMIN_EMAILS` to .env.local
-// so the existing Clerk-based admin bootstrap in src/lib/auth/users.ts
-// keeps working.
+// so the Clerk-based admin bootstrap code path keeps working.
 
 const config: AppConfig = {
   // The full name of the org the agent represents. Used in the

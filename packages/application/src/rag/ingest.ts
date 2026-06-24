@@ -9,7 +9,7 @@
 // the error message; commit 7 will introduce the mapping
 // helper).
 import { err, ok, type Result, ValidationError, ExternalServiceError } from '@app/domain';
-import type { DocumentRepository } from '../ports/index';
+import type { DocumentRepository, ChunkRepository } from '../ports/index';
 import type { EmbeddingService } from '../ports/index';
 import type { Hasher } from '../ports/index';
 import type { PdfParser } from '../ports/index';
@@ -29,6 +29,7 @@ export interface IngestResult {
 
 export interface IngestDeps {
   documents: DocumentRepository;
+  chunks: ChunkRepository;
   embeddings: EmbeddingService;
   hasher: Hasher;
   pdfParser: PdfParser;
@@ -46,9 +47,6 @@ export async function ingestFile(
   if (existing && existing.fileHash === fileHash) {
     return ok({ documentId: existing.id, chunks: 0, status: 'unchanged' });
   }
-  if (existing) {
-    await deps.documents.deleteById(existing.id);
-  }
 
   let text: string;
   try {
@@ -60,8 +58,9 @@ export async function ingestFile(
   if (texts.length === 0) {
     return err(new ValidationError(`No extractable text in ${fileName}`));
   }
+  let embeddings: number[][];
   try {
-    await deps.embeddings.embedBatch(texts);
+    embeddings = await deps.embeddings.embedBatch(texts);
   } catch (cause) {
     return err(new ExternalServiceError('Embedding API failed', cause));
   }
@@ -72,9 +71,18 @@ export async function ingestFile(
     uploadedBy,
   });
 
-  // We do not insert chunks here directly — the documents
-  // adapter wraps the transaction so a document without
-  // chunks is impossible. See @app/infrastructure/db.
+  await deps.chunks.insertMany(
+    texts.map((t, i) => ({
+      documentId: inserted.id,
+      content: t,
+      embedding: embeddings[i],
+    })),
+  );
+
+  if (existing) {
+    await deps.documents.deleteById(existing.id);
+  }
+
   return ok({
     documentId: inserted.id,
     chunks: texts.length,

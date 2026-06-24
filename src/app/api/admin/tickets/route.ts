@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import { requireAdminGet, isTicketStatus, parseQueryPagination } from '@/composition';
+import { respond } from '@/lib/http';
 
 export async function GET(req: Request) {
   const auth = await requireAdminGet(req);
@@ -16,5 +16,5 @@ export async function GET(req: Request) {
     limit,
     offset,
   });
-  return NextResponse.json(result);
+  return respond(result);
 }

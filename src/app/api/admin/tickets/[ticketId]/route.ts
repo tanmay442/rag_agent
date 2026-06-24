@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdminRoute, isTicketStatus, TICKET_STATUSES } from '@/composition';
+import { respond } from '@/lib/http';
+import { ValidationError, NotFoundError, ConflictError } from '@app/domain';
 
 const PatchSchema = z.object({
   status: z.enum(TICKET_STATUSES).optional(),
@@ -19,10 +20,10 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    return respond(new ValidationError('Invalid payload'));
   }
   if (parsed.data.status && !isTicketStatus(parsed.data.status)) {
-    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    return respond(new ValidationError('Invalid status'));
   }
   const result = await comp.updateTicket({
     ticketId,
@@ -32,8 +33,9 @@ export async function PATCH(
     actorId: session.user.id,
   });
   if (!result.ok) {
-    const status = result.reason === 'not_found' ? 404 : 409;
-    return NextResponse.json({ error: result.reason }, { status });
+    return result.reason === 'not_found'
+      ? respond(new NotFoundError('Ticket not found'))
+      : respond(new ConflictError('Ticket update conflict'));
   }
-  return NextResponse.json({ ticket: result.ticket });
+  return respond({ ticket: result.ticket });
 }
