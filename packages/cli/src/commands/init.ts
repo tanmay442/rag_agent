@@ -133,7 +133,7 @@ export interface InitResult {
   seedReason?: string;
 }
 
-async function promptOrg(rl: Interface, config: AppConfig): Promise<void> {
+export async function promptOrg(rl: Interface, config: AppConfig): Promise<void> {
   banner('Organisation');
   config.orgName = await ask(rl, 'Company / org name', config.orgName);
   config.orgShortName = await ask(rl, 'Short name (nav brand)', config.orgShortName);
@@ -144,7 +144,7 @@ async function promptOrg(rl: Interface, config: AppConfig): Promise<void> {
   );
 }
 
-async function promptPersona(rl: Interface, config: AppConfig): Promise<void> {
+export async function promptPersona(rl: Interface, config: AppConfig): Promise<void> {
   banner('Agent persona');
   const personaNameInput = await ask(
     rl,
@@ -157,7 +157,7 @@ async function promptPersona(rl: Interface, config: AppConfig): Promise<void> {
   };
 }
 
-async function promptOutOfScope(rl: Interface, config: AppConfig): Promise<void> {
+export async function promptOutOfScope(rl: Interface, config: AppConfig): Promise<void> {
   banner('Out-of-scope topics');
   console.log('Current list:');
   for (const t of config.outOfScopeTopics) {
@@ -184,7 +184,7 @@ async function promptOutOfScope(rl: Interface, config: AppConfig): Promise<void>
   }
 }
 
-async function promptCustomInstructions(rl: Interface, config: AppConfig): Promise<void> {
+export async function promptCustomInstructions(rl: Interface, config: AppConfig): Promise<void> {
   banner('Custom instructions');
   console.log('Anything extra the agent should always do or never do?');
   const custom = await askMultiLine(
@@ -195,7 +195,7 @@ async function promptCustomInstructions(rl: Interface, config: AppConfig): Promi
   config.customInstructions = custom === '' ? undefined : custom;
 }
 
-async function promptAdmin(rl: Interface, config: AppConfig): Promise<void> {
+export async function promptAdmin(rl: Interface, config: AppConfig): Promise<void> {
   banner('Admin emails');
   console.log('Comma-separated. The first time one of these emails signs in via Clerk,');
   console.log('they are auto-promoted to admin.');
@@ -211,7 +211,7 @@ async function promptAdmin(rl: Interface, config: AppConfig): Promise<void> {
   config.adminEmails = parsedEmails;
 }
 
-async function promptBranding(rl: Interface, config: AppConfig): Promise<void> {
+export async function promptBranding(rl: Interface, config: AppConfig): Promise<void> {
   banner('Branding');
   config.branding = {
     title: await ask(rl, 'Browser tab title', config.branding.title),
@@ -219,7 +219,7 @@ async function promptBranding(rl: Interface, config: AppConfig): Promise<void> {
   };
 }
 
-async function promptSeed(rl: Interface, config: AppConfig, repoRoot: string): Promise<string> {
+export async function promptSeed(rl: Interface, config: AppConfig, repoRoot: string): Promise<string> {
   banner('Seed PDFs');
   const sourceDir = await ask(
     rl,
@@ -231,7 +231,7 @@ async function promptSeed(rl: Interface, config: AppConfig, repoRoot: string): P
   return absSource;
 }
 
-async function writeOutputs(opts: {
+export async function writeOutputs(opts: {
   repoRoot: string;
   configPath: string;
   envPath: string;
@@ -328,7 +328,7 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
   });
 }
 
-function writeConfigFile(configPath: string, config: AppConfig): void {
+export function writeConfigFile(configPath: string, config: AppConfig): void {
   mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, renderConfigFile(config));
 }
