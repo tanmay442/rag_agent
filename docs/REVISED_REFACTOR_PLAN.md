@@ -142,7 +142,7 @@ The reason the Commit-1 bug went undetected: **no test asserts chunks are persis
 
 - `packages/application/src/rag/__tests__/ingest.integration.test.ts`: drive `ingestFile` with a fake PDF/embeddings, assert `chunks.insertMany` was called with `{documentId, content, embedding}` tuples matching the embed output — fails on current code, passes after Commit 1.
 - `search.ts` test (unguarded DB path), `parseQueryPagination` NaN test, `respond()` mapping test, `setUserRole` audit-action test.
-- Remove/update references to non-existent `docs/TECH_DEBT.md`. If a tech-debt tracker still exists elsewhere, update that. Otherwise, close the loop in the PR description.
+- A prior version of this plan referenced a non-existent `docs/TECH_DEBT.md`. No such file was ever committed — the reference has been removed.
 
 ---
 

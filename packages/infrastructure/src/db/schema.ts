@@ -79,7 +79,7 @@ export const ticketAudit = pgTable('ticket_audit', {
   action: text('action').notNull(),
   at: timestamp('at').defaultNow().notNull(),
 }, (table) => [
-  check('ticket_audit_action_check', sql`${table.action} IN ('create','assign','status_change','note','impersonation')`),
+  check('ticket_audit_action_check', sql`${table.action} IN ('create','assign','status_change','note','impersonation','role_change')`),
 ]);
 
 export type Document = typeof documents.$inferSelect;
