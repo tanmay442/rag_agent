@@ -10,7 +10,6 @@
     "./prompts": "./src/prompts/index.ts"
   },
   "dependencies": {
-    "@app/pulsar-content": "workspace:*",
     "dotenv": "^17.4.2"
   },
   "devDependencies": {

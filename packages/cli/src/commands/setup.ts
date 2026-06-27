@@ -3,7 +3,6 @@ import {
   readFileSync,
   writeFileSync,
   readdirSync,
-  mkdirSync,
 } from 'node:fs';
 import { join, resolve, isAbsolute } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -31,7 +30,6 @@ import {
   type AppConfig,
 } from '@app/domain';
 import { Llm } from '@app/infrastructure';
-import { runFixtures } from './fixtures';
 
 const { Pool } = pg;
 
@@ -305,9 +303,8 @@ function printNextSteps(repoRoot: string, config: AppConfig): void {
   console.log(`     The first time \x1b[33m${firstAdmin}\x1b[0m signs in via Clerk,`);
   console.log('     they are auto-promoted to admin.');
   console.log();
-  console.log('  \x1b[1m3.\x1b[0m  Upload more documents:');
-  console.log('     Run \x1b[36mpnpm cli seed --dir=/path/to/pdfs\x1b[0m');
-  console.log('     or use the admin UI at /admin/documents.');
+  console.log('  \x1b[1m3.\x1b[0m  Upload documents:');
+  console.log('     Use the admin console at /admin/upload');
   console.log();
   console.log('  \x1b[1m4.\x1b[0m  Re-run this wizard anytime:');
   console.log('     \x1b[36mpnpm setup\x1b[0m');
@@ -320,7 +317,7 @@ export async function runSetup(repoRoot: string): Promise<void> {
   const CONFIG_PATH = join(repoRoot, 'config', 'app.config.ts');
   const ENV_PATH = join(repoRoot, '.env.local');
 
-  console.log('\n\x1b[1mPulsar Analytics — one-command interactive setup\x1b[0m');
+  console.log('\n\x1b[1mRAG Support Agent — setup\x1b[0m');
   console.log('This wizard configures everything needed to run the RAG Support Agent.\n');
 
   // Step 1: Prereq checks
@@ -360,15 +357,10 @@ export async function runSetup(repoRoot: string): Promise<void> {
     ? config.seedDocsDir
     : resolve(repoRoot, config.seedDocsDir);
 
-  // Handle fixtures if no PDFs found
-  if (!existsSync(absSource) || readdirSync(absSource).length === 0) {
-    if (await askYesNo(rl, 'No PDFs found. Generate sample corpus for testing?', true)) {
-      const fixturesDir = '/tmp/opencode/setup-fixtures';
-      mkdirSync(fixturesDir, { recursive: true });
-      const { written } = await runFixtures({ outDir: fixturesDir, repoRoot });
-      absSource = fixturesDir;
-      ok(`Generated ${written.length} sample PDF(s) in ${fixturesDir}`);
-    }
+  // If no PDFs found, skip seeding
+  if (!absSource || !existsSync(absSource) || readdirSync(absSource).length === 0) {
+    absSource = '';
+    warn('No PDFs found. You can upload documents later via /admin/upload.');
   }
 
   // Validate config schema
