@@ -307,7 +307,7 @@ function printNextSteps(repoRoot: string, config: AppConfig): void {
   console.log('     Use the admin console at /admin/upload');
   console.log();
   console.log('  \x1b[1m4.\x1b[0m  Re-run this wizard anytime:');
-  console.log('     \x1b[36mpnpm setup\x1b[0m');
+  console.log('     \x1b[36mpnpm configure\x1b[0m');
   console.log();
 }
 
@@ -322,7 +322,7 @@ export async function runSetup(repoRoot: string): Promise<void> {
 
   // Step 1: Prereq checks
   if (!promptPrereqs(repoRoot)) {
-    console.error('\nFix the issues above and re-run `pnpm setup`.');
+    console.error('\nFix the issues above and re-run `pnpm configure`.');
     process.exit(1);
   }
 

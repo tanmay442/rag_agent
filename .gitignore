@@ -42,7 +42,7 @@ yarn-error.log*
 next-env.d.ts
 
 
-# Seed PDFs dropped by `pnpm setup` or uploaded via the admin console.
+# Seed PDFs dropped by `pnpm configure` or uploaded via the admin console.
 /documents/
 
 # Workspace package build outputs

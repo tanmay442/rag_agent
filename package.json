@@ -18,7 +18,7 @@
     "setup-test-db": "tsx scripts/setup-test-db.ts",
     "teardown-test-db": "tsx scripts/teardown-test-db.ts",
     "typecheck": "tsc --noEmit",
-    "setup": "tsx packages/cli/src/index.ts setup",
+    "configure": "tsx packages/cli/src/index.ts setup",
     "cli": "tsx packages/cli/src/index.ts",
     "arch": "dependency-cruiser --config .dependency-cruiser.cjs packages src"
   },
