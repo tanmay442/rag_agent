@@ -74,17 +74,9 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       # ---- 5. E2E (DISABLED) -----------------------------------------
-      # TODO :) The e2e step is currently disabled. It provisions a
-      # per-run Neon branch, runs vitest + playwright, and tears the
-      # branch down on exit, but the setup is flaky in CI:
-      #   - Neon REST API: 423 "project already has running conflicting
-      #     operations" races between branch-create and endpoint-create.
-      #   - `scripts/fixtures/sample.pdf` is a corrupted test PDF that
-      #     makes the seed step fail with "bad XRef entry".
-      #   - The free-plan branches limit (10) can fill up after a few
-      #     failed runs, locking out further CI invocations until the
-      #     user manually prunes branches in the Neon console.
-      # Re-enable by uncommenting the block below and adding the
+      # E2E tests are disabled — Neon branch provisioning is flaky
+      # in CI and the free-plan branch limit (10) fills up after
+      # failed runs. Re-enable by uncommenting below and adding the
       # listed secrets to the repo's GitHub Actions secrets.
       #
       # - name: End-to-end tests

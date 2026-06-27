@@ -3,7 +3,7 @@
 import { err, ok, type Result, RateLimitedError } from '@app/domain';
 import type { RateLimiter } from '../ports/index';
 
-export interface RateLimitInput {
+interface RateLimitInput {
   key: string;
   limit: number;
   windowMs: number;

@@ -7,7 +7,7 @@ module.exports = {
       severity: 'error',
       comment: 'Domain is pure: it may only depend on zod.',
       from: { path: '^packages/domain' },
-      to: { path: '^packages/(application|infrastructure|cli|pulsar-content)' },
+      to: { path: '^packages/(application|infrastructure|cli)' },
     },
     {
       name: 'no-domain-importing-src',
@@ -85,13 +85,6 @@ module.exports = {
       to: { path: '^src/(app|components)' },
     },
 
-    // ---- PULSAR-CONTENT: no internal deps ----
-    {
-      name: 'no-pulsar-content-internals',
-      severity: 'error',
-      from: { path: '^packages/pulsar-content' },
-      to: { path: '^packages/(domain|application|infrastructure|cli)' },
-    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

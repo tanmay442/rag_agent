@@ -15,7 +15,7 @@ import type { Hasher } from '../ports/index';
 import type { PdfParser } from '../ports/index';
 import type { TextSplitter } from '../ports/index';
 
-export interface IngestFileInput {
+interface IngestFileInput {
   fileName: string;
   buffer: Buffer;
   uploadedBy: string;

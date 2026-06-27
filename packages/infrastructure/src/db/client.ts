@@ -8,4 +8,3 @@ import * as schema from './schema';
 
 export { schema };
 export const db = drizzle(buildPool(), { schema });
-export type DB = typeof db;

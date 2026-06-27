@@ -6,11 +6,11 @@ import {
   type Result,
   NotFoundError,
 } from '@app/domain';
-import type { DocumentRepository, ChunkRepository, AuditLog } from '../ports/index';
+import type { DocumentRepository, ChunkRepository, AuditLog, Clock } from '../ports/index';
 import { ingestFile } from '../rag/ingest';
 import type { IngestDeps, IngestResult } from '../rag/ingest';
 
-export interface ListDocumentsInput {
+interface ListDocumentsInput {
   search?: string;
   includeDeleted?: boolean;
   limit?: number;
@@ -98,7 +98,7 @@ export interface RestoreResult {
 export async function restoreDocument(
   documentId: number,
   actorId: string,
-  deps: { documents: DocumentRepository; audit: AuditLog; clock: { now(): Date } },
+  deps: { documents: DocumentRepository; audit: AuditLog; clock: Clock },
 ): Promise<Result<RestoreResult>> {
   const doc = await deps.documents.findById(documentId);
   if (!doc) return ok({ ok: false, reason: 'not_found' });

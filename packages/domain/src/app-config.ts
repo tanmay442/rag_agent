@@ -8,22 +8,22 @@
 // Clean Architecture refactor. No behaviour change.
 import { z } from 'zod';
 
-export const toneSchema = z.enum(['friendly', 'formal', 'casual', 'concise']);
-export type Tone = z.infer<typeof toneSchema>;
+const toneSchema = z.enum(['friendly', 'formal', 'casual', 'concise']);
+type Tone = z.infer<typeof toneSchema>;
 
-export const outOfScopeTopicSchema = z.object({
+const outOfScopeTopicSchema = z.object({
   topic: z.string().min(1),
   handling: z.string().min(1),
 });
-export type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
+type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
 
 export const appConfigSchema = z.object({
-  orgName: z.string().min(1).default('Pulsar Analytics'),
+  orgName: z.string().min(1).default('Your Company'),
   orgShortName: z.string().min(1).default('RAG Support'),
   audience: z
     .string()
     .min(1)
-    .default('Pulsar Analytics customers and prospects'),
+    .default('your customers'),
   agentPersona: z
     .object({
       name: z.string().min(1).optional(),
@@ -67,7 +67,7 @@ export const appConfigSchema = z.object({
       {
         topic: 'personal advice',
         handling:
-          'Decline politely. This assistant is for Pulsar product support only.',
+          'Decline politely. This assistant is for this product only.',
       },
     ]),
   adminEmails: z.array(z.string().email()).default([]),
@@ -78,18 +78,16 @@ export const appConfigSchema = z.object({
         .string()
         .min(1)
         .default(
-          'AI customer support agent for Pulsar Analytics, with grounded citations.',
+          'AI customer support agent, with grounded citations.',
         ),
     })
     .default({
       title: 'RAG Support',
       description:
-        'AI customer support agent for Pulsar Analytics, with grounded citations.',
+        'AI customer support agent, with grounded citations.',
     }),
   seedDocsDir: z.string().min(1).default('./documents'),
   prefetchFirstTurn: z.boolean().default(false),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
-
-export const DEFAULT_APP_CONFIG: AppConfig = appConfigSchema.parse({});

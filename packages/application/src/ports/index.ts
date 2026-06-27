@@ -16,13 +16,6 @@ export interface DocumentRow {
   deletedAt: Date | null;
 }
 
-export interface ChunkRow {
-  id: number;
-  documentId: number;
-  content: string;
-  embedding: number[];
-}
-
 export interface TicketRow {
   id: number;
   ticketId: string;
@@ -133,8 +126,8 @@ export interface UserRepository {
 
 // ---- Audit ----
 
-export type DocumentAuditAction = 'upload' | 'replace' | 'delete' | 'restore';
-export type TicketAuditAction =
+type DocumentAuditAction = 'upload' | 'replace' | 'delete' | 'restore';
+type TicketAuditAction =
   | 'create'
   | 'assign'
   | 'status_change'
@@ -192,16 +185,6 @@ export interface QueryStats {
 export interface EmbeddingService {
   embed(value: string): Promise<number[]>;
   embedBatch(values: string[]): Promise<number[][]>;
-}
-
-export interface ChatService {
-  /** Stream a UI message stream. Captures citations via onCitation. */
-  stream(input: {
-    system: string;
-    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
-    preFetched: Array<{ similarity: number; content: string }>;
-    capturedCitations: Array<{ similarity: number; snippet: string }>;
-  }): Promise<ReadableStream<Uint8Array>>;
 }
 
 // ---- PDF parsing & text splitting ----

@@ -72,12 +72,6 @@ importers:
       '@app/infrastructure':
         specifier: workspace:*
         version: link:packages/infrastructure
-      '@app/pulsar-content':
-        specifier: workspace:*
-        version: link:packages/pulsar-content
-      '@playwright/test':
-        specifier: ^1.61.0
-        version: 1.61.0
       '@tailwindcss/postcss':
         specifier: ^4.3.1
         version: 4.3.1
@@ -153,9 +147,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@app/pulsar-content':
-        specifier: workspace:*
-        version: link:../pulsar-content
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -224,12 +215,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
-
-  packages/pulsar-content:
-    dependencies:
-      pdf-lib:
-        specifier: ^1.17.1
-        version: 1.17.1
 
 packages:
 
@@ -4778,6 +4763,7 @@ snapshots:
   '@playwright/test@1.61.0':
     dependencies:
       playwright: 1.61.0
+    optional: true
 
   '@polka/url@1.0.0-next.29': {}
 
@@ -7132,13 +7118,15 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  playwright-core@1.61.0: {}
+  playwright-core@1.61.0:
+    optional: true
 
   playwright@1.61.0:
     dependencies:
       playwright-core: 1.61.0
     optionalDependencies:
       fsevents: 2.3.2
+    optional: true
 
   possible-typed-array-names@1.1.0: {}
 
