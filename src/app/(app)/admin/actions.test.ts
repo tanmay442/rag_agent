@@ -34,26 +34,28 @@ const {
   redirectMock: vi.fn(),
 }));
 
-vi.mock('@/composition', () => ({
-  requireAdmin: requireAdminMock,
-  requireSession: requireAdminMock,
-  getAppSession: vi.fn(),
-  ForbiddenError: class ForbiddenError extends Error {
-    status = 403;
-  },
-  getComposition: () => ({
-    uploadPdf: uploadPdfMock,
-    replacePdf: replacePdfMock,
-    softDeleteDocument: softDeleteDocumentMock,
-    restoreDocument: restoreDocumentMock,
-    hardDeleteDocument: hardDeleteDocumentMock,
-    recountChunksForDocument: recountChunksForDocumentMock,
-    recountChunksForAllDocuments: recountChunksForAllDocumentsMock,
-    setUserRole: setUserRoleMock,
-    updateTicket: updateTicketMock,
-    logTicketEvent: logTicketEventMock,
-  }),
-}));
+vi.mock('@/composition', async () => {
+  const { ForbiddenError, UnauthorizedError } = await import('@app/domain');
+  return {
+    requireAdmin: requireAdminMock,
+    requireSession: requireAdminMock,
+    getAppSession: vi.fn(),
+    ForbiddenError,
+    UnauthorizedError,
+    getComposition: () => ({
+      uploadPdf: uploadPdfMock,
+      replacePdf: replacePdfMock,
+      softDeleteDocument: softDeleteDocumentMock,
+      restoreDocument: restoreDocumentMock,
+      hardDeleteDocument: hardDeleteDocumentMock,
+      recountChunksForDocument: recountChunksForDocumentMock,
+      recountChunksForAllDocuments: recountChunksForAllDocumentsMock,
+      setUserRole: setUserRoleMock,
+      updateTicket: updateTicketMock,
+      logTicketEvent: logTicketEventMock,
+    }),
+  };
+});
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: clerkClientMock,

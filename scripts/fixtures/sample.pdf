@@ -1,11 +1,17 @@
-// Gardenia Public School — Student & Parent Handbook.
-// Hand-rolled PDF (we avoid pdf-lib here to keep this fixture
-// rendering identical to the one the script has shipped for
-// years, which the test fixtures assert against byte-for-byte
-// after PDF version rounding).
-import { writeFileSync } from 'node:fs';
-
-const PAGE_CONTENT = `BT
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 3280 >>
+stream
+BT
 /F1 12 Tf
 50 750 Td
 (Gardenia Public School - Student & Parent Handbook) Tj
@@ -97,36 +103,21 @@ const PAGE_CONTENT = `BT
 (Vice Principal (Discipline): Ms. Priya Iyer. School nurse: available) Tj
 0 -20 Td
 (in the infirmary from 8:00 AM to 4:00 PM on all school days.) Tj
-ET`;
-
-export function buildPdf(content: string): string {
-  const objects: string[] = [];
-  objects.push('<< /Type /Catalog /Pages 2 0 R >>');
-  objects.push('<< /Type /Pages /Count 1 /Kids [3 0 R] >>');
-  objects.push(
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
-  );
-  const stream = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
-  objects.push(stream);
-  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-
-  let pdf = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  for (let i = 0; i < objects.length; i++) {
-    offsets.push(pdf.length);
-    pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
-  }
-  const xrefStart = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (const off of offsets) {
-    pdf += `${off.toString().padStart(10, '0')} 00000 n \n`;
-  }
-  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
-  return pdf;
-}
-
-export function writeStudentHandbook(outPath: string): string {
-  const pdf = buildPdf(PAGE_CONTENT);
-  writeFileSync(outPath, pdf, 'utf8');
-  return outPath;
-}
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000003573 00000 n 
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+3643
+%%EOF

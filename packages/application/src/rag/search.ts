@@ -16,8 +16,8 @@ export interface SearchDeps {
   embeddings: EmbeddingService;
 }
 
-export const SIMILARITY_THRESHOLD = 0.5;
-export const DEFAULT_LIMIT = 3;
+const SIMILARITY_THRESHOLD = 0.5;
+const DEFAULT_LIMIT = 3;
 
 export interface SearchOpts {
   threshold?: number;

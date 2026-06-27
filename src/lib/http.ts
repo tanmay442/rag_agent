@@ -1,10 +1,5 @@
 import { DomainError } from '@app/domain';
 
-export interface ErrorResponse {
-  error: string;
-  code?: string;
-}
-
 const SAFE_MESSAGES: Record<string, string> = {
   validation_error: 'Invalid input provided',
   not_found: 'The requested resource was not found',

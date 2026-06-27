@@ -6,7 +6,6 @@
 // looks like: ['node', 'index.ts', 'init', ...]. We strip the
 // first two to get the sub-command and its args.
 import { runInit } from './commands/init';
-import { runFixtures } from './commands/fixtures';
 import { runSetup } from './commands/setup';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -22,7 +21,6 @@ Commands:
   init               Interactive setup (same as \`pnpm setup\`).
   setup              One-command interactive first-run wizard.
   seed [--dir=...]   Ingest every PDF in the given dir.
-  fixtures [outDir]  Regenerate the Pulsar + school PDF fixtures.
   db-migrate [args]  Run drizzle-kit push (or other migration command).
 `);
 }
@@ -40,12 +38,6 @@ async function main(): Promise<void> {
     case 'setup':
       await runSetup(REPO_ROOT);
       return;
-    case 'fixtures': {
-      const outDir = rest[0] ?? './scripts/fixtures';
-      const { written } = await runFixtures({ outDir, repoRoot: REPO_ROOT });
-      console.log(`Wrote ${written.length} fixtures to ${outDir}`);
-      return;
-    }
     case 'seed': {
       // Delegate to scripts/seed-docs.ts via tsx. The script
       // already supports --dir=...
