@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getComposition, requireAdmin, ForbiddenError } from '@/composition';
+import { UnauthorizedError } from '@app/domain';
 import type { TicketStatus } from '@app/application/admin/tickets';
 import type { AppRole } from '@app/infrastructure/auth';
 import { toSafeError } from '@/lib/http';
@@ -17,6 +18,9 @@ async function requireAdminOrError(): Promise<
     // thrown by tests or upstream middleware) should be treated as
     // 'Forbidden' so the page renders an inline error rather than
     // crashing the action.
+    if (err instanceof UnauthorizedError) {
+      return { error: 'Unauthorized' };
+    }
     if (err instanceof ForbiddenError) {
       return { error: 'Forbidden' };
     }

@@ -24,6 +24,7 @@ const { requireAdminMock, listAuditMock, requireAdminRouteMock, requireAdminGetM
 
 vi.mock('@/composition', async () => {
   const actual = await vi.importActual<typeof import('@/composition')>('@/composition');
+  const { ForbiddenError } = await import('@app/domain');
   return {
     ...actual,
     requireAdmin: requireAdminMock,
@@ -31,9 +32,7 @@ vi.mock('@/composition', async () => {
     requireAdminGet: requireAdminGetMock,
     requireSession: requireAdminMock,
     getAppSession: vi.fn(),
-    ForbiddenError: class ForbiddenError extends Error {
-      status = 403;
-    },
+    ForbiddenError,
     getComposition: () => ({ listAudit: listAuditMock }),
   };
 });

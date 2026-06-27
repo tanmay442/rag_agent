@@ -17,16 +17,17 @@ const { requireAdminMock, setUserRoleMock, requireAdminRouteMock } = vi.hoisted(
   return { requireAdminMock, setUserRoleMock, requireAdminRouteMock };
 });
 
-vi.mock('@/composition', () => ({
-  requireAdmin: requireAdminMock,
-  requireAdminRoute: requireAdminRouteMock,
-  requireSession: requireAdminMock,
-  getAppSession: vi.fn(),
-  ForbiddenError: class ForbiddenError extends Error {
-    status = 403;
-  },
-  getComposition: () => ({ setUserRole: setUserRoleMock }),
-}));
+vi.mock('@/composition', async () => {
+  const { ForbiddenError } = await import('@app/domain');
+  return {
+    requireAdmin: requireAdminMock,
+    requireAdminRoute: requireAdminRouteMock,
+    requireSession: requireAdminMock,
+    getAppSession: vi.fn(),
+    ForbiddenError,
+    getComposition: () => ({ setUserRole: setUserRoleMock }),
+  };
+});
 
 import { ForbiddenError } from '@/composition';
 import * as route from './route';

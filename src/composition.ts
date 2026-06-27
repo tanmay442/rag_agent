@@ -40,7 +40,8 @@ import {
   type RateLimitDeps,
 } from '@app/application';
 import { Db, Llm, Auth, Pdf } from '@app/infrastructure';
-import { requireAdmin, requireSession, getAppSession, ForbiddenError } from '@app/infrastructure/auth';
+import { requireAdmin, requireSession, getAppSession } from '@app/infrastructure/auth';
+import { ForbiddenError, UnauthorizedError } from '@app/domain';
 import { type MyUIMessage } from '@app/domain';
 import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
@@ -154,7 +155,7 @@ function createComposition() {
 }
 
 export { appConfig, isTicketStatus, TICKET_STATUSES, type MyUIMessage };
-export { requireAdmin, requireSession, getAppSession, ForbiddenError };
+export { requireAdmin, requireSession, getAppSession, ForbiddenError, UnauthorizedError };
 
 export type Composition = ReturnType<typeof createComposition>;
 
@@ -177,6 +178,9 @@ export async function requireAdminRoute(): Promise<
     const session = await requireAdmin();
     return { ok: true, session, comp: getComposition() };
   } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return { ok: false, response: new Response('Unauthorized', { status: 401 }) };
+    }
     if (err instanceof ForbiddenError) {
       return { ok: false, response: new Response('Forbidden', { status: 403 }) };
     }
