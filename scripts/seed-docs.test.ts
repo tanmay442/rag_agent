@@ -37,11 +37,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FIXTURES = join(HERE, 'fixtures');
-
-// The fixture corpus used by these tests. Change this array when
-// adding/removing files from scripts/fixtures/.
-const FIXTURE_PDFS = ['sample.pdf'];
 
 beforeEach(() => {
   ingestFileMock.mockReset();
@@ -50,20 +45,6 @@ beforeEach(() => {
 });
 
 describe('seed-docs', () => {
-  // TODO: re-enable once scripts/fixtures/ is tracked in git
-  // (currently gitignored, so readdirSync fails in CI).
-  it.skip('passes every fixture PDF to ingestFile and prints status', async () => {
-    console.log('SKIPPED: scripts/fixtures/ directory is gitignored — see TODO');
-  });
-
-  it.skip('ingests a single fixture end-to-end through the production path', async () => {
-    console.log('SKIPPED: scripts/fixtures/ directory is gitignored — see TODO');
-  });
-
-  it.skip('passes a custom userId when given via opts', async () => {
-    console.log('SKIPPED: scripts/fixtures/ directory is gitignored — see TODO');
-  });
-
   it('exits with an error when no fixtures are present', async () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {

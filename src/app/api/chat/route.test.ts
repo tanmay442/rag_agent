@@ -22,13 +22,13 @@ const { currentUserMock } = vi.hoisted(() => ({
 
 // The route reads `appConfig.prefetchFirstTurn` at request time. We
 // expose a hoisted mutable so individual tests can flip the toggle
-// on and off. Default is `false` (the Pulsar default).
+// on and off. Default is `false`.
 const { appConfigMock } = vi.hoisted(() => ({
   appConfigMock: {
     prefetchFirstTurn: false,
-    orgName: 'Pulsar Analytics',
+    orgName: 'Test Corp',
     orgShortName: 'RAG Support',
-    audience: 'Pulsar Analytics customers and prospects',
+    audience: 'test customers',
     agentPersona: { name: 'Astra', tone: 'friendly' as const },
     outOfScopeTopics: [],
     branding: { title: 'RAG Support', description: '' },
@@ -141,7 +141,7 @@ beforeEach(() => {
   rateLimitResult.ok = true;
   rateLimitResult.remaining = 29;
   rateLimitResult.resetMs = 60_000;
-  // Reset the toggle to the Pulsar default.
+  // Reset the toggle to the default.
   appConfigMock.prefetchFirstTurn = false;
 });
 
@@ -331,7 +331,7 @@ describe('/api/chat searchDocumentation tool', () => {
   });
 });
 
-describe('/api/chat pre-fetch toggle (Pulsar default off)', () => {
+describe('/api/chat pre-fetch toggle (default off)', () => {
   // Captures the `system` argument passed to streamText for a given
   // body. The LLM stream is a no-op so we can read the captured
   // argument synchronously after the request resolves.

@@ -171,7 +171,7 @@ function buildCustomInstructionsBlock(config: AppConfig): string | null {
 // shape to the previous inline version; gated on whether the caller
 // passes any chunks. The route only passes chunks when
 // `appConfig.prefetchFirstTurn === true`; when the toggle is off
-// (the default for Pulsar), the route calls `searchChunks` itself
+// (the default), the route calls `searchChunks` itself
 // and the model is expected to call the tool every turn.
 function buildPrefetchBlock(chunks: RetrievedChunk[]): string {
   const header = `# Pre-fetched documentation for the user's first message`;

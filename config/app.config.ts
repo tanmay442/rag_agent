@@ -15,14 +15,14 @@ import type { AppConfig } from '@app/domain/app-config';
 const config: AppConfig = {
   // The full name of the org the agent represents. Used in the
   // system prompt and the landing page hero.
-  orgName: 'Pulsar Analytics',
+  orgName: 'Your Company',
 
   // Short brand shown in the top nav and mobile sheet.
   orgShortName: 'RAG Support',
 
   // Who the agent is talking to. Phrased as a noun phrase; the
   // system prompt builds "help <audience> find answers ...".
-  audience: 'Pulsar Analytics customers and prospects',
+  audience: 'your customers',
 
   // Persona. `name` is optional; if set, the agent introduces itself
   // by name on the first reply. `tone` controls length and warmth.
@@ -75,7 +75,7 @@ const config: AppConfig = {
     {
       topic: 'personal advice',
       handling:
-        'Decline politely. This assistant is for Pulsar product support only.',
+        'Decline politely. This assistant is for this product only.',
     },
   ],
 
@@ -89,7 +89,7 @@ const config: AppConfig = {
   // Browser tab title + meta description.
   branding: {
     title: 'RAG Support',
-    description: 'AI customer support agent for Pulsar Analytics, with grounded citations.',
+    description: 'AI customer support agent, with grounded citations.',
   },
 
   // Where the setup CLI drops seed PDFs and where `pnpm seed`
