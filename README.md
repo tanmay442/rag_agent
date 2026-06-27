@@ -151,7 +151,7 @@ call sites do not need to change.
 
 ### Unit + integration (Vitest)
 
-~120 tests across 17 files. Run with `pnpm test` (single run) or
+120 tests across 18 files. Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
