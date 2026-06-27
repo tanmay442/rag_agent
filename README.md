@@ -38,7 +38,7 @@ pnpm install
 # 2. One-command interactive setup — prompts for every env var,
 #    validates connectivity, migrates the database, and optionally
 #    seeds documents from a local folder.
-pnpm setup
+pnpm configure
 
 # 3. Run the app
 pnpm dev
@@ -129,7 +129,7 @@ call sites do not need to change.
 
 | Script | What it does |
 | --- | --- |
-| `pnpm setup` | One-command interactive setup wizard (prompts for env vars, migrates DB, seeds docs, runs smoke test) |
+| `pnpm configure` | One-command interactive setup wizard (prompts for env vars, migrates DB, seeds docs, runs smoke test) |
 | `pnpm dev` | Run Next.js in dev mode |
 | `pnpm build` | Production build |
 | `pnpm start` | Run the production build |

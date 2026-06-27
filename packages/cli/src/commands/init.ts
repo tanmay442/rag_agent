@@ -1,4 +1,4 @@
-// `rag-agent init` (and `pnpm setup`) — interactive first-time
+// `rag-agent init` (and `pnpm configure`) — interactive first-time
 // configuration. Walks the user through org details, agent
 // persona, custom instructions, admin emails, and a folder of
 // seed PDFs. Writes config/app.config.ts, upserts ADMIN_EMAILS in
@@ -389,7 +389,7 @@ function renderConfigFile(config: AppConfig): string {
   return `import type { AppConfig } from '@app/domain';
 
 // Runtime configuration for this deployment of the RAG Support Agent.
-// Edit any field, or run \`pnpm setup\` to be walked through the values
+// Edit any field, or run \`pnpm configure\` to be walked through the values
 // interactively. The schema validates this object on load.
 
 const config: AppConfig = ${body};
@@ -402,7 +402,7 @@ function runSeedIfPossible(repoRoot: string, destDir: string): { ran: boolean; r
   if (!process.env.DATABASE_URL) {
     return {
       ran: false,
-      reason: 'DATABASE_URL is not set in .env.local; re-run `pnpm setup` (or just `pnpm seed`) once you have a Neon database.',
+      reason: 'DATABASE_URL is not set in .env.local; re-run `pnpm configure` (or just `pnpm seed`) once you have a Neon database.',
     };
   }
   const result = spawnSync(

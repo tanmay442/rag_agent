@@ -18,7 +18,7 @@ function usage(): void {
   console.log(`Usage: rag-agent <command> [args]
 
 Commands:
-  init               Interactive setup (same as \`pnpm setup\`).
+  init               Interactive setup (same as \`pnpm configure\`).
   setup              One-command interactive first-run wizard.
   seed [--dir=...]   Ingest every PDF in the given dir.
   db-migrate [args]  Run drizzle-kit push (or other migration command).
