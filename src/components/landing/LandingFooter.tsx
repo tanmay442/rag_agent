@@ -1,6 +1,6 @@
 import { GithubIcon } from '@/components/icons/GithubIcon';
 
-const STACK = ['Next.js', 'Tailwind', 'AI SDK', 'Pinecone'];
+const STACK = ['Next.js', 'Tailwind', 'AI SDK', 'pgvector'];
 
 /**
  * Bottom bar for the landing page. Tech list on the right is a

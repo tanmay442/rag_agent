@@ -8,14 +8,14 @@
 // Clean Architecture refactor. No behaviour change.
 import { z } from 'zod';
 
-export const toneSchema = z.enum(['friendly', 'formal', 'casual', 'concise']);
-export type Tone = z.infer<typeof toneSchema>;
+const toneSchema = z.enum(['friendly', 'formal', 'casual', 'concise']);
+type Tone = z.infer<typeof toneSchema>;
 
-export const outOfScopeTopicSchema = z.object({
+const outOfScopeTopicSchema = z.object({
   topic: z.string().min(1),
   handling: z.string().min(1),
 });
-export type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
+type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
 
 export const appConfigSchema = z.object({
   orgName: z.string().min(1).default('Your Company'),
@@ -91,5 +91,3 @@ export const appConfigSchema = z.object({
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
-
-export const DEFAULT_APP_CONFIG: AppConfig = appConfigSchema.parse({});
