@@ -81,14 +81,5 @@ export const ticketAudit = pgTable('ticket_audit', {
 ]);
 
 export type Document = typeof documents.$inferSelect;
-export type NewDocument = typeof documents.$inferInsert;
-export type Chunk = typeof chunks.$inferSelect;
-export type NewChunk = typeof chunks.$inferInsert;
 export type Ticket = typeof tickets.$inferSelect;
-export type NewTicket = typeof tickets.$inferInsert;
 export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
-export type DocumentAudit = typeof documentAudit.$inferSelect;
-export type NewDocumentAudit = typeof documentAudit.$inferInsert;
-export type TicketAudit = typeof ticketAudit.$inferSelect;
-export type NewTicketAudit = typeof ticketAudit.$inferInsert;
