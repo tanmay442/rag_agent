@@ -26,7 +26,7 @@ opened only when the user explicitly asks for one.
 - **Database:** Neon Serverless Postgres with the `pgvector` extension
   and HNSW cosine index
 - **ORM:** Drizzle
-- **Tooling:** Vitest, Testing Library, Playwright, `drizzle-kit`
+- **Tooling:** Vitest, Testing Library, `drizzle-kit`
 - **UI:** Dark "obsidian slate" theme via CSS custom properties in `src/app/globals.css` (no light variant). Route groups split the app: `(marketing)` for the public landing, `(app)` for the unified sidebar + mobile-drawer shell that wraps `/chat` and `/admin/*`.
 
 ## Quick start (recommended)
