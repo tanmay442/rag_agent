@@ -36,8 +36,8 @@ opened only when the user explicitly asks for one.
 pnpm install
 
 # 2. One-command interactive setup — prompts for every env var,
-#    validates connectivity, migrates the database, seeds sample
-#    documents, and runs an end-to-end smoke test.
+#    validates connectivity, migrates the database, and optionally
+#    seeds documents from a local folder.
 pnpm setup
 
 # 3. Run the app
@@ -137,9 +137,7 @@ call sites do not need to change.
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Vitest unit + integration suite |
 | `pnpm test:ui` | Vitest with the interactive UI |
-| `pnpm e2e` | Playwright smoke tests |
-| `pnpm test:ci` | Full CI pipeline (setup → vitest → playwright → teardown) |
-| `pnpm test:ci:run` | Vitest + Playwright only (skips DB setup/teardown) |
+| `pnpm test:ci` | Provision test DB + vitest suite (skipped when `NEON_API_KEY` is absent) |
 | `pnpm db:push` | Apply the Drizzle schema to the configured DB (interactive) |
 | `pnpm db:generate` | Generate SQL migrations from `packages/infrastructure/src/db/schema.ts` |
 | `pnpm db:studio` | Drizzle Studio |
@@ -147,16 +145,13 @@ call sites do not need to change.
 | `pnpm cli init` | Interactive first-time setup: org name, agent persona, admin emails, seed PDFs. Writes `config/app.config.ts` and re-seeds. |
 | `pnpm cli seed` | Ingest every PDF in `scripts/fixtures/` |
 | `pnpm cli db-migrate` | Apply the Drizzle schema + enable pgvector + add-column migrations |
-| `pnpm cli fixtures` | Manage PDF fixtures |
 | `pnpm arch` | Architecture boundary check via dependency-cruiser |
-| `pnpm setup-test-db` | Provision a `dev-test` Neon branch and write `DATABASE_URL` to `.env.test` |
-| `pnpm teardown-test-db` | Delete the `dev-test` branch |
 
 ## Tests
 
 ### Unit + integration (Vitest)
 
-127 tests across 19 files (plus Playwright e2e when run with `pnpm test:ci`). Run with `pnpm test` (single run) or
+~120 tests across 17 files. Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
@@ -189,15 +184,6 @@ call sites do not need to change.
   replace, empty-text and API-failure error paths
 - `packages/application/src/auth/__tests__/users.test.ts` —
   `setUserRole`: audit logging, invalid role, user-not-found
-
-### E2E (Playwright)
-
-`e2e/chat.spec.ts` asks a seeded question, asserts a citation, then
-escalates to a ticket. `e2e/admin.spec.ts` covers the public-route
-behaviour and the unauthenticated redirects from `/chat` and `/admin`.
-The full auth-gated flow requires a configured Clerk project; tests
-that need it are gated on `SKIP_AUTH_E2E=0`. The Playwright config
-boots the dev server and runs `pnpm setup-test-db` as a global setup.
 
 ## Architecture
 
@@ -233,21 +219,16 @@ src/
 ├── lib/config/             # App-level config types
 ├── proxy.ts                # clerkMiddleware (Next 16 convention)
 └── …
-scripts/                   # setup, seed, e2e fixtures
+scripts/                   # setup, seed, migration scripts
 ```
 
 ### CI
 
-`pnpm test:ci` runs the full pipeline:
-
-1. `pnpm setup-test-db` — provision a `dev-test` Neon branch (skipped
-   when `NEON_API_KEY` is not set)
-2. `vitest run --reporter=dot` — unit + integration suite
-3. `playwright test` — E2E smoke against a fresh dev server
-4. `pnpm teardown-test-db` — delete the `dev-test` branch
-
-Set `SKIP_E2E_SETUP=1` to skip the branch provisioning step in
-environments where the DB is already seeded.
+`pnpm test:ci` provisions a Neon test branch, runs the full Vitest
+suite, and tears the branch down. Requires `NEON_API_KEY` and
+`NEON_PROJECT_ID` in `.env.local`. When these are absent the
+branching step is skipped and the suite runs against whatever
+database `DATABASE_URL` points to.
 
 ## Workspace layout
 
@@ -263,8 +244,7 @@ packages/
 ├── infrastructure/ # @app/infrastructure — Drizzle repos, AI SDK
 │                   #   adapters, Clerk session, pdf-parse, bytea
 ├── cli/            # @app/cli — `rag-agent` sub-commands:
-│                   #   init, seed, fixtures, db-migrate
-└── pulsar-content/ # @app/pulsar-content — PDF fixtures + render-pdf
+                    #   init, setup, seed, db-migrate
 ```
 
 `src/` is the Next.js app shell. `src/composition.ts` is the only
@@ -275,12 +255,11 @@ place where adapters are instantiated; routes import from
 
 | Layer            | May import                                | May NOT import                |
 |------------------|-------------------------------------------|-------------------------------|
-| `domain`         | zod                                       | application, infrastructure, cli, pulsar-content, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
+| `domain`         | zod                                       | application, infrastructure, cli, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
 | `application`    | domain, its own port interfaces           | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
 | `infrastructure` | domain, application, drizzle, @ai-sdk, clerk, pdf-parse, pg, pdf-lib | src/app, src/components, next |
 | `src/app`, `src/components` | application, domain, src/lib/http, src/lib/config | drizzle, @ai-sdk, pdf-parse, infrastructure |
-| `cli`            | application, pulsar-content, infrastructure, dotenv | src/app, src/components |
-| `pulsar-content` | pdf-lib                                   | any other internal package |
+| `cli`            | application, infrastructure, dotenv       | src/app, src/components |
 
 Run `pnpm arch` after any change that touches the import graph.
 
