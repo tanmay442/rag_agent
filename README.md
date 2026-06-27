@@ -36,9 +36,8 @@ opened only when the user explicitly asks for one.
 pnpm install
 
 # 2. One-command interactive setup — prompts for every env var,
-#    validates connectivity, selects an embedding model, migrates
-#    the database, seeds sample documents, and runs an end-to-end
-#    smoke test.
+#    validates connectivity, migrates the database, seeds sample
+#    documents, and runs an end-to-end smoke test.
 pnpm setup
 
 # 3. Run the app
@@ -130,6 +129,7 @@ call sites do not need to change.
 
 | Script | What it does |
 | --- | --- |
+| `pnpm setup` | One-command interactive setup wizard (prompts for env vars, migrates DB, seeds docs, runs smoke test) |
 | `pnpm dev` | Run Next.js in dev mode |
 | `pnpm build` | Production build |
 | `pnpm start` | Run the production build |
@@ -139,13 +139,16 @@ call sites do not need to change.
 | `pnpm test:ui` | Vitest with the interactive UI |
 | `pnpm e2e` | Playwright smoke tests |
 | `pnpm test:ci` | Full CI pipeline (setup → vitest → playwright → teardown) |
+| `pnpm test:ci:run` | Vitest + Playwright only (skips DB setup/teardown) |
 | `pnpm db:push` | Apply the Drizzle schema to the configured DB (interactive) |
 | `pnpm db:generate` | Generate SQL migrations from `packages/infrastructure/src/db/schema.ts` |
 | `pnpm db:studio` | Drizzle Studio |
+| `pnpm cli` | Run the `rag-agent` CLI dispatcher (`--help` for usage) |
 | `pnpm cli init` | Interactive first-time setup: org name, agent persona, admin emails, seed PDFs. Writes `config/app.config.ts` and re-seeds. |
 | `pnpm cli seed` | Ingest every PDF in `scripts/fixtures/` |
-| `pnpm cli db-migrate` | Apply the Drizzle schema + add-column migrations to the configured DB |
+| `pnpm cli db-migrate` | Apply the Drizzle schema + enable pgvector + add-column migrations |
 | `pnpm cli fixtures` | Manage PDF fixtures |
+| `pnpm arch` | Architecture boundary check via dependency-cruiser |
 | `pnpm setup-test-db` | Provision a `dev-test` Neon branch and write `DATABASE_URL` to `.env.test` |
 | `pnpm teardown-test-db` | Delete the `dev-test` branch |
 
@@ -153,7 +156,7 @@ call sites do not need to change.
 
 ### Unit + integration (Vitest)
 
-164 tests across 23 files (plus Playwright e2e when run with `pnpm test:ci`). Run with `pnpm test` (single run) or
+127 tests across 19 files (plus Playwright e2e when run with `pnpm test:ci`). Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
@@ -175,10 +178,17 @@ call sites do not need to change.
   rendering
 - `src/app/api/admin/{users,documents,tickets}/...` — 403 / 400 / 404 /
   409 paths and the happy path
-- `src/app/admin/actions.test.ts` — every admin server action 403s for
+- `src/app/(app)/admin/actions.test.ts` — every admin server action 403s for
   non-admin and forwards the right shape on success
 - `src/proxy.test.ts` — middleware route gating (public / signed-in /
   admin)
+- `packages/application/src/rag/__tests__/search.test.ts` —
+  vector search error propagation and success path
+- `packages/application/src/rag/__tests__/ingest.integration.test.ts` —
+  PDF ingest pipeline: chunk insertion, hash dedup, transactional
+  replace, empty-text and API-failure error paths
+- `packages/application/src/auth/__tests__/users.test.ts` —
+  `setUserRole`: audit logging, invalid role, user-not-found
 
 ### E2E (Playwright)
 
@@ -261,7 +271,7 @@ packages/
 place where adapters are instantiated; routes import from
 `@/composition` and call the use-cases.
 
-### Layer rules (enforced by `pnpm lint:arch`)
+### Layer rules (enforced by `pnpm arch`)
 
 | Layer            | May import                                | May NOT import                |
 |------------------|-------------------------------------------|-------------------------------|
@@ -272,7 +282,7 @@ place where adapters are instantiated; routes import from
 | `cli`            | application, pulsar-content, infrastructure, dotenv | src/app, src/components |
 | `pulsar-content` | pdf-lib                                   | any other internal package |
 
-Run `pnpm lint:arch` after any change that touches the import graph.
+Run `pnpm arch` after any change that touches the import graph.
 
 ### Boundary validation
 
