@@ -12,7 +12,6 @@
     "./rag/ingest": "./src/rag/ingest.ts",
     "./rag/search": "./src/rag/search.ts",
     "./auth": "./src/auth/index.ts",
-    "./auth/sync-user": "./src/auth/sync-user.ts",
     "./auth/audit": "./src/auth/audit.ts",
     "./auth/rate-limit": "./src/auth/rate-limit.ts",
     "./auth/query-stats": "./src/auth/query-stats.ts",

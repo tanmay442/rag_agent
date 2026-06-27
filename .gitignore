@@ -57,3 +57,6 @@ next-env.d.ts
 .fallowrc.json
 .neon
 skills-lock.json
+
+# Proposed plans (never commit)
+proposedplans.md
