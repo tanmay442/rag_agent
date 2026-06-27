@@ -102,6 +102,7 @@ const TONE_OPTIONS: ReadonlyArray<PromptOption<AppConfig['agentPersona']['tone']
 
 const banner = (s: string) => console.log(`\n\x1b[1m${s}\x1b[0m`);
 const ok = (s: string) => console.log(`\x1b[32m  ✓\x1b[0m ${s}`);
+const warn = (s: string) => console.log(`\x1b[33m  ⚠\x1b[0m ${s}`);
 
 async function loadCurrentDefaults(repoRoot: string, configPath: string): Promise<AppConfig> {
   if (existsSync(configPath)) {
@@ -139,7 +140,7 @@ export async function promptOrg(rl: Interface, config: AppConfig): Promise<void>
   config.orgShortName = await ask(rl, 'Short name (nav brand)', config.orgShortName);
   config.audience = await ask(
     rl,
-    'Who does the agent talk to? (e.g. "Pulsar Analytics customers and prospects")',
+    'Who does the agent talk to? (e.g. "your customers")',
     config.audience,
   );
 }
@@ -223,9 +224,13 @@ export async function promptSeed(rl: Interface, config: AppConfig, repoRoot: str
   banner('Seed PDFs');
   const sourceDir = await ask(
     rl,
-    'Path to a folder of PDFs to use as the RAG corpus',
-    config.seedDocsDir,
+    'Path to a folder of PDFs (leave empty to skip — upload via /admin/upload later)',
+    '',
   );
+  if (!sourceDir) {
+    warn('Skipped. You can upload documents later via /admin/upload.');
+    return '';
+  }
   const absSource = isAbsolute(sourceDir) ? sourceDir : resolve(repoRoot, sourceDir);
   console.log(`  resolved: ${absSource}`);
   return absSource;
@@ -249,9 +254,14 @@ export async function writeOutputs(opts: {
     ok(`wrote ADMIN_EMAILS to ${relative(repoRoot, envPath)}`);
   }
 
-  const outcome = copyPdfsFromDir(absSource, destDir);
+  let outcome: PdfCopyOutcome = { copied: [], skipped: [] };
+  if (absSource) {
+    outcome = copyPdfsFromDir(absSource, destDir);
+  }
   if (outcome.copied.length > 0) {
     ok(`copied ${outcome.copied.length} PDF(s) to ${relative(repoRoot, destDir)}/`);
+  } else if (!absSource) {
+    console.log('  (PDFs skipped — upload via /admin/upload later)');
   } else {
     console.log(`  (no PDFs copied from ${absSource})`);
   }
@@ -262,7 +272,13 @@ export async function writeOutputs(opts: {
     console.log(`  Hint: the RAG pipeline only accepts .pdf files. ${outcome.skipped.length} non-PDF(s) ignored.`);
   }
 
-  const { ran, reason } = runSeedIfPossible(repoRoot, destDir);
+  let ran = false;
+  let reason: string | undefined;
+  if (absSource && outcome.copied.length > 0) {
+    ({ ran, reason } = runSeedIfPossible(repoRoot, destDir));
+  } else {
+    reason = 'No PDFs to seed';
+  }
   if (ran) {
     ok('seeded PDFs into the database');
   } else {
@@ -291,7 +307,7 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
   const defaults = await loadCurrentDefaults(REPO_ROOT, CONFIG_PATH);
   let config: AppConfig = defaults;
 
-  console.log('\n\x1b[1mPulsar Analytics — first-time support agent setup\x1b[0m');
+  console.log('\n\x1b[1mRAG Support Agent — setup\x1b[0m');
   console.log('Press Enter to keep the current value shown in [brackets].\n');
 
   await promptOrg(rl, config);
