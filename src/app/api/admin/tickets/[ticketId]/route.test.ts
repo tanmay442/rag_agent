@@ -17,18 +17,19 @@ const { requireAdminMock, updateTicketMock, requireAdminRouteMock } = vi.hoisted
   return { requireAdminMock, updateTicketMock, requireAdminRouteMock };
 });
 
-vi.mock('@/composition', () => ({
-  requireAdmin: requireAdminMock,
-  requireAdminRoute: requireAdminRouteMock,
-  requireSession: requireAdminMock,
-  getAppSession: vi.fn(),
-  ForbiddenError: class ForbiddenError extends Error {
-    status = 403;
-  },
-  getComposition: () => ({ updateTicket: updateTicketMock }),
-  TICKET_STATUSES: ['created', 'in_progress', 'closed'],
-  isTicketStatus: (s: string) => ['created', 'in_progress', 'closed'].includes(s),
-}));
+vi.mock('@/composition', async () => {
+  const { ForbiddenError } = await import('@app/domain');
+  return {
+    requireAdmin: requireAdminMock,
+    requireAdminRoute: requireAdminRouteMock,
+    requireSession: requireAdminMock,
+    getAppSession: vi.fn(),
+    ForbiddenError,
+    getComposition: () => ({ updateTicket: updateTicketMock }),
+    TICKET_STATUSES: ['created', 'in_progress', 'closed'],
+    isTicketStatus: (s: string) => ['created', 'in_progress', 'closed'].includes(s),
+  };
+});
 
 import { ForbiddenError } from '@/composition';
 import * as route from './route';

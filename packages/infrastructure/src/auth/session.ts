@@ -2,6 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { users } from '../db/schema';
+import { ForbiddenError, UnauthorizedError } from '@app/domain';
 
 export type AppRole = 'admin' | 'user';
 
@@ -108,21 +109,15 @@ function parseClerkRole(value: unknown): AppRole | null {
   return null;
 }
 
-export class ForbiddenError extends Error {
-  constructor(message = 'Forbidden') {
-    super(message);
-  }
-}
-
 export async function requireAdmin(): Promise<AppSessionFull> {
   const session = await getAppSession();
-  if (!session) throw new ForbiddenError('Not signed in');
+  if (!session) throw new UnauthorizedError('Not signed in');
   if (session.user.role !== 'admin') throw new ForbiddenError('Admin role required');
   return session;
 }
 
 export async function requireSession(): Promise<AppSessionFull> {
   const session = await getAppSession();
-  if (!session) throw new ForbiddenError('Not signed in');
+  if (!session) throw new UnauthorizedError('Not signed in');
   return session;
 }

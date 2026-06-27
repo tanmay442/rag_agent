@@ -32,16 +32,17 @@ const { requireAdminMock, getDocumentByIdMock, requireAdminDocumentMock } = vi.h
   return { requireAdminMock, getDocumentByIdMock, requireAdminDocumentMock };
 });
 
-vi.mock('@/composition', () => ({
-  requireAdmin: requireAdminMock,
-  requireAdminDocument: requireAdminDocumentMock,
-  requireSession: requireAdminMock,
-  getAppSession: vi.fn(),
-  ForbiddenError: class ForbiddenError extends Error {
-    status = 403;
-  },
-  getComposition: () => ({ getDocumentById: getDocumentByIdMock }),
-}));
+vi.mock('@/composition', async () => {
+  const { ForbiddenError } = await import('@app/domain');
+  return {
+    requireAdmin: requireAdminMock,
+    requireAdminDocument: requireAdminDocumentMock,
+    requireSession: requireAdminMock,
+    getAppSession: vi.fn(),
+    ForbiddenError,
+    getComposition: () => ({ getDocumentById: getDocumentByIdMock }),
+  };
+});
 
 import { ForbiddenError } from '@/composition';
 import * as route from './route';
