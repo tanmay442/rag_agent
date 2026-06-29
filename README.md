@@ -73,16 +73,24 @@ pnpm dev
   `<SignUp />` components. Email+password and Google are enabled in the
   Clerk dashboard; the app is provider-agnostic.
 - **Role model:** Every Clerk user has `publicMetadata.role` of `admin`
-  or `user`. Clerk is the source of truth; a local `users` table mirrors
-  the role for fast lookups.
+  or `user`. The local `users` table is the single source of truth for
+  roles; Clerk's `publicMetadata` is kept in sync as a secondary store
+  for JWT-based middleware checks.
 - **Bootstrap:** `ADMIN_EMAILS` is a comma-separated env var. The first
   time a user with one of those emails signs in, they are auto-promoted
-  to `admin` (both in Clerk's `publicMetadata` and in the local row).
-  After that, admins promote others from `/admin/users`.
+  to `admin` in the local DB and the role is synced back to Clerk's
+  `publicMetadata`. After that, admins promote others from `/admin/users`.
 - **Route gating:** `src/proxy.ts` runs `clerkMiddleware`. `/chat(.*)`,
   `/admin(.*)`, `/api/chat(.*)`, and `/api/admin(.*)` require a signed-in
   user; `/admin(.*)` and `/api/admin(.*)` additionally require
   `role === 'admin'` (non-admins are redirected to `/chat`).
+- **JWT template:** To enable fast role checks in middleware without
+  hitting the Clerk Backend SDK on every request, configure a JWT
+  template in the Clerk Dashboard (Sessions → Customize session token):
+  `{ "metadata": "{{user.public_metadata}}" }`. This projects
+  `publicMetadata.role` into the session token's `metadata.role` claim,
+  which `src/proxy.ts` reads as its fast path. Without this template,
+  the middleware falls back to a Backend SDK call on every request.
 - **Action gating:** Every admin server action and API route calls
   `requireAdmin()` as its second line. Server actions return
   `{ error: 'Forbidden' }`; API routes return HTTP 403.
@@ -117,7 +125,9 @@ pnpm dev
 - **`/admin/analytics`** — Read-only counts and an in-process top-queries
   table.
 - **`/admin/audit`** — Full audit log filterable by document id or
-  ticket id.
+  ticket id. Document audit events: upload, replace, delete, restore.
+  Ticket audit events: create, assign, status_change, note,
+  impersonation, role_change.
 
 ## Rate limit
 
