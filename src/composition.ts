@@ -1,13 +1,4 @@
-// Composition root. The single place where the
-// application's port interfaces are wired to concrete
-// infrastructure adapters. Routes and server actions
-// import the methods on this object instead of reaching
-// into drizzle / @ai-sdk / clerk directly.
-//
-// `createComposition()` returns a typed object whose
-// methods are the use-cases. Tests can call
-// `createTestComposition()` to get a composition with
-// fakes for every port.
+// Composition root: wires port interfaces to infrastructure adapters.
 import {
   ingestFile,
   searchChunks,

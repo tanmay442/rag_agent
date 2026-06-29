@@ -1,7 +1,4 @@
-// Drizzle table definitions. Source of truth for the
-// documents, chunks, tickets, users, document_audit, and
-// ticket_audit tables. The bytea customType for the
-// documents.blob column lives in storage/bytea-blob.ts.
+// Drizzle table definitions. bytea customType lives in storage/bytea-blob.ts.
 import {
   pgTable, serial, text, timestamp, integer,
   index, check,

@@ -37,11 +37,7 @@ export default async function TicketsPage({
     comp.listUsers({ limit: 100 }),
   ]);
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
-  // Build a clerkUserId -> { name, email } index for display. Tickets
-  // raised before the chat tool started overriding the LLM-provided
-  // identity still have placeholder values like 'user@example.com';
-  // falling back to the userList join cleans those rows up at render
-  // time without touching the database.
+  // Index by clerkUserId; fall back to userList for tickets with placeholder identity fields.
   const userByClerkId = new Map<
     string,
     { name: string | null; email: string }
@@ -161,10 +157,7 @@ export default async function TicketsPage({
                     <div className="flex min-w-0 flex-col">
                       <span className="truncate">
                         {(() => {
-                          // If the stored name looks like a placeholder
-                          // (e.g. 'User' from the LLM-fabricated row) and
-                          // the user is a Clerk id that exists in the
-                          // local users table, fall back to that row.
+                          // Fall back to userList if stored name is a placeholder.
                           const looksLikeClerkId = t.userId.startsWith('user_');
                           const nameLooksPlaceholder =
                             !t.name || t.name === 'User' || t.name === 'Unknown';

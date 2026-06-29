@@ -57,7 +57,6 @@ export function ChatInterface() {
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 
-  // Auto-grow the composer up to a max height.
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     const el = composerRef.current;
@@ -66,8 +65,7 @@ export function ChatInterface() {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [input]);
 
-  // Auto-scroll the messages container to the bottom, throttled to
-  // avoid scrolling on every state change during rapid streaming.
+  // Throttle auto-scroll to avoid excessive scrolling during rapid streaming.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
@@ -88,10 +86,7 @@ export function ChatInterface() {
   }, [messages, status]);
 
   return (
-    // To prevent the layout from stretching, we assign a explicit height limitation. 
-    // Here we use `h-[600px] md:h-[700px] max-h-full` to bound the container. 
-    // If your parent wrapper already has a rigid height (e.g. `h-screen` or `h-[80vh]`), 
-    // you can swap this class to `h-full`.
+    // Height constraint to prevent layout stretch.
     <div
       className="flex h-[600px] md:h-[700px] max-h-full w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40"
       data-testid="chat-frame"

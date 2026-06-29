@@ -1,13 +1,4 @@
-// Drizzle-backed implementations of the application's
-// repository ports. Each function returns the shape the
-// application expects (Drizzle's $inferSelect row types
-// for documents/chunks/tickets/users; AuditRepo /
-// UserRepo / TicketRepo aliases for the application).
-//
-// Functions that participate in transactions accept an optional
-// `client` parameter — a Drizzle instance scoped to the
-// transaction. When omitted they fall back to the module-level
-// `db`.
+// Drizzle-backed repository implementations.
 import { eq, desc, ilike, or, sql, inArray, isNull, and } from 'drizzle-orm';
 import { db } from './client';
 import {

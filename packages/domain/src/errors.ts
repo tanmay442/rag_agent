@@ -1,10 +1,5 @@
-// Domain error hierarchy. Application and infrastructure layers
-// throw or return these; the route layer maps them to HTTP
-// status codes via respond() in src/lib/http.ts.
-//
-// The class names are the public contract: respond() does
-// `instanceof` checks. Adding a new kind of error means
-// updating both this file and the respond() mapping.
+// The route layer maps these to HTTP status codes via
+// `instanceof` checks in respond() (src/lib/http.ts).
 
 export abstract class DomainError extends Error {
   abstract readonly code: string;

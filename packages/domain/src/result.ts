@@ -1,13 +1,3 @@
-// Result<T, E> — a small discriminated union used to thread
-// expected failures across module boundaries without throwing.
-// "ok: true" carries the success value; "ok: false" carries
-// the typed error. Consumers can map / flatMap / unwrap.
-//
-// The choice of { ok: true, value } / { ok: false, error } is
-// not a Maybe/Option: we explicitly do not model "absence of
-// a value" — only absence of a value because of a known
-// failure. Use `value: undefined` for an explicit no-value
-// success.
 import type { DomainError } from './errors';
 
 export type Result<T, E = DomainError> =
