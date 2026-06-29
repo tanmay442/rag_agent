@@ -25,7 +25,7 @@ export async function setUserRole(
   if (!row) return err(new NotFoundError(`User not found: ${input.clerkUserId}`));
   void deps.users.syncClerkRole(input.clerkUserId, input.role).catch(() => {});
   void deps.audit.logTicketEvent({
-    action: 'impersonation',
+    action: 'role_change',
     ticketId: `user:${input.clerkUserId}`,
     actorId: input.actorId,
   }).catch(() => {});

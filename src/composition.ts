@@ -117,7 +117,7 @@ function createComposition() {
     enforceRateLimit: (input: Parameters<typeof enforceRateLimit>[0]) =>
       enforceRateLimit(input, rateLimitDeps).then(unwrap),
     listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
-      listDocuments(input, { documents: documentRepo, chunks: chunkRepo }).then(unwrap),
+      listDocuments(input, { documents: documentRepo, chunks: chunkRepo, users: Db.userRepo }).then(unwrap),
     uploadPdf: (input: Parameters<typeof uploadPdf>[0]) =>
       uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
     softDeleteDocument: (input: Parameters<typeof softDeleteDocument>[0]) =>

@@ -8,7 +8,7 @@ export interface AnalyticsSummary {
   openTicketCount: number;
   usersCount: number;
   topQueries: Array<{ q: string; count: number }>;
-  coldStart: true;
+  coldStart: boolean;
 }
 
 export async function getAnalyticsSummary(
@@ -34,6 +34,6 @@ export async function getAnalyticsSummary(
     openTicketCount,
     usersCount,
     topQueries: deps.stats.top(10),
-    coldStart: true,
+    coldStart: docCount === 0,
   });
 }

@@ -188,9 +188,15 @@ export async function impersonateUserAction(
 ): Promise<{ error?: string; url?: string }> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;
+  if (session.user.id === clerkUserId) {
+    return { error: 'Cannot impersonate yourself' };
+  }
+  const comp = getComposition();
+  const targetUser = await comp.getUserByClerkId(clerkUserId);
+  if (targetUser?.user?.role === 'admin') {
+    return { error: 'Cannot impersonate another admin' };
+  }
   try {
-    // Create a sign-in token for the target user; admin will use it to
-    // sign in as that user.
     const { clerkClient } = await import('@clerk/nextjs/server');
     const client = await clerkClient();
     const signInToken = await client.signInTokens.createSignInToken({

@@ -57,7 +57,7 @@ export async function updateTicket(
 ): Promise<Result<UpdateTicketResult>> {
   const existing = await deps.tickets.findByTicketId(input.ticketId);
   if (!existing) return ok({ ok: false, reason: 'not_found' });
-  if (input.status && !VALID_TRANSITIONS[existing.status as TicketStatus].includes(input.status)) {
+  if (input.status && isTicketStatus(existing.status) && !VALID_TRANSITIONS[existing.status].includes(input.status)) {
     return ok({ ok: false, reason: 'invalid_transition' });
   }
   const patch: Partial<{ status: string; assignedTo: string | null; notes: string }> = {};
