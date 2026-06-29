@@ -1,13 +1,3 @@
-// Use-case: ingest a PDF file (buffer) into the document
-// store. Computes a sha256, short-circuits when an existing
-// file with the same name has the same hash, otherwise
-// deletes the old document + cascades its chunks and re-runs
-// the parse → chunk → embed → insert pipeline.
-//
-// Returns a Result so the route layer can decide how to map
-// failures (the current production behaviour is a 500 with
-// the error message; commit 7 will introduce the mapping
-// helper).
 import { err, ok, type Result, ValidationError, ExternalServiceError } from '@app/domain';
 import type { DocumentRepository, ChunkRepository } from '../ports/index';
 import type { EmbeddingService } from '../ports/index';
@@ -65,6 +55,16 @@ export async function ingestFile(
     return err(new ExternalServiceError('Embedding API failed', cause));
   }
 
+  if (embeddings.length !== texts.length) {
+    return err(new ExternalServiceError('Embedding count mismatch'));
+  }
+
+  // NOTE: Callers should wrap these operations in a database transaction
+  // when atomicity is required (see TransactionRunner).
+  if (existing) {
+    await deps.documents.deleteById(existing.id);
+  }
+
   const inserted = await deps.documents.insert({
     fileName,
     fileHash,
@@ -78,10 +78,6 @@ export async function ingestFile(
       embedding: embeddings[i],
     })),
   );
-
-  if (existing) {
-    await deps.documents.deleteById(existing.id);
-  }
 
   return ok({
     documentId: inserted.id,

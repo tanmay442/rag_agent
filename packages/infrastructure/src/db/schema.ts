@@ -1,7 +1,4 @@
-// Drizzle table definitions. Source of truth for the
-// documents, chunks, tickets, users, document_audit, and
-// ticket_audit tables. The bytea customType for the
-// documents.blob column lives in storage/bytea-blob.ts.
+// Drizzle table definitions. bytea customType lives in storage/bytea-blob.ts.
 import {
   pgTable, serial, text, timestamp, integer,
   index, check,
@@ -25,7 +22,7 @@ export const documents = pgTable('documents', {
 
 export const chunks = pgTable('chunks', {
   id: serial('id').primaryKey(),
-  documentId: serial('document_id').references(() => documents.id, { onDelete: 'cascade' }).notNull(),
+  documentId: integer('document_id').references(() => documents.id, { onDelete: 'cascade' }).notNull(),
   content: text('content').notNull(),
   embedding: vector('embedding').notNull(),
 }, (table) => [
@@ -46,6 +43,7 @@ export const tickets = pgTable('tickets', {
   notes: text('notes'),
 }, (table) => [
   index('tickets_status_idx').on(table.status),
+  check('tickets_status_check', sql`${table.status} IN ('created','in_progress','closed')`),
 ]);
 
 export const users = pgTable('users', {

@@ -80,7 +80,7 @@ describe('ingestFile', () => {
       deps,
     );
     expect(result.ok).toBe(true);
-    expect(insert).toHaveBeenCalledBefore(deleteById);
+    expect(deleteById).toHaveBeenCalledBefore(insert);
   });
 
   it('returns unchanged when hash matches', async () => {

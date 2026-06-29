@@ -16,6 +16,7 @@ const {
   updateTicketMock,
   logTicketEventMock,
   clerkClientMock,
+  getUserByClerkIdMock,
   revalidatePathMock,
   redirectMock,
 } = vi.hoisted(() => ({
@@ -30,6 +31,7 @@ const {
   updateTicketMock: vi.fn(),
   logTicketEventMock: vi.fn(),
   clerkClientMock: vi.fn(),
+  getUserByClerkIdMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   redirectMock: vi.fn(),
 }));
@@ -53,6 +55,7 @@ vi.mock('@/composition', async () => {
       setUserRole: setUserRoleMock,
       updateTicket: updateTicketMock,
       logTicketEvent: logTicketEventMock,
+      getUserByClerkId: getUserByClerkIdMock,
     }),
   };
 });
@@ -92,6 +95,7 @@ beforeEach(() => {
   setUserRoleMock.mockReset();
   updateTicketMock.mockReset();
   clerkClientMock.mockReset();
+  getUserByClerkIdMock.mockReset();
   revalidatePathMock.mockReset();
   redirectMock.mockReset();
 });
@@ -160,7 +164,7 @@ describe('admin actions', () => {
     });
     restoreDocumentMock.mockResolvedValue({ ok: false, reason: 'expired' });
     const result = await restoreDocumentAction(42);
-    expect(result.error).toContain('expired');
+    expect(result.error).toBe('An error occurred');
   });
 
   it('setRoleAction rejects invalid role values', async () => {
@@ -191,13 +195,14 @@ describe('admin actions', () => {
     });
     updateTicketMock.mockResolvedValue({ ok: false, reason: 'invalid_transition' });
     const result = await updateTicketAction('TKT-1001', { status: 'closed' });
-    expect(result.error).toContain('invalid_transition');
+    expect(result.error).toBe('An error occurred');
   });
 
   it('impersonateUserAction returns a Clerk sign-in URL', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
+    getUserByClerkIdMock.mockResolvedValue({ user: { role: 'user' } });
     clerkClientMock.mockResolvedValue({
       signInTokens: {
         createSignInToken: vi
@@ -207,6 +212,23 @@ describe('admin actions', () => {
     });
     const result = await impersonateUserAction('user_1');
     expect(result.url).toContain('clerk.example');
+  });
+
+  it('impersonateUserAction blocks self-impersonation', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    const result = await impersonateUserAction('admin_1');
+    expect(result.error).toBe('Cannot impersonate yourself');
+  });
+
+  it('impersonateUserAction blocks admin-to-admin impersonation', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    getUserByClerkIdMock.mockResolvedValue({ user: { role: 'admin' } });
+    const result = await impersonateUserAction('admin_2');
+    expect(result.error).toBe('Cannot impersonate another admin');
   });
 
   it('recountChunksAction 403s when requireAdmin throws', async () => {

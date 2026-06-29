@@ -4,18 +4,13 @@ import { useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { recountAllChunksAction } from '../actions';
 
-// Small client component for the page-level "Recount all chunks"
-// button. Posts to the server action, then refreshes the page with a
-// `?recounted=...` search param that the server component reads to
-// render a success banner. The banner survives the page reload so the
-// admin gets a visible confirmation even though `revalidatePath`
-// triggers a full re-render of the documents table.
 export function RecountAllButton() {
   const [pending, startTransition] = useTransition();
-  const [, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const params = useSearchParams();
   return (
+    <>
     <button
       type="button"
       disabled={pending}
@@ -27,8 +22,7 @@ export function RecountAllButton() {
             setError(res.error);
             return;
           }
-          // Build a redirect URL that includes the new search params so
-          // the page re-renders with the success banner.
+          // Include search params so page re-renders with success banner.
           const next = new URLSearchParams(params.toString());
           if (typeof res.documents === 'number') {
             next.set('recountedDocs', String(res.documents));
@@ -44,5 +38,11 @@ export function RecountAllButton() {
     >
       {pending ? 'Recounting…' : 'Recount all chunks'}
     </button>
+    {error && (
+      <p className="text-sm text-red-500" role="alert" data-testid="recount-error">
+        {error}
+      </p>
+    )}
+    </>
   );
 }

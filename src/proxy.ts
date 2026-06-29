@@ -1,8 +1,7 @@
 import { clerkClient, clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-// Public routes: landing, sign-in / sign-up, Next internals, app
-// icons, and any static asset.
+// Public routes: landing, sign-in / sign-up, Next internals.
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
@@ -12,8 +11,7 @@ const isPublicRoute = createRouteMatcher([
   '/opengraph-image',
 ]);
 
-// Routes that require a signed-in user. Clerk's `auth.protect()` will
-// redirect to the sign-in page if the user is signed out.
+// Require signed-in user. Clerk's `auth.protect()` redirects to sign-in.
 const isProtectedRoute = createRouteMatcher([
   '/chat(.*)',
   '/admin(.*)',
@@ -21,8 +19,7 @@ const isProtectedRoute = createRouteMatcher([
   '/api/admin(.*)',
 ]);
 
-// Admin-only routes. We read the role from Clerk's sessionClaims.metadata
-// (Clerk automatically maps publicMetadata to `metadata` in the JWT).
+// Admin-only routes. Reads role from Clerk JWT (publicMetadata -> metadata).
 const isAdminRoute = createRouteMatcher([
   '/admin(.*)',
   '/api/admin(.*)',
@@ -32,20 +29,19 @@ async function resolveRole(
   userId: string,
   sessionClaims: unknown,
 ): Promise<'admin' | 'user'> {
-  // 1. The Clerk session token template maps publicMetadata -> metadata
-  //    in the JWT. If the template is configured and the user has a role
-  //    set on publicMetadata, this is the cheap path.
-  const claims = sessionClaims as
-    | { metadata?: { role?: unknown } }
-    | undefined;
-  const fromClaims = claims?.metadata?.role;
-  if (fromClaims === 'admin' || fromClaims === 'user') {
-    return fromClaims;
+  // sessionClaims may be null/undefined if Clerk config is wrong.
+  if (!sessionClaims || typeof sessionClaims !== 'object') {
+  } else {
+    // Fast path: read role from JWT session token template.
+    const claims = sessionClaims as
+      | { metadata?: { role?: unknown } }
+      | undefined;
+    const fromClaims = claims?.metadata?.role;
+    if (fromClaims === 'admin' || fromClaims === 'user') {
+      return fromClaims;
+    }
   }
-  // 2. Fallback: read the role directly from Clerk via the Backend SDK.
-  //    The proxy runs in the Edge runtime; clerkClient works there. This
-  //    keeps admin gating functional even when the session-token template
-  //    hasn't been configured yet.
+  // Fallback: read role from Clerk Backend SDK (Edge-compatible).
   try {
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
@@ -68,6 +64,9 @@ export default clerkMiddleware(async (auth, req) => {
       }
     }
     return NextResponse.next();
+  }
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return NextResponse.next();
 });

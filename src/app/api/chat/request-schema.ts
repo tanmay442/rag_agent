@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const MessagePartSchema = z.union([
   z.object({ type: z.literal('text'), text: z.string() }),
-  z.object({ type: z.string(), text: z.string().optional() }).passthrough(),
+  z.object({ type: z.string(), text: z.string().optional() }).strip(),
 ]);
 
 export const ChatRequestSchema = z.object({
@@ -14,6 +14,6 @@ export const ChatRequestSchema = z.object({
       id: z.string().optional(),
       role: z.enum(['user', 'assistant', 'system']),
       parts: z.array(MessagePartSchema),
-    }).passthrough(),
-  ),
+    }).strip(),
+  ).max(100),
 });

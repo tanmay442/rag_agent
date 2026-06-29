@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
+// NOTE: vitest.workspace.ts is the primary configuration when present.
+// This file is used as a fallback for single-project runs or when
+// the workspace file is missing. Keep both in sync if you change settings.
 export default defineConfig({
   plugins: [react()],
   test: {

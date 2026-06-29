@@ -39,6 +39,7 @@ function buildChatTools(deps: {
         query: z
           .string()
           .min(1)
+          .max(2000)
           .describe(
             'A focused, specific search query. Reformulate vague user wording into a tight phrase (e.g. "school cell phone policy" instead of "phones").',
           ),
@@ -90,6 +91,7 @@ function buildChatTools(deps: {
           ),
         issue: z
           .string()
+          .max(10_000)
           .describe(
             'Structured ticket summary in the form: Question: ...\nWhat was tried: ...\nDocs searched: ...\nUser context: ...',
           ),
@@ -112,9 +114,7 @@ function buildChatTools(deps: {
           realName = 'Unknown';
           realEmail = '';
         }
-        // Generate a unique ticket ID with retry on collision.
-        // The unique constraint serialises concurrent inserts.
-        // Validates the parsed number to handle legacy/non-standard IDs.
+        // Unique ticket ID with retry on collision; handles legacy non-standard IDs.
         let ticketId = '';
         for (let attempt = 0; attempt < 5; attempt++) {
           const [latest] = await db
@@ -160,6 +160,10 @@ async function streamChatResponse(req: Request): Promise<Response> {
   const { userId } = await auth();
   if (!userId) {
     return new Response('Unauthorized', { status: 401 });
+  }
+  const contentType = req.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    return new Response('Content-Type must be application/json', { status: 415 });
   }
   const comp = getComposition();
   const limit = comp.rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });

@@ -1,10 +1,4 @@
-// Port interfaces — the boundary between the application layer
-// and whatever infrastructure implementation provides the
-// behaviour. Adapters in @app/infrastructure implement these;
-// use-cases depend on these abstractions, not on drizzle /
-// @ai-sdk / pdf-parse / clerk directly. This is the core of
-// the Clean Architecture dependency rule: use-cases know
-// nothing about HOW the work is done, only WHAT they need.
+// Port interfaces — application-layer abstractions over infrastructure.
 
 export interface DocumentRow {
   id: number;
@@ -23,7 +17,7 @@ export interface TicketRow {
   name: string;
   email: string;
   issue: string;
-  status: string;
+  status: 'created' | 'in_progress' | 'closed';
   createdAt: Date;
   assignedTo: string | null;
   notes: string | null;
@@ -34,7 +28,7 @@ export interface UserRow {
   email: string;
   name: string | null;
   imageUrl: string | null;
-  role: string;
+  role: 'admin' | 'user';
   lastSeenAt: Date | null;
   createdAt: Date;
 }
@@ -198,6 +192,22 @@ export interface TextSplitter {
 }
 
 // ---- Misc ----
+
+/** Context provided inside a transaction. Each property is a
+ *  repository instance whose operations participate in the
+ *  active database transaction. */
+export interface TransactionContext {
+  documents: DocumentRepository;
+  chunks: ChunkRepository;
+  audit: AuditLog;
+}
+
+/** Runs a callback inside a database transaction. The callback
+ *  receives a `TransactionContext` whose repository instances
+ *  are scoped to the transaction. */
+export interface TransactionRunner {
+  run<T>(fn: (ctx: TransactionContext) => Promise<T>): Promise<T>;
+}
 
 export interface Clock {
   now(): Date;

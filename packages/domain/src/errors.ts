@@ -1,10 +1,5 @@
-// Domain error hierarchy. Application and infrastructure layers
-// throw or return these; the route layer maps them to HTTP
-// status codes via respond() in src/lib/http.ts.
-//
-// The class names are the public contract: respond() does
-// `instanceof` checks. Adding a new kind of error means
-// updating both this file and the respond() mapping.
+// The route layer maps these to HTTP status codes via
+// `instanceof` checks in respond() (src/lib/http.ts).
 
 export abstract class DomainError extends Error {
   abstract readonly code: string;
@@ -15,7 +10,7 @@ export abstract class DomainError extends Error {
 export class ValidationError extends DomainError {
   readonly code = 'validation_error';
   readonly status = 400;
-  constructor(message: string, readonly details?: unknown) {
+  constructor(message: string, readonly details?: Record<string, unknown>) {
     super(message);
   }
 }
@@ -39,7 +34,7 @@ export class ForbiddenError extends DomainError {
 export class NotFoundError extends DomainError {
   readonly code = 'not_found';
   readonly status = 404;
-  constructor(message: string) {
+  constructor(message: string = 'The requested resource was not found') {
     super(message);
   }
 }
@@ -76,6 +71,6 @@ export class ExternalServiceError extends DomainError {
   readonly code = 'external_service';
   readonly status = 502;
   constructor(message: string, readonly cause?: unknown) {
-    super(message);
+    super(message, { cause });
   }
 }

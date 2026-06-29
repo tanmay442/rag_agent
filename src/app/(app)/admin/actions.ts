@@ -14,10 +14,7 @@ async function requireAdminOrError(): Promise<
   try {
     return await requireAdmin();
   } catch (err) {
-    // Both real ForbiddenError and plain Error with status 403 (e.g.
-    // thrown by tests or upstream middleware) should be treated as
-    // 'Forbidden' so the page renders an inline error rather than
-    // crashing the action.
+    // Handle both ForbiddenError and plain Error with status 403.
     if (err instanceof UnauthorizedError) {
       return { error: 'Unauthorized' };
     }
@@ -104,7 +101,7 @@ export async function restoreDocumentAction(
   try {
     const result = await getComposition().restoreDocument(documentId, session.user.id);
     if (!result.ok) {
-      return { error: `Restore failed: ${result.reason}` };
+      return { error: 'An error occurred' };
     }
     revalidatePath('/admin/documents');
     return {};
@@ -173,7 +170,7 @@ export async function updateTicketAction(
       actorId: session.user.id,
     });
     if (!result.ok) {
-      return { error: `Update failed: ${result.reason ?? 'unknown'}` };
+      return { error: 'An error occurred' };
     }
     revalidatePath('/admin/tickets');
     return {};
@@ -188,9 +185,15 @@ export async function impersonateUserAction(
 ): Promise<{ error?: string; url?: string }> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;
+  if (session.user.id === clerkUserId) {
+    return { error: 'Cannot impersonate yourself' };
+  }
+  const comp = getComposition();
+  const targetUser = await comp.getUserByClerkId(clerkUserId);
+  if (targetUser?.user?.role === 'admin') {
+    return { error: 'Cannot impersonate another admin' };
+  }
   try {
-    // Create a sign-in token for the target user; admin will use it to
-    // sign in as that user.
     const { clerkClient } = await import('@clerk/nextjs/server');
     const client = await clerkClient();
     const signInToken = await client.signInTokens.createSignInToken({
@@ -213,11 +216,7 @@ export interface RecountChunksResult {
   count?: number;
 }
 
-// Admin-only server action: re-derives the live chunk count for a
-// single document from the `chunks` table. Read-only; returns the
-// fresh count so the UI can surface it. Revalidates the documents
-// page so any cache is cleared even if the displayed count was
-// already correct.
+// Re-derives live chunk count for a single document. Returns fresh count.
 export async function recountChunksAction(
   documentId: number,
 ): Promise<RecountChunksResult> {
@@ -239,11 +238,7 @@ export interface RecountAllChunksResult {
   total?: number;
 }
 
-// Admin-only server action: re-derives chunk counts for every document
-// in the system. Returns summary numbers so the page can render a
-// "Recounted N documents, total M chunks" banner. The page reads the
-// summary from the `?recounted=...` search param so the message
-// survives the page reload that `revalidatePath` triggers.
+// Re-derives chunk counts for all documents. Returns summary numbers.
 export async function recountAllChunksAction(): Promise<RecountAllChunksResult> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;
