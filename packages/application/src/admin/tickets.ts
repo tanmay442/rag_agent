@@ -9,7 +9,7 @@ export function isTicketStatus(value: string): value is TicketStatus {
   return (TICKET_STATUSES as readonly string[]).includes(value);
 }
 
-const VALID_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
+export const VALID_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
   created: ['in_progress', 'closed'],
   in_progress: ['closed', 'created'],
   closed: [],
@@ -81,6 +81,8 @@ export async function updateTicket(
       action: 'status_change',
       ticketId: input.ticketId,
       actorId: input.actorId,
+    }).catch((auditErr) => {
+      console.error('Audit logging failed:', auditErr);
     });
     return ok({ ok: true, ticket: updated });
   } catch (e) {

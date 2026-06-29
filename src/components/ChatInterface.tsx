@@ -349,9 +349,17 @@ export function ChatInterface() {
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <div className="flex flex-col gap-0.5">
-              <span className="font-medium">Something went wrong.</span>
+              <span className="font-medium">
+                {error instanceof Error
+                  ? error.name === 'AbortError'
+                    ? 'Request was aborted.'
+                    : error.message || 'Something went wrong.'
+                  : 'Something went wrong.'}
+              </span>
               <span className="text-[12px] text-[var(--danger)]/80">
-                Try again in a moment.
+                {error instanceof Error && error.name === 'AbortError'
+                  ? ''
+                  : 'Try again in a moment.'}
               </span>
             </div>
           </div>

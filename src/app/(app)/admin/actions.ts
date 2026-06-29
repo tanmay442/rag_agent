@@ -104,7 +104,7 @@ export async function restoreDocumentAction(
   try {
     const result = await getComposition().restoreDocument(documentId, session.user.id);
     if (!result.ok) {
-      return { error: `Restore failed: ${result.reason}` };
+      return { error: 'An error occurred' };
     }
     revalidatePath('/admin/documents');
     return {};
@@ -173,7 +173,7 @@ export async function updateTicketAction(
       actorId: session.user.id,
     });
     if (!result.ok) {
-      return { error: `Update failed: ${result.reason ?? 'unknown'}` };
+      return { error: 'An error occurred' };
     }
     revalidatePath('/admin/tickets');
     return {};

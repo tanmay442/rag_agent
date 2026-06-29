@@ -12,10 +12,11 @@ import { recountAllChunksAction } from '../actions';
 // triggers a full re-render of the documents table.
 export function RecountAllButton() {
   const [pending, startTransition] = useTransition();
-  const [, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const params = useSearchParams();
   return (
+    <>
     <button
       type="button"
       disabled={pending}
@@ -44,5 +45,11 @@ export function RecountAllButton() {
     >
       {pending ? 'Recounting…' : 'Recount all chunks'}
     </button>
+    {error && (
+      <p className="text-sm text-red-500" role="alert" data-testid="recount-error">
+        {error}
+      </p>
+    )}
+    </>
   );
 }

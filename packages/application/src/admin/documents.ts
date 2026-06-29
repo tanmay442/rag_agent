@@ -90,6 +90,8 @@ export async function uploadPdf(
     action: r.value.status === 'inserted' ? 'upload' : 'replace',
     documentId: r.value.documentId,
     actorId: input.actorId,
+  }).catch((auditErr) => {
+    console.error('Audit logging failed:', auditErr);
   });
   return r;
   } catch (e) {
@@ -173,6 +175,8 @@ export async function hardDeleteDocument(
     action: 'delete',
     documentId: input.documentId,
     actorId: input.actorId,
+  }).catch((auditErr) => {
+    console.error('Audit logging failed:', auditErr);
   });
   return ok(undefined);
   } catch (e) {
@@ -199,11 +203,13 @@ export async function replacePdf(
     return err(new ConflictError('Failed to save document blob'));
   }
   if (r.value.status !== 'unchanged') {
-    await deps.audit.logDocumentEvent({
-      action: 'replace',
-      documentId: input.documentId,
-      actorId: input.actorId,
-    });
+  await deps.audit.logDocumentEvent({
+    action: 'replace',
+    documentId: input.documentId,
+    actorId: input.actorId,
+  }).catch((auditErr) => {
+    console.error('Audit logging failed:', auditErr);
+  });
   }
   return r;
   } catch (e) {

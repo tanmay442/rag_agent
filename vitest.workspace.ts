@@ -21,6 +21,7 @@ const workspace = [
       include: ['packages/**/*.{test,test-d}.{ts,tsx}'],
       environment: 'node',
       globals: true,
+      setupFiles: ['./vitest.setup.ts'],
     },
   },
 ];

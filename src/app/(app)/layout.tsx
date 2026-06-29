@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { getAppSession } from '@/composition';
 import { AppSidebar, type AppRole } from '@/components/app/AppSidebar';
 
@@ -19,19 +20,18 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await getAppSession();
-  const role: AppRole = (session?.user.role as AppRole | undefined) ?? 'user';
+  if (!session) {
+    redirect('/sign-in');
+  }
+  const role: AppRole = (session.user.role as AppRole | undefined) ?? 'user';
 
   return (
     <>
       <AppSidebar
-        user={
-          session
-            ? {
-                name: session.user.name,
-                imageUrl: session.user.imageUrl,
-              }
-            : null
-        }
+        user={{
+          name: session.user.name,
+          imageUrl: session.user.imageUrl,
+        }}
         role={role}
       />
       <main

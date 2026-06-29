@@ -28,6 +28,8 @@ import {
   updateTicket,
   isTicketStatus,
   TICKET_STATUSES,
+  VALID_TRANSITIONS,
+  type TicketStatus,
   getDocumentById,
   hardDeleteDocument,
   replacePdf,
@@ -154,7 +156,7 @@ function createComposition() {
   };
 }
 
-export { appConfig, isTicketStatus, TICKET_STATUSES, type MyUIMessage };
+export { appConfig, isTicketStatus, TICKET_STATUSES, VALID_TRANSITIONS, type TicketStatus, type MyUIMessage };
 export { requireAdmin, requireSession, getAppSession, ForbiddenError, UnauthorizedError };
 
 export type Composition = ReturnType<typeof createComposition>;
@@ -163,6 +165,14 @@ let _composition: Composition | null = null;
 export function getComposition(): Composition {
   if (!_composition) _composition = createComposition();
   return _composition;
+}
+
+/**
+ * Reset the singleton composition to null. Intended for test
+ * isolation so each test suite starts with a fresh composition.
+ */
+export function resetComposition() {
+  _composition = null;
 }
 
 /**
@@ -184,7 +194,11 @@ export async function requireAdminRoute(): Promise<
     if (err instanceof ForbiddenError) {
       return { ok: false, response: new Response('Forbidden', { status: 403 }) };
     }
-    throw err;
+    // Clerk-specific errors (network, rate-limit, misconfiguration) or
+    // any other unexpected error should yield a 503 so the client can
+    // retry instead of seeing a 500.
+    console.error('requireAdminRoute failed', err);
+    return { ok: false, response: new Response('Service Unavailable', { status: 503 }) };
   }
 }
 
