@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useSession } from '@clerk/nextjs';
 import { setRoleAction, impersonateUserAction } from '../actions';
 
 export function UserRowActions({
@@ -10,6 +11,7 @@ export function UserRowActions({
   clerkUserId: string;
   role: 'admin' | 'user';
 }) {
+  const { session } = useSession();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -25,7 +27,10 @@ export function UserRowActions({
             const next: 'admin' | 'user' = role === 'admin' ? 'user' : 'admin';
             const res = await setRoleAction(clerkUserId, next);
             if (res.error) setError(res.error);
-            else setMessage(`Role set to ${next}`);
+            else {
+              await session?.reload();
+              setMessage(`Role set to ${next}`);
+            }
           })
         }
         className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)] disabled:opacity-50"
