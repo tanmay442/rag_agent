@@ -1,13 +1,3 @@
-// Use-case: ingest a PDF file (buffer) into the document
-// store. Computes a sha256, short-circuits when an existing
-// file with the same name has the same hash, otherwise
-// deletes the old document + cascades its chunks and re-runs
-// the parse → chunk → embed → insert pipeline.
-//
-// Returns a Result so the route layer can decide how to map
-// failures (the current production behaviour is a 500 with
-// the error message; commit 7 will introduce the mapping
-// helper).
 import { err, ok, type Result, ValidationError, ExternalServiceError } from '@app/domain';
 import type { DocumentRepository, ChunkRepository } from '../ports/index';
 import type { EmbeddingService } from '../ports/index';

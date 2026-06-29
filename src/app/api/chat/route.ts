@@ -114,9 +114,7 @@ function buildChatTools(deps: {
           realName = 'Unknown';
           realEmail = '';
         }
-        // Generate a unique ticket ID with retry on collision.
-        // The unique constraint serialises concurrent inserts.
-        // Validates the parsed number to handle legacy/non-standard IDs.
+        // Unique ticket ID with retry on collision; handles legacy non-standard IDs.
         let ticketId = '';
         for (let attempt = 0; attempt < 5; attempt++) {
           const [latest] = await db

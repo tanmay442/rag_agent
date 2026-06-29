@@ -14,10 +14,7 @@ async function requireAdminOrError(): Promise<
   try {
     return await requireAdmin();
   } catch (err) {
-    // Both real ForbiddenError and plain Error with status 403 (e.g.
-    // thrown by tests or upstream middleware) should be treated as
-    // 'Forbidden' so the page renders an inline error rather than
-    // crashing the action.
+    // Handle both ForbiddenError and plain Error with status 403.
     if (err instanceof UnauthorizedError) {
       return { error: 'Unauthorized' };
     }
@@ -219,11 +216,7 @@ export interface RecountChunksResult {
   count?: number;
 }
 
-// Admin-only server action: re-derives the live chunk count for a
-// single document from the `chunks` table. Read-only; returns the
-// fresh count so the UI can surface it. Revalidates the documents
-// page so any cache is cleared even if the displayed count was
-// already correct.
+// Re-derives live chunk count for a single document. Returns fresh count.
 export async function recountChunksAction(
   documentId: number,
 ): Promise<RecountChunksResult> {
@@ -245,11 +238,7 @@ export interface RecountAllChunksResult {
   total?: number;
 }
 
-// Admin-only server action: re-derives chunk counts for every document
-// in the system. Returns summary numbers so the page can render a
-// "Recounted N documents, total M chunks" banner. The page reads the
-// summary from the `?recounted=...` search param so the message
-// survives the page reload that `revalidatePath` triggers.
+// Re-derives chunk counts for all documents. Returns summary numbers.
 export async function recountAllChunksAction(): Promise<RecountAllChunksResult> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;

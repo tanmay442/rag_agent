@@ -1,7 +1,3 @@
-// Clerk session adapter. Wraps the @clerk/nextjs/server
-// auth() / currentUser() / clerkClient() calls so the
-// application layer only sees the SessionStore port.
-//
 // TODO: Dual role resolution — this adapter resolves roles
 // solely from Clerk publicMetadata, while other code paths
 // may resolve roles from the DB users table. This inconsistency

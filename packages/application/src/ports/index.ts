@@ -1,10 +1,4 @@
-// Port interfaces — the boundary between the application layer
-// and whatever infrastructure implementation provides the
-// behaviour. Adapters in @app/infrastructure implement these;
-// use-cases depend on these abstractions, not on drizzle /
-// @ai-sdk / pdf-parse / clerk directly. This is the core of
-// the Clean Architecture dependency rule: use-cases know
-// nothing about HOW the work is done, only WHAT they need.
+// Port interfaces — application-layer abstractions over infrastructure.
 
 export interface DocumentRow {
   id: number;

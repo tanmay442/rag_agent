@@ -1,5 +1,3 @@
-// Use-case: list users / set role / get / touch last seen.
-// Source: src/lib/auth/users.ts (listUsers, setUserRole, getUserByClerkId, touchLastSeen).
 import { err, ok, type Result, NotFoundError, ValidationError, ExternalServiceError } from '@app/domain';
 import type { UserRepository } from '../ports/index';
 import type { AuditLog } from '../ports/index';

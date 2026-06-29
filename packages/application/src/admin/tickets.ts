@@ -1,4 +1,3 @@
-// Admin ticket use-cases. Source: src/lib/admin/tickets.ts.
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
 import type { TicketRepository, AuditLog, TicketRow } from '../ports/index';
 
