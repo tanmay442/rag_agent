@@ -41,7 +41,7 @@ export async function searchChunks(
   try {
     rows = await deps.chunks.searchByVector(embedding, { threshold, limit });
   } catch (cause) {
-    console.error('[searchChunks] Vector search failed:', cause);
+    // TODO: Replace with an injected logger port for proper observability.
     return err(new ExternalServiceError('Vector search failed', cause));
   }
   return ok(

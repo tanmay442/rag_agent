@@ -31,6 +31,9 @@ export default async function TicketsPage({
       limit: PAGE_SIZE,
       offset,
     }),
+    // TODO: Replace with a search/autocomplete endpoint that only fetches
+    // the users needed for the current page's assignee dropdown, rather
+    // than loading up to 100 users upfront.
     comp.listUsers({ limit: 100 }),
   ]);
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));

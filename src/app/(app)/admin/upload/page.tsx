@@ -13,9 +13,14 @@ export default function UploadPage() {
   const [fileSize, setFileSize] = useState<number | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  function acceptFile(file: File) {
+  async function acceptFile(file: File) {
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setLocalError('Only PDF files are supported.');
+      return;
+    }
+    const firstBytes = await file.slice(0, 5).text();
+    if (!firstBytes.startsWith('%PDF')) {
+      setLocalError('File is not a valid PDF');
       return;
     }
     setLocalError(null);
@@ -37,11 +42,11 @@ export default function UploadPage() {
     if (inputRef.current) inputRef.current.value = '';
   }
 
-  function onDrop(e: DragEvent<HTMLLabelElement>) {
+  async function onDrop(e: DragEvent<HTMLLabelElement>) {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) acceptFile(file);
+    if (file) await acceptFile(file);
   }
 
   function onDragOver(e: DragEvent<HTMLLabelElement>) {
@@ -133,9 +138,9 @@ export default function UploadPage() {
           accept="application/pdf"
           required
           className="sr-only"
-          onChange={(e) => {
+          onChange={async (e) => {
             const f = e.target.files?.[0];
-            if (f) acceptFile(f);
+            if (f) await acceptFile(f);
           }}
           data-testid="upload-input"
         />

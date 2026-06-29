@@ -69,6 +69,11 @@ export function TicketOverlay({
     };
   }, [activeId, params, router]);
 
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (activeId) overlayRef.current?.focus();
+  }, [activeId]);
+
   if (!activeId) return null;
   if (typeof document === 'undefined') return null;
 
@@ -83,6 +88,8 @@ export function TicketOverlay({
 
   return createPortal(
     <div
+      ref={overlayRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex justify-end"
       data-testid="ticket-overlay"
       role="dialog"

@@ -4,6 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -34,8 +35,9 @@ const QUICK_PROMPTS: Array<{ label: string; text: string }> = [
 
 export function ChatInterface() {
   const [input, setInput] = useState('');
+  const transport = useMemo(() => new DefaultChatTransport({ api: '/api/chat' }), []);
   const { messages, sendMessage, status, error, stop } = useChat<MyUIMessage>({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    transport,
   });
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -64,20 +66,14 @@ export function ChatInterface() {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [input]);
 
-  // Auto-scroll the messages container to the bottom on every change
-  // using requestAnimationFrame to capture the correct scrollHeight
-  // after layout paints. The callback re-reads the ref so a
-  // detached node (e.g. after test teardown) is a no-op rather
-  // than a TypeError.
+  // Auto-scroll the messages container to the bottom, throttled to
+  // avoid scrolling on every state change during rapid streaming.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    let frameId = 0;
-    const handleScroll = () => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
       const el = messagesScrollRef.current;
-      // Detached nodes (e.g. between tests, after teardown) may
-      // not implement scrollTo in jsdom. The triple guard
-      // (instance + connected + function-present) keeps this a
-      // no-op in every case instead of throwing.
       if (!(el instanceof HTMLElement)) return;
       if (!el.isConnected) return;
       if (typeof el.scrollTo !== 'function') return;
@@ -85,9 +81,10 @@ export function ChatInterface() {
         top: el.scrollHeight,
         behavior: status === 'streaming' ? 'auto' : 'smooth',
       });
+    }, 100);
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-    frameId = requestAnimationFrame(handleScroll);
-    return () => cancelAnimationFrame(frameId);
   }, [messages, status]);
 
   return (

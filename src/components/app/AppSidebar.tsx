@@ -167,6 +167,9 @@ export function AppSidebar({
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
+          {/* TODO: Implement focus trap (e.g. using @focus-trap/react or a
+              manual Tab/Shift+Tab handler) to keep keyboard focus within
+              the drawer when it is open. */}
           <nav
             id="app-mobile-drawer"
             role="dialog"
