@@ -143,7 +143,7 @@ export async function listDocuments(
       fileHash: documents.fileHash,
       uploadedBy: documents.uploadedBy,
       uploadedAt: documents.uploadedAt,
-      blob: documents.blob,
+      blob: sql<Buffer | null>`null::bytea`.as('blob'),
       deletedAt: documents.deletedAt,
       total: sql<number>`count(*) over()`.as('total'),
     })
@@ -164,7 +164,7 @@ export const ticketRepo = {
     return (row as TicketRow | undefined) ?? null;
   },
   async list(opts: {
-    status?: string;
+    status?: 'created' | 'in_progress' | 'closed';
     assignee?: string | null;
     search?: string;
     limit: number;
@@ -266,6 +266,13 @@ export const userRepo = {
     const row = await db.query.users.findFirst({ where: eq(users.clerkUserId, clerkUserId) });
     return (row as UserRow | undefined) ?? null;
   },
+  async findByIds(clerkUserIds: string[]): Promise<UserRow[]> {
+    if (clerkUserIds.length === 0) return [];
+    const rows = await db.query.users.findMany({
+      where: (u, { inArray }) => inArray(u.clerkUserId, clerkUserIds),
+    });
+    return rows as UserRow[];
+  },
   async setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<UserRow | null> {
     const [row] = await db.update(users).set({ role }).where(eq(users.clerkUserId, clerkUserId)).returning();
     return (row as UserRow | null) ?? null;
@@ -316,8 +323,11 @@ export const auditRepo = {
   ): Promise<void> {
     await client.insert(documentAudit).values(input);
   },
-  async logTicketEvent(input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change'; ticketId: string; actorId: string }): Promise<void> {
-    await db.insert(ticketAudit).values(input);
+  async logTicketEvent(
+    input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change'; ticketId: string; actorId: string },
+    client: Client = db,
+  ): Promise<void> {
+    await client.insert(ticketAudit).values(input);
   },
   async list(input: { documentId?: number; ticketId?: string; limit: number; offset: number }): Promise<{
     events: Array<{
@@ -428,7 +438,7 @@ function createChunkRepo(client: Client): ChunkRepository {
 function createAuditRepo(client: Client): AuditLog {
   return {
     logDocumentEvent: (input) => auditRepo.logDocumentEvent(input, client),
-    logTicketEvent: (input) => auditRepo.logTicketEvent(input),
+    logTicketEvent: (input) => auditRepo.logTicketEvent(input, client),
     list: (input) => auditRepo.list(input),
   };
 }

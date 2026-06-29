@@ -29,9 +29,7 @@ async function resolveRole(
   userId: string,
   sessionClaims: unknown,
 ): Promise<'admin' | 'user'> {
-  // sessionClaims may be null/undefined if Clerk config is wrong.
-  if (!sessionClaims || typeof sessionClaims !== 'object') {
-  } else {
+  if (sessionClaims && typeof sessionClaims === 'object') {
     // Fast path: read role from JWT session token template.
     const claims = sessionClaims as
       | { metadata?: { role?: unknown } }

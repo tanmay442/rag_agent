@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { requireAdminRoute, isTicketStatus, TICKET_STATUSES } from '@/composition';
+import { requireAdminRoute, TICKET_STATUSES } from '@/composition';
 import { respond } from '@/lib/http';
 import { ValidationError, NotFoundError, ConflictError } from '@app/domain';
 
@@ -21,9 +21,6 @@ export async function PATCH(
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) {
     return respond(new ValidationError('Invalid payload'));
-  }
-  if (parsed.data.status && !isTicketStatus(parsed.data.status)) {
-    return respond(new ValidationError('Invalid status'));
   }
   const result = await comp.updateTicket({
     ticketId,

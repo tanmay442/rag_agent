@@ -52,10 +52,10 @@ export async function listDocuments(
   const ids = documents.map((d) => d.id);
   const chunkCounts = ids.length > 0 ? await deps.chunks.countForDocuments(ids) : new Map<number, number>();
   const uploaderIds = [...new Set(documents.map((d) => d.uploadedBy))];
+  const uploaders = uploaderIds.length > 0 ? await deps.users.findByIds(uploaderIds) : [];
   const uploaderMap = new Map<string, string | null>();
-  for (const uid of uploaderIds) {
-    const user = await deps.users.findByClerkId(uid);
-    uploaderMap.set(uid, user?.name ?? null);
+  for (const u of uploaders) {
+    uploaderMap.set(u.clerkUserId, u.name ?? null);
   }
   const result = documents.map((d) => ({
     ...d,
@@ -96,17 +96,20 @@ export async function uploadPdf(
 
 export async function softDeleteDocument(
   input: { documentId: number; actorId: string },
-  deps: { documents: DocumentRepository; audit: AuditLog },
+  deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<void>> {
   try {
-  const row = await deps.documents.softDelete(input.documentId, new Date());
-  if (!row) return err(new NotFoundError(`Document not found: ${input.documentId}`));
-  await deps.audit.logDocumentEvent({
-    action: 'delete',
-    documentId: input.documentId,
-    actorId: input.actorId,
-  });
-  return ok(undefined);
+    const existing = await deps.documents.findById(input.documentId);
+    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+    await deps.runner.run(async (tx) => {
+      await tx.documents.softDelete(input.documentId, new Date());
+      await tx.audit.logDocumentEvent({
+        action: 'delete',
+        documentId: input.documentId,
+        actorId: input.actorId,
+      });
+    });
+    return ok(undefined);
   } catch (e) {
     return err(new ExternalServiceError('Failed to soft-delete document', e));
   }
