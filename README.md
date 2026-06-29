@@ -84,6 +84,13 @@ pnpm dev
   `/admin(.*)`, `/api/chat(.*)`, and `/api/admin(.*)` require a signed-in
   user; `/admin(.*)` and `/api/admin(.*)` additionally require
   `role === 'admin'` (non-admins are redirected to `/chat`).
+- **JWT template:** To enable fast role checks in middleware without
+  hitting the Clerk Backend SDK on every request, configure a JWT
+  template in the Clerk Dashboard (Sessions → Customize session token):
+  `{ "metadata": "{{user.public_metadata}}" }`. This projects
+  `publicMetadata.role` into the session token's `metadata.role` claim,
+  which `src/proxy.ts` reads as its fast path. Without this template,
+  the middleware falls back to a Backend SDK call on every request.
 - **Action gating:** Every admin server action and API route calls
   `requireAdmin()` as its second line. Server actions return
   `{ error: 'Forbidden' }`; API routes return HTTP 403.
