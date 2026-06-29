@@ -8,7 +8,7 @@ import {
   ConflictError,
   ExternalServiceError,
 } from '@app/domain';
-import type { DocumentRepository, ChunkRepository, AuditLog, Clock, UserRepository } from '../ports/index';
+import type { DocumentRepository, ChunkRepository, AuditLog, Clock, UserRepository, TransactionRunner } from '../ports/index';
 import { ingestFile } from '../rag/ingest';
 import type { IngestDeps, IngestResult } from '../rag/ingest';
 
@@ -70,32 +70,25 @@ export async function listDocuments(
 
 export async function uploadPdf(
   input: { fileName: string; buffer: Buffer; actorId: string },
-  deps: IngestDeps & { audit: AuditLog },
+  deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<IngestResult>> {
   try {
-  const r = await ingestFile(
-    { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
-    deps,
-  );
-  if (!r.ok) return r;
-  // Save the blob for inline preview (mirrors legacy behaviour).
-  // TODO: Wrap in a transaction so the document and blob are atomically persisted.
-  // If updateBlob fails we must clean up the document/chunks created by ingestFile.
-  // TODO: Large PDF blobs should be moved to external storage (S3/R2) instead of
-  // being stored directly in the database to avoid DB size limits and improve performance.
-  const blobResult = await deps.documents.updateBlob(r.value.documentId, input.buffer).then(() => true).catch(() => false);
-  if (!blobResult) {
-    await deps.documents.deleteById(r.value.documentId);
-    return err(new ConflictError('Failed to save document blob'));
-  }
-  await deps.audit.logDocumentEvent({
-    action: r.value.status === 'inserted' ? 'upload' : 'replace',
-    documentId: r.value.documentId,
-    actorId: input.actorId,
-  }).catch((auditErr) => {
-    console.error('Audit logging failed:', auditErr);
-  });
-  return r;
+    // TODO: Large PDF blobs should be moved to external storage (S3/R2) instead of
+    // being stored directly in the database to avoid DB size limits and improve performance.
+    return await deps.runner.run(async (tx) => {
+      const r = await ingestFile(
+        { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
+        { ...deps, documents: tx.documents, chunks: tx.chunks },
+      );
+      if (!r.ok) return r;
+      await tx.documents.updateBlob(r.value.documentId, input.buffer);
+      await tx.audit.logDocumentEvent({
+        action: r.value.status === 'inserted' ? 'upload' : 'replace',
+        documentId: r.value.documentId,
+        actorId: input.actorId,
+      });
+      return r;
+    });
   } catch (e) {
     return err(new ExternalServiceError('Failed to upload PDF', e));
   }
@@ -129,7 +122,7 @@ export interface RestoreResult {
 export async function restoreDocument(
   documentId: number,
   actorId: string,
-  deps: { documents: DocumentRepository; audit: AuditLog; clock: Clock },
+  deps: { documents: DocumentRepository; audit: AuditLog; clock: Clock; runner: TransactionRunner },
 ): Promise<Result<RestoreResult>> {
   const doc = await deps.documents.findById(documentId);
   if (!doc) return ok({ ok: false, reason: 'not_found' });
@@ -137,16 +130,13 @@ export async function restoreDocument(
   if (deps.clock.now().getTime() - doc.deletedAt.getTime() > RESTORE_WINDOW_MS) {
     return ok({ ok: false, reason: 'expired' });
   }
-  // TODO: Wrap restore + audit in a transaction so the audit log is never
-  // written without the corresponding state change (or vice-versa).
   try {
-    await deps.documents.restore(documentId);
-    await deps.audit.logDocumentEvent({ action: 'restore', documentId, actorId });
+    await deps.runner.run(async (tx) => {
+      await tx.documents.restore(documentId);
+      await tx.audit.logDocumentEvent({ action: 'restore', documentId, actorId });
+    });
   } catch {
-    // If the audit write fails after restore, the document is already
-    // un-deleted but there is no audit trail. Return an error so the caller
-    // knows the operation was only partially successful.
-    return err(new ConflictError('Document restored but audit log failed'));
+    return err(new ConflictError('Document restore transaction failed'));
   }
   return ok({ ok: true });
 }
@@ -165,22 +155,20 @@ export async function getDocumentById(
 
 export async function hardDeleteDocument(
   input: { documentId: number; actorId: string },
-  deps: { documents: DocumentRepository; audit: AuditLog },
+  deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<void>> {
   try {
-  // TODO: Wrap hard-delete in a transaction to ensure the delete and audit log
-  // are atomically committed.
-  const existing = await deps.documents.findById(input.documentId);
-  if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
-  await deps.documents.deleteById(input.documentId);
-  await deps.audit.logDocumentEvent({
-    action: 'delete',
-    documentId: input.documentId,
-    actorId: input.actorId,
-  }).catch((auditErr) => {
-    console.error('Audit logging failed:', auditErr);
-  });
-  return ok(undefined);
+    const existing = await deps.documents.findById(input.documentId);
+    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+    await deps.runner.run(async (tx) => {
+      await tx.documents.deleteById(input.documentId);
+      await tx.audit.logDocumentEvent({
+        action: 'delete',
+        documentId: input.documentId,
+        actorId: input.actorId,
+      });
+    });
+    return ok(undefined);
   } catch (e) {
     return err(new ExternalServiceError('Failed to hard-delete document', e));
   }
@@ -188,32 +176,28 @@ export async function hardDeleteDocument(
 
 export async function replacePdf(
   input: { documentId: number; fileName: string; buffer: Buffer; actorId: string },
-  deps: IngestDeps & { audit: AuditLog },
+  deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<IngestResult>> {
   try {
-  const existing = await deps.documents.findById(input.documentId);
-  if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+    const existing = await deps.documents.findById(input.documentId);
+    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
 
-  const r = await ingestFile(
-    { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
-    deps,
-  );
-  if (!r.ok) return r;
-  // TODO: Wrap in a transaction so the blob update and document replacement are atomic.
-  const blobResult = await deps.documents.updateBlob(r.value.documentId, input.buffer).then(() => true).catch(() => false);
-  if (!blobResult) {
-    return err(new ConflictError('Failed to save document blob'));
-  }
-  if (r.value.status !== 'unchanged') {
-  await deps.audit.logDocumentEvent({
-    action: 'replace',
-    documentId: input.documentId,
-    actorId: input.actorId,
-  }).catch((auditErr) => {
-    console.error('Audit logging failed:', auditErr);
-  });
-  }
-  return r;
+    return await deps.runner.run(async (tx) => {
+      const r = await ingestFile(
+        { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
+        { ...deps, documents: tx.documents, chunks: tx.chunks },
+      );
+      if (!r.ok) return r;
+      await tx.documents.updateBlob(r.value.documentId, input.buffer);
+      if (r.value.status !== 'unchanged') {
+        await tx.audit.logDocumentEvent({
+          action: 'replace',
+          documentId: input.documentId,
+          actorId: input.actorId,
+        });
+      }
+      return r;
+    });
   } catch (e) {
     return err(new ExternalServiceError('Failed to replace PDF', e));
   }

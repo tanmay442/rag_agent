@@ -3,6 +3,11 @@
 // application expects (Drizzle's $inferSelect row types
 // for documents/chunks/tickets/users; AuditRepo /
 // UserRepo / TicketRepo aliases for the application).
+//
+// Functions that participate in transactions accept an optional
+// `client` parameter — a Drizzle instance scoped to the
+// transaction. When omitted they fall back to the module-level
+// `db`.
 import { eq, desc, ilike, or, sql, inArray, isNull, and } from 'drizzle-orm';
 import { db } from './client';
 import {
@@ -16,55 +21,57 @@ import {
 } from './schema';
 import type { TicketRow, UserRow } from '@app/application/ports';
 
+type Client = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 // ---- Documents / Chunks ----
 
-export async function findDocumentByName(name: string): Promise<Document | null> {
-  const row = await db.query.documents.findFirst({ where: eq(documents.fileName, name) });
+export async function findDocumentByName(name: string, client: Client = db): Promise<Document | null> {
+  const row = await client.query.documents.findFirst({ where: eq(documents.fileName, name) });
   return (row as Document | undefined) ?? null;
 }
 
-export async function findDocumentById(id: number): Promise<Document | null> {
-  const row = await db.query.documents.findFirst({ where: eq(documents.id, id) });
+export async function findDocumentById(id: number, client: Client = db): Promise<Document | null> {
+  const row = await client.query.documents.findFirst({ where: eq(documents.id, id) });
   return (row as Document | undefined) ?? null;
 }
 
-export async function insertDocument(input: {
-  fileName: string;
-  fileHash: string;
-  uploadedBy: string;
-}): Promise<Document> {
-  const [row] = await db.insert(documents).values(input).returning();
+export async function insertDocument(
+  input: { fileName: string; fileHash: string; uploadedBy: string },
+  client: Client = db,
+): Promise<Document> {
+  const [row] = await client.insert(documents).values(input).returning();
   if (!row) throw new Error('Failed to insert document');
   return row as Document;
 }
 
-export async function deleteDocumentById(id: number): Promise<void> {
-  await db.delete(documents).where(eq(documents.id, id));
+export async function deleteDocumentById(id: number, client: Client = db): Promise<void> {
+  await client.delete(documents).where(eq(documents.id, id));
 }
 
-export async function updateDocumentBlob(id: number, blob: Buffer): Promise<void> {
-  await db.update(documents).set({ blob }).where(eq(documents.id, id));
+export async function updateDocumentBlob(id: number, blob: Buffer, client: Client = db): Promise<void> {
+  await client.update(documents).set({ blob }).where(eq(documents.id, id));
 }
 
-export async function softDeleteDocument(id: number, at: Date): Promise<Document | null> {
-  const [row] = await db.update(documents).set({ deletedAt: at }).where(eq(documents.id, id)).returning();
+export async function softDeleteDocument(id: number, at: Date, client: Client = db): Promise<Document | null> {
+  const [row] = await client.update(documents).set({ deletedAt: at }).where(eq(documents.id, id)).returning();
   return (row as Document | null) ?? null;
 }
 
-export async function restoreDocument(id: number): Promise<Document | null> {
-  const [row] = await db.update(documents).set({ deletedAt: null }).where(eq(documents.id, id)).returning();
+export async function restoreDocument(id: number, client: Client = db): Promise<Document | null> {
+  const [row] = await client.update(documents).set({ deletedAt: null }).where(eq(documents.id, id)).returning();
   return (row as Document | null) ?? null;
 }
 
 export async function searchChunksByVector(
   embedding: number[],
   opts: { threshold: number; limit: number },
+  client: Client = db,
 ): Promise<Array<{ content: string; similarity: number }>> {
   if (!Array.isArray(embedding) || embedding.length === 0 || !embedding.every((v) => Number.isFinite(v))) {
     throw new Error('Invalid embedding: must be a non-empty array of finite numbers');
   }
   const vectorLiteral = `[${embedding.join(',')}]`;
-  const result = await db.execute(sql`
+  const result = await client.execute(sql`
     SELECT content, 1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
     FROM chunks
     WHERE 1 - (embedding <=> ${vectorLiteral}::vector) > ${opts.threshold}
@@ -76,17 +83,23 @@ export async function searchChunksByVector(
   return rows.map((r) => ({ content: r.content, similarity: Number(r.similarity) }));
 }
 
-export async function insertChunks(rows: Array<{ documentId: number; content: string; embedding: number[] }>): Promise<void> {
+export async function insertChunks(
+  rows: Array<{ documentId: number; content: string; embedding: number[] }>,
+  client: Client = db,
+): Promise<void> {
   if (rows.length === 0) return;
   const BATCH_SIZE = 500;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    await db.insert(chunks).values(rows.slice(i, i + BATCH_SIZE));
+    await client.insert(chunks).values(rows.slice(i, i + BATCH_SIZE));
   }
 }
 
-export async function countChunksForDocuments(documentIds: number[]): Promise<Map<number, number>> {
+export async function countChunksForDocuments(
+  documentIds: number[],
+  client: Client = db,
+): Promise<Map<number, number>> {
   if (documentIds.length === 0) return new Map();
-  const rows = await db
+  const rows = await client
     .select({ documentId: chunks.documentId, count: sql<number>`count(*)::int` })
     .from(chunks)
     .where(inArray(chunks.documentId, documentIds))
@@ -94,33 +107,36 @@ export async function countChunksForDocuments(documentIds: number[]): Promise<Ma
   return new Map(rows.map((r) => [r.documentId, r.count]));
 }
 
-export async function countChunksForAll(): Promise<number> {
-  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(chunks);
+export async function countChunksForAll(client: Client = db): Promise<number> {
+  const [row] = await client.select({ count: sql<number>`count(*)::int` }).from(chunks);
   return row?.count ?? 0;
 }
 
-export async function countChunksForDocument(id: number): Promise<number> {
-  const [row] = await db
+export async function countChunksForDocument(id: number, client: Client = db): Promise<number> {
+  const [row] = await client
     .select({ count: sql<number>`count(*)::int` })
     .from(chunks)
     .where(eq(chunks.documentId, id));
   return row?.count ?? 0;
 }
 
-export async function recountChunksForAll(): Promise<Array<{ documentId: number; count: number }>> {
-  const rows = await db
+export async function recountChunksForAll(client: Client = db): Promise<Array<{ documentId: number; count: number }>> {
+  const rows = await client
     .select({ documentId: chunks.documentId, count: sql<number>`count(*)::int` })
     .from(chunks)
     .groupBy(chunks.documentId);
   return rows;
 }
 
-export async function listDocuments(opts: {
-  search?: string;
-  includeDeleted?: boolean;
-  limit: number;
-  offset: number;
-}): Promise<{ documents: Document[]; total: number }> {
+export async function listDocuments(
+  opts: {
+    search?: string;
+    includeDeleted?: boolean;
+    limit: number;
+    offset: number;
+  },
+  client: Client = db,
+): Promise<{ documents: Document[]; total: number }> {
   const whereParts = [] as ReturnType<typeof eq>[];
   if (!opts.includeDeleted) whereParts.push(isNull(documents.deletedAt));
   if (opts.search) whereParts.push(ilike(documents.fileName, `%${opts.search.replace(/[%_]/g, '\\$&')}%`));
@@ -129,27 +145,24 @@ export async function listDocuments(opts: {
     : whereParts.length === 1
       ? whereParts[0]
       : and(...whereParts);
-  const rows = (await db
+  const rows = await client
     .select({
       id: documents.id,
       fileName: documents.fileName,
       fileHash: documents.fileHash,
       uploadedBy: documents.uploadedBy,
       uploadedAt: documents.uploadedAt,
+      blob: documents.blob,
       deletedAt: documents.deletedAt,
+      total: sql<number>`count(*) over()`.as('total'),
     })
     .from(documents)
     .where(where)
     .orderBy(desc(documents.uploadedAt))
     .limit(opts.limit)
-    .offset(opts.offset)) as Document[];
-  // TODO: There is a race condition between the row query and the count query.
-  // Use COUNT(*) OVER() window function to get both in a single query for consistency.
-  const [totalRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(documents)
-    .where(where);
-  return { documents: rows, total: totalRow?.count ?? 0 };
+    .offset(opts.offset);
+  const total = rows[0]?.total ?? 0;
+  return { documents: rows as unknown as Document[], total };
 }
 
 // ---- Tickets ----
@@ -179,20 +192,27 @@ export const ticketRepo = {
       : whereParts.length === 1
         ? whereParts[0]
         : and(...whereParts);
-    const rows = (await db
-      .select()
+    const rows = await db
+      .select({
+        id: tickets.id,
+        ticketId: tickets.ticketId,
+        userId: tickets.userId,
+        name: tickets.name,
+        email: tickets.email,
+        issue: tickets.issue,
+        status: tickets.status,
+        assignedTo: tickets.assignedTo,
+        notes: tickets.notes,
+        createdAt: tickets.createdAt,
+        total: sql<number>`count(*) over()`.as('total'),
+      })
       .from(tickets)
       .where(where)
       .orderBy(desc(tickets.createdAt))
       .limit(limit)
-      .offset(opts.offset)) as TicketRow[];
-    // TODO: There is a race condition between the row query and the count query.
-    // Use COUNT(*) OVER() window function to get both in a single query for consistency.
-    const [totalRow] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(tickets)
-      .where(where);
-    return { rows, total: totalRow?.count ?? 0 };
+      .offset(opts.offset);
+    const total = rows[0]?.total ?? 0;
+    return { rows: rows as unknown as TicketRow[], total };
   },
   async latest(): Promise<{ id: number; ticketId: string } | null> {
     const [latest] = await db
@@ -299,8 +319,11 @@ export const userRepo = {
 // ---- Audit ----
 
 export const auditRepo = {
-  async logDocumentEvent(input: { action: 'upload' | 'replace' | 'delete' | 'restore'; documentId: number; actorId: string }): Promise<void> {
-    await db.insert(documentAudit).values(input);
+  async logDocumentEvent(
+    input: { action: 'upload' | 'replace' | 'delete' | 'restore'; documentId: number; actorId: string },
+    client: Client = db,
+  ): Promise<void> {
+    await client.insert(documentAudit).values(input);
   },
   async logTicketEvent(input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change'; ticketId: string; actorId: string }): Promise<void> {
     await db.insert(ticketAudit).values(input);
@@ -346,44 +369,88 @@ export const auditRepo = {
       : wantTix
         ? sql``
         : sql`WHERE 1 = 0`;
-    const result = await db.execute<{
+    const actorResult = await db.execute<{
       id: number; kind: string; document_id: number | null; ticket_id: string | null;
-      actor_id: string; action: string; at: Date;
+      actor_id: string; action: string; at: Date; actor_name: string | null;
     }>(sql`
-      SELECT * FROM (
+      SELECT c.*, u.name AS actor_name FROM (
         SELECT id, 'document' AS kind, document_id, NULL::text AS ticket_id, actor_id, action, at
         FROM document_audit ${docWhere}
         UNION ALL
         SELECT id, 'ticket' AS kind, NULL::int AS document_id, ticket_id, actor_id, action, at
         FROM ticket_audit ${tixWhere}
-      ) combined
-      ORDER BY at DESC
+      ) c
+      LEFT JOIN users u ON u.clerkUserId = c.actor_id
+      ORDER BY c.at DESC
       LIMIT ${input.limit}
       OFFSET ${input.offset}
     `);
-    const rawRows = (result as unknown as { rows?: Array<{ id: number; kind: string; document_id: number | null; ticket_id: string | null; actor_id: string; action: string; at: Date }> }).rows ?? [];
+    const rawRows = (actorResult as unknown as { rows?: Array<{ id: number; kind: string; document_id: number | null; ticket_id: string | null; actor_id: string; action: string; at: Date; actor_name: string | null }> }).rows ?? [];
     const events = rawRows.map((r) => ({
       id: r.id,
       kind: r.kind as 'document' | 'ticket',
       documentId: r.document_id ?? null,
       ticketId: r.ticket_id ?? null,
       actorId: r.actor_id,
-      actorName: null as string | null,
+      actorName: r.actor_name ?? null,
       action: r.action,
       at: r.at instanceof Date ? r.at : new Date(r.at),
     }));
-    // TODO: A JOIN on the users table in the UNION query above would be more
-    // efficient than a separate N+1 query for actor names. Consider using a
-    // CTE or subquery to resolve actor names in a single round-trip.
-    const actorIds = Array.from(new Set(events.map((e) => e.actorId)));
-    if (actorIds.length > 0) {
-      const actorRows = await db
-        .select({ clerkUserId: users.clerkUserId, name: users.name })
-        .from(users)
-        .where(inArray(users.clerkUserId, actorIds));
-      const actorMap = new Map(actorRows.map((r) => [r.clerkUserId, r.name]));
-      for (const e of events) e.actorName = actorMap.get(e.actorId) ?? null;
-    }
     return { events, total };
+  },
+};
+
+// ---- Transaction runner ----
+// Wraps Drizzle's db.transaction() so the application layer
+// can execute multiple repository calls atomically.
+
+import type { TransactionRunner, TransactionContext, DocumentRepository, ChunkRepository, AuditLog } from '@app/application/ports';
+
+function createDocumentRepo(client: Client): DocumentRepository {
+  return {
+    findByName: (name) => findDocumentByName(name, client),
+    findById: (id) => findDocumentById(id, client),
+    saveBlob: (id, blob) => updateDocumentBlob(id, blob, client),
+    insert: (input) => insertDocument(input, client),
+    deleteById: (id) => deleteDocumentById(id, client),
+    softDelete: (id, at) => softDeleteDocument(id, at, client),
+    restore: (id) => restoreDocument(id, client),
+    listDeletedSince: () => Promise.resolve([]),
+    updateBlob: (id, blob) => updateDocumentBlob(id, blob, client),
+    list: (opts) => listDocuments(opts, client),
+    countChunksForDocuments: (ids) => countChunksForDocuments(ids, client),
+    countChunksForAll: () => countChunksForAll(client),
+  };
+}
+
+function createChunkRepo(client: Client): ChunkRepository {
+  return {
+    searchByVector: (embedding, opts) => searchChunksByVector(embedding, opts, client),
+    insertMany: (rows) => insertChunks(rows, client),
+    countForDocuments: (ids) => countChunksForDocuments(ids, client),
+    countForAll: () => countChunksForAll(client),
+    countForDocument: (id) => countChunksForDocument(id, client),
+    recountAll: () => recountChunksForAll(client),
+  };
+}
+
+function createAuditRepo(client: Client): AuditLog {
+  return {
+    logDocumentEvent: (input) => auditRepo.logDocumentEvent(input, client),
+    logTicketEvent: (input) => auditRepo.logTicketEvent(input),
+    list: (input) => auditRepo.list(input),
+  };
+}
+
+export const transactionRunner: TransactionRunner = {
+  async run<T>(fn: (ctx: TransactionContext) => Promise<T>): Promise<T> {
+    return db.transaction(async (tx) => {
+      const ctx: TransactionContext = {
+        documents: createDocumentRepo(tx),
+        chunks: createChunkRepo(tx),
+        audit: createAuditRepo(tx),
+      };
+      return fn(ctx);
+    });
   },
 };
