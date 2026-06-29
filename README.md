@@ -86,6 +86,9 @@ pnpm dev
 - **Action gating:** Every admin server action and API route calls
   `requireAdmin()` as its second line. Server actions return
   `{ error: 'Forbidden' }`; API routes return HTTP 403.
+- **Security headers:** `next.config.ts` sets `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and disables
+  the `X-Powered-By` header.
 
 ## Admin console
 
@@ -151,7 +154,7 @@ call sites do not need to change.
 
 ### Unit + integration (Vitest)
 
-120 tests across 18 files. Run with `pnpm test` (single run) or
+122 tests across 18 files. Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
@@ -181,7 +184,8 @@ call sites do not need to change.
   vector search error propagation and success path
 - `packages/application/src/rag/__tests__/ingest.integration.test.ts` —
   PDF ingest pipeline: chunk insertion, hash dedup, transactional
-  replace, empty-text and API-failure error paths
+  document replacement (delete-before-insert with TransactionRunner),
+  empty-text and API-failure error paths
 - `packages/application/src/auth/__tests__/users.test.ts` —
   `setUserRole`: audit logging, invalid role, user-not-found
 
@@ -240,7 +244,8 @@ packages/
 ├── domain/         # @app/domain — pure types, Zod schemas,
 │                   #   Result<T,E>, DomainError hierarchy
 ├── application/    # @app/application — use-cases + port
-│                   #   interfaces. Returns Result<T, DomainError>.
+│                   #   interfaces (incl. TransactionRunner).
+│                   #   Returns Result<T, DomainError>.
 ├── infrastructure/ # @app/infrastructure — Drizzle repos, AI SDK
 │                   #   adapters, Clerk session, pdf-parse, bytea
 ├── cli/            # @app/cli — `rag-agent` sub-commands:
