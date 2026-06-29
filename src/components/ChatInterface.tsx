@@ -69,7 +69,7 @@ export function ChatInterface() {
   // Auto-scroll the messages container to the bottom, throttled to
   // avoid scrolling on every state change during rapid streaming.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {

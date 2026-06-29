@@ -114,6 +114,7 @@ async function captureToolsFromStreamText<T>(): Promise<T | undefined> {
   const res = await appHandler.POST(
     new Request('http://localhost/api/chat', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: [] }),
     }),
   );
@@ -155,6 +156,7 @@ describe('/api/chat', () => {
     const res = await appHandler.POST(
       new Request('http://localhost/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [] }),
       }),
     );
@@ -168,6 +170,7 @@ describe('/api/chat', () => {
     const res = await appHandler.POST(
       new Request('http://localhost/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [] }),
       }),
     );
@@ -310,6 +313,7 @@ describe('/api/chat searchDocumentation tool', () => {
     const res = await appHandler.POST(
       new Request('http://localhost/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [] }),
       }),
     );
@@ -345,6 +349,7 @@ describe('/api/chat pre-fetch toggle (default off)', () => {
     const res = await appHandler.POST(
       new Request('http://localhost/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }),
     );
@@ -405,6 +410,7 @@ describe('/api/chat pre-fetch toggle (default off)', () => {
     const res = await appHandler.POST(
       new Request('http://localhost/api/chat', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [
             {
