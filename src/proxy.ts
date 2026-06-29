@@ -32,15 +32,20 @@ async function resolveRole(
   userId: string,
   sessionClaims: unknown,
 ): Promise<'admin' | 'user'> {
-  // 1. The Clerk session token template maps publicMetadata -> metadata
-  //    in the JWT. If the template is configured and the user has a role
-  //    set on publicMetadata, this is the cheap path.
-  const claims = sessionClaims as
-    | { metadata?: { role?: unknown } }
-    | undefined;
-  const fromClaims = claims?.metadata?.role;
-  if (fromClaims === 'admin' || fromClaims === 'user') {
-    return fromClaims;
+  // Defensive: sessionClaims may be null/undefined if Clerk config is wrong.
+  if (!sessionClaims || typeof sessionClaims !== 'object') {
+    // Fall through to Clerk SDK fallback below.
+  } else {
+    // 1. The Clerk session token template maps publicMetadata -> metadata
+    //    in the JWT. If the template is configured and the user has a role
+    //    set on publicMetadata, this is the cheap path.
+    const claims = sessionClaims as
+      | { metadata?: { role?: unknown } }
+      | undefined;
+    const fromClaims = claims?.metadata?.role;
+    if (fromClaims === 'admin' || fromClaims === 'user') {
+      return fromClaims;
+    }
   }
   // 2. Fallback: read the role directly from Clerk via the Backend SDK.
   //    The proxy runs in the Edge runtime; clerkClient works there. This

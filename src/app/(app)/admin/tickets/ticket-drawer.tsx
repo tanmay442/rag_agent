@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { updateTicketAction } from '../actions';
+import { VALID_TRANSITIONS, type TicketStatus } from '@/composition';
 
 export interface UserOption {
   clerkUserId: string;
@@ -69,9 +70,12 @@ export function TicketDrawer({
             className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)]"
             data-testid={`ticket-status-${ticketId}`}
           >
-            <option value="created">created</option>
-            <option value="in_progress">in_progress</option>
-            <option value="closed">closed</option>
+            <option value={currentStatus}>{currentStatus}</option>
+            {VALID_TRANSITIONS[currentStatus as TicketStatus]?.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
         </label>
         <label className="flex flex-1 flex-col gap-1">

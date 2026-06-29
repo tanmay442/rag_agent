@@ -14,6 +14,7 @@ export async function GET(
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${safeName}"`,
       'Cache-Control': 'private, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

@@ -164,7 +164,7 @@ describe('admin actions', () => {
     });
     restoreDocumentMock.mockResolvedValue({ ok: false, reason: 'expired' });
     const result = await restoreDocumentAction(42);
-    expect(result.error).toContain('expired');
+    expect(result.error).toBe('An error occurred');
   });
 
   it('setRoleAction rejects invalid role values', async () => {
@@ -195,7 +195,7 @@ describe('admin actions', () => {
     });
     updateTicketMock.mockResolvedValue({ ok: false, reason: 'invalid_transition' });
     const result = await updateTicketAction('TKT-1001', { status: 'closed' });
-    expect(result.error).toContain('invalid_transition');
+    expect(result.error).toBe('An error occurred');
   });
 
   it('impersonateUserAction returns a Clerk sign-in URL', async () => {

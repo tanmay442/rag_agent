@@ -39,6 +39,7 @@ function buildChatTools(deps: {
         query: z
           .string()
           .min(1)
+          .max(2000)
           .describe(
             'A focused, specific search query. Reformulate vague user wording into a tight phrase (e.g. "school cell phone policy" instead of "phones").',
           ),
@@ -161,6 +162,10 @@ async function streamChatResponse(req: Request): Promise<Response> {
   const { userId } = await auth();
   if (!userId) {
     return new Response('Unauthorized', { status: 401 });
+  }
+  const contentType = req.headers.get('content-type');
+  if (!contentType?.includes('application/json')) {
+    return new Response('Content-Type must be application/json', { status: 415 });
   }
   const comp = getComposition();
   const limit = comp.rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });

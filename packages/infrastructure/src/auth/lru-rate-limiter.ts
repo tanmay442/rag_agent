@@ -21,15 +21,23 @@ export const lruRateLimiter: RateLimiter = {
     bucket.timestamps = bucket.timestamps.filter((t) => t > cutoff);
     bucket.lastTouched = now;
     if (buckets.size > MAX_KEYS) {
-      let oldestKey: string | null = null;
-      let oldestTouched = Number.POSITIVE_INFINITY;
+      const evictThreshold = now - opts.windowMs;
       for (const [k, b] of buckets) {
-        if (b.lastTouched < oldestTouched) {
-          oldestTouched = b.lastTouched;
-          oldestKey = k;
+        if (b.lastTouched < evictThreshold) {
+          buckets.delete(k);
         }
       }
-      if (oldestKey) buckets.delete(oldestKey);
+      if (buckets.size > MAX_KEYS) {
+        let oldestKey: string | null = null;
+        let oldestTouched = Number.POSITIVE_INFINITY;
+        for (const [k, b] of buckets) {
+          if (b.lastTouched < oldestTouched) {
+            oldestTouched = b.lastTouched;
+            oldestKey = k;
+          }
+        }
+        if (oldestKey) buckets.delete(oldestKey);
+      }
     }
     if (bucket.timestamps.length >= opts.limit) {
       const oldest = bucket.timestamps[0] ?? now;

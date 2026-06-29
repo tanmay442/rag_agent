@@ -11,6 +11,9 @@ export const vector = customType<{ data: number[]; driverData: string }>({
     if (typeof value === 'string') {
       return value.replace(/^\[/, '').replace(/\]$/, '').split(',').map((s) => Number(s));
     }
-    return value as number[];
+    if (Array.isArray(value) && value.every((v) => typeof v === 'number')) {
+      return value;
+    }
+    throw new Error(`Unexpected vector value from driver: ${typeof value}`);
   },
 });
