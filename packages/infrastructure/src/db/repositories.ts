@@ -371,7 +371,7 @@ export const auditRepo = {
         SELECT id, 'ticket' AS kind, NULL::int AS document_id, ticket_id, actor_id, action, at
         FROM ticket_audit ${tixWhere}
       ) c
-      LEFT JOIN users u ON u.clerkUserId = c.actor_id
+      LEFT JOIN users u ON u.clerk_user_id = c.actor_id
       ORDER BY c.at DESC
       LIMIT ${input.limit}
       OFFSET ${input.offset}
