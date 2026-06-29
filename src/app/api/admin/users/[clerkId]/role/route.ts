@@ -18,7 +18,7 @@ export async function POST(
   const body = await req.json().catch(() => ({}));
   const parsed = RoleSchema.safeParse(body);
   if (!parsed.success) {
-    return respond(new ValidationError('invalid_role', parsed.error.issues));
+    return respond(new ValidationError('invalid_role', { issues: parsed.error.issues }));
   }
   try {
     const user = await comp.setUserRole({ clerkUserId: clerkId, role: parsed.data.role as 'admin' | 'user', actorId: session.user.id });

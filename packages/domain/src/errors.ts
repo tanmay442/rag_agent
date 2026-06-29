@@ -15,7 +15,7 @@ export abstract class DomainError extends Error {
 export class ValidationError extends DomainError {
   readonly code = 'validation_error';
   readonly status = 400;
-  constructor(message: string, readonly details?: unknown) {
+  constructor(message: string, readonly details?: Record<string, unknown>) {
     super(message);
   }
 }

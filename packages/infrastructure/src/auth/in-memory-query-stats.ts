@@ -46,6 +46,9 @@ export const inMemoryQueryStats: QueryStats = {
     trimBucket(bucket);
     evictIfNeeded();
   },
+  // TODO: This iterates all users and all queries to build the top-N list.
+  // For better performance, maintain a running top-N using a min-heap or
+  // periodically compute the top-N on record() calls instead of on query.
   top(limit) {
     const counts = new Map<string, number>();
     for (const bucket of users.values()) {

@@ -213,6 +213,7 @@ export function parseQueryPagination(
 ): { limit: number; offset: number } {
   const rawLimit = Number(url.searchParams.get('limit') ?? defaults.limit ?? 25);
   const rawOffset = Number(url.searchParams.get('offset') ?? defaults.offset ?? 0);
+  // Note: Negative values are clamped to 0 downstream by the database layer.
   return {
     limit: Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25),
     offset: Number.isFinite(rawOffset) ? rawOffset : (defaults.offset ?? 0),

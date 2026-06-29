@@ -143,6 +143,8 @@ export async function listDocuments(opts: {
     .orderBy(desc(documents.uploadedAt))
     .limit(opts.limit)
     .offset(opts.offset)) as Document[];
+  // TODO: There is a race condition between the row query and the count query.
+  // Use COUNT(*) OVER() window function to get both in a single query for consistency.
   const [totalRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(documents)
@@ -164,6 +166,8 @@ export const ticketRepo = {
     limit: number;
     offset: number;
   }): Promise<{ rows: TicketRow[]; total: number }> {
+    // Defense-in-depth: enforce a hard maximum at the repository level.
+    const limit = Math.min(Math.max(opts.limit, 1), 500);
     const whereParts = [] as ReturnType<typeof eq>[];
     if (opts.status) whereParts.push(eq(tickets.status, opts.status));
     if (opts.assignee !== undefined && opts.assignee !== null) {
@@ -180,8 +184,10 @@ export const ticketRepo = {
       .from(tickets)
       .where(where)
       .orderBy(desc(tickets.createdAt))
-      .limit(opts.limit)
+      .limit(limit)
       .offset(opts.offset)) as TicketRow[];
+    // TODO: There is a race condition between the row query and the count query.
+    // Use COUNT(*) OVER() window function to get both in a single query for consistency.
     const [totalRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(tickets)
@@ -366,6 +372,9 @@ export const auditRepo = {
       action: r.action,
       at: r.at instanceof Date ? r.at : new Date(r.at),
     }));
+    // TODO: A JOIN on the users table in the UNION query above would be more
+    // efficient than a separate N+1 query for actor names. Consider using a
+    // CTE or subquery to resolve actor names in a single round-trip.
     const actorIds = Array.from(new Set(events.map((e) => e.actorId)));
     if (actorIds.length > 0) {
       const actorRows = await db

@@ -25,6 +25,7 @@ export function DocumentRowActions({
   const [recountPending, startRecount] = useTransition();
   const [recountCount, setRecountCount] = useState<number | null>(null);
   const [recountError, setRecountError] = useState<string | null>(null);
+  const [hardDeletePending, startHardDelete] = useTransition();
   const btn =
     'rounded-xl border border-[var(--border)] px-2 py-1 text-xs text-[var(--foreground-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)] disabled:opacity-50';
   return (
@@ -83,9 +84,9 @@ export function DocumentRowActions({
       {isDeleted ? (
         <button
           type="button"
-          disabled={pending}
+          disabled={hardDeletePending}
           onClick={() =>
-            startTransition(async () => {
+            startHardDelete(async () => {
               setError(null);
               const res = await hardDeleteDocumentAction(id);
               if (res.error) setError(res.error);
@@ -94,7 +95,7 @@ export function DocumentRowActions({
           className="rounded-xl border border-[var(--danger)]/40 px-2 py-1 text-xs text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/10 disabled:opacity-50"
           data-testid={`documents-hard-delete-${id}`}
         >
-          {pending ? 'Removing…' : 'Hard delete'}
+          {hardDeletePending ? 'Removing…' : 'Hard delete'}
         </button>
       ) : null}
       <button

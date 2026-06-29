@@ -81,6 +81,8 @@ export async function uploadPdf(
   // Save the blob for inline preview (mirrors legacy behaviour).
   // TODO: Wrap in a transaction so the document and blob are atomically persisted.
   // If updateBlob fails we must clean up the document/chunks created by ingestFile.
+  // TODO: Large PDF blobs should be moved to external storage (S3/R2) instead of
+  // being stored directly in the database to avoid DB size limits and improve performance.
   const blobResult = await deps.documents.updateBlob(r.value.documentId, input.buffer).then(() => true).catch(() => false);
   if (!blobResult) {
     await deps.documents.deleteById(r.value.documentId);
