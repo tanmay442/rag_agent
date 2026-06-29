@@ -4,6 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -34,8 +35,9 @@ const QUICK_PROMPTS: Array<{ label: string; text: string }> = [
 
 export function ChatInterface() {
   const [input, setInput] = useState('');
+  const transport = useMemo(() => new DefaultChatTransport({ api: '/api/chat' }), []);
   const { messages, sendMessage, status, error, stop } = useChat<MyUIMessage>({
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    transport,
   });
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -55,7 +57,6 @@ export function ChatInterface() {
 
   const isStreaming = status === 'submitted' || status === 'streaming';
 
-  // Auto-grow the composer up to a max height.
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     const el = composerRef.current;
@@ -64,20 +65,13 @@ export function ChatInterface() {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [input]);
 
-  // Auto-scroll the messages container to the bottom on every change
-  // using requestAnimationFrame to capture the correct scrollHeight
-  // after layout paints. The callback re-reads the ref so a
-  // detached node (e.g. after test teardown) is a no-op rather
-  // than a TypeError.
+  // Throttle auto-scroll to avoid excessive scrolling during rapid streaming.
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    let frameId = 0;
-    const handleScroll = () => {
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
       const el = messagesScrollRef.current;
-      // Detached nodes (e.g. between tests, after teardown) may
-      // not implement scrollTo in jsdom. The triple guard
-      // (instance + connected + function-present) keeps this a
-      // no-op in every case instead of throwing.
       if (!(el instanceof HTMLElement)) return;
       if (!el.isConnected) return;
       if (typeof el.scrollTo !== 'function') return;
@@ -85,16 +79,14 @@ export function ChatInterface() {
         top: el.scrollHeight,
         behavior: status === 'streaming' ? 'auto' : 'smooth',
       });
+    }, 100);
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-    frameId = requestAnimationFrame(handleScroll);
-    return () => cancelAnimationFrame(frameId);
   }, [messages, status]);
 
   return (
-    // To prevent the layout from stretching, we assign a explicit height limitation. 
-    // Here we use `h-[600px] md:h-[700px] max-h-full` to bound the container. 
-    // If your parent wrapper already has a rigid height (e.g. `h-screen` or `h-[80vh]`), 
-    // you can swap this class to `h-full`.
+    // Height constraint to prevent layout stretch.
     <div
       className="flex h-[600px] md:h-[700px] max-h-full w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/40"
       data-testid="chat-frame"
@@ -349,9 +341,17 @@ export function ChatInterface() {
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <div className="flex flex-col gap-0.5">
-              <span className="font-medium">Something went wrong.</span>
+              <span className="font-medium">
+                {error instanceof Error
+                  ? error.name === 'AbortError'
+                    ? 'Request was aborted.'
+                    : error.message || 'Something went wrong.'
+                  : 'Something went wrong.'}
+              </span>
               <span className="text-[12px] text-[var(--danger)]/80">
-                Try again in a moment.
+                {error instanceof Error && error.name === 'AbortError'
+                  ? ''
+                  : 'Try again in a moment.'}
               </span>
             </div>
           </div>

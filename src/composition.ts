@@ -1,13 +1,4 @@
-// Composition root. The single place where the
-// application's port interfaces are wired to concrete
-// infrastructure adapters. Routes and server actions
-// import the methods on this object instead of reaching
-// into drizzle / @ai-sdk / clerk directly.
-//
-// `createComposition()` returns a typed object whose
-// methods are the use-cases. Tests can call
-// `createTestComposition()` to get a composition with
-// fakes for every port.
+// Composition root: wires port interfaces to infrastructure adapters.
 import {
   ingestFile,
   searchChunks,
@@ -28,6 +19,8 @@ import {
   updateTicket,
   isTicketStatus,
   TICKET_STATUSES,
+  VALID_TRANSITIONS,
+  type TicketStatus,
   getDocumentById,
   hardDeleteDocument,
   replacePdf,
@@ -117,13 +110,13 @@ function createComposition() {
     enforceRateLimit: (input: Parameters<typeof enforceRateLimit>[0]) =>
       enforceRateLimit(input, rateLimitDeps).then(unwrap),
     listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
-      listDocuments(input, { documents: documentRepo, chunks: chunkRepo }).then(unwrap),
+      listDocuments(input, { documents: documentRepo, chunks: chunkRepo, users: Db.userRepo }).then(unwrap),
     uploadPdf: (input: Parameters<typeof uploadPdf>[0]) =>
-      uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
+      uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     softDeleteDocument: (input: Parameters<typeof softDeleteDocument>[0]) =>
       softDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
     restoreDocument: (id: number, actorId: string) =>
-      restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock }).then(unwrap),
+      restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock, runner: Db.transactionRunner }).then(unwrap),
     listTickets: (input: Parameters<typeof listTickets>[0]) =>
       listTickets(input, { tickets: Db.ticketRepo }).then(unwrap),
     updateTicket: (input: Parameters<typeof updateTicket>[0]) =>
@@ -131,9 +124,9 @@ function createComposition() {
     getDocumentById: (id: number) =>
       getDocumentById(id, { documents: documentRepo }).then((r) => unwrap(r).document),
     hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
-      hardDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
+      hardDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     replacePdf: (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) =>
-      replacePdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
+      replacePdf(input, { ...ingestDeps, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     recountChunksForDocument: (id: number) =>
       recountChunksForDocument(id, { chunks: chunkRepo }).then(unwrap),
     recountChunksForAllDocuments: () =>
@@ -154,7 +147,7 @@ function createComposition() {
   };
 }
 
-export { appConfig, isTicketStatus, TICKET_STATUSES, type MyUIMessage };
+export { appConfig, isTicketStatus, TICKET_STATUSES, VALID_TRANSITIONS, type TicketStatus, type MyUIMessage };
 export { requireAdmin, requireSession, getAppSession, ForbiddenError, UnauthorizedError };
 
 export type Composition = ReturnType<typeof createComposition>;
@@ -163,6 +156,14 @@ let _composition: Composition | null = null;
 export function getComposition(): Composition {
   if (!_composition) _composition = createComposition();
   return _composition;
+}
+
+/**
+ * Reset the singleton composition to null. Intended for test
+ * isolation so each test suite starts with a fresh composition.
+ */
+export function resetComposition() {
+  _composition = null;
 }
 
 /**
@@ -184,7 +185,11 @@ export async function requireAdminRoute(): Promise<
     if (err instanceof ForbiddenError) {
       return { ok: false, response: new Response('Forbidden', { status: 403 }) };
     }
-    throw err;
+    // Clerk-specific errors (network, rate-limit, misconfiguration) or
+    // any other unexpected error should yield a 503 so the client can
+    // retry instead of seeing a 500.
+    console.error('requireAdminRoute failed', err);
+    return { ok: false, response: new Response('Service Unavailable', { status: 503 }) };
   }
 }
 
@@ -199,6 +204,7 @@ export function parseQueryPagination(
 ): { limit: number; offset: number } {
   const rawLimit = Number(url.searchParams.get('limit') ?? defaults.limit ?? 25);
   const rawOffset = Number(url.searchParams.get('offset') ?? defaults.offset ?? 0);
+  // Note: Negative values are clamped to 0 downstream by the database layer.
   return {
     limit: Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25),
     offset: Number.isFinite(rawOffset) ? rawOffset : (defaults.offset ?? 0),

@@ -19,18 +19,47 @@ export const googleEmbeddingService: EmbeddingService = {
   },
   async embedBatch(values: string[]): Promise<number[][]> {
     const out: number[][] = [];
+    const model = getEmbeddingModel();
     for (let i = 0; i < values.length; i += BATCH_SIZE) {
       const batch = values.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         batch.map((v) =>
           embed({
-            model: getEmbeddingModel(),
+            model,
             value: v,
             providerOptions: { google: EMBEDDING_OPTIONS },
           }).then(({ embedding }) => embedding),
         ),
       );
-      out.push(...results);
+      const batchEmbeddings: (number[] | null)[] = new Array(batch.length).fill(null);
+      const failedIndices: number[] = [];
+      for (let j = 0; j < results.length; j++) {
+        const r = results[j];
+        if (r.status === 'fulfilled') {
+          batchEmbeddings[j] = r.value;
+        } else {
+          failedIndices.push(j);
+        }
+      }
+      // Retry failed items individually
+      if (failedIndices.length > 0) {
+        const retryResults = await Promise.allSettled(
+          failedIndices.map((idx) =>
+            embed({
+              model,
+              value: batch[idx],
+              providerOptions: { google: EMBEDDING_OPTIONS },
+            }).then(({ embedding }) => embedding),
+          ),
+        );
+        for (let j = 0; j < failedIndices.length; j++) {
+          const rr = retryResults[j];
+          if (rr.status === 'fulfilled') {
+            batchEmbeddings[failedIndices[j]] = rr.value;
+          }
+        }
+      }
+      out.push(...(batchEmbeddings.filter(Boolean) as number[][]));
     }
     return out;
   },

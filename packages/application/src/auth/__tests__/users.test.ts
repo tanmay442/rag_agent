@@ -37,7 +37,7 @@ describe('setUserRole', () => {
     );
     expect(result.ok).toBe(true);
     expect(logTicketEvent).toHaveBeenCalledWith({
-      action: 'impersonation',
+      action: 'role_change',
       ticketId: 'user:user_1',
       actorId: 'actor_1',
     });

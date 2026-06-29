@@ -38,10 +38,8 @@ export function TicketOverlay({
   const params = useSearchParams();
   const activeId = params.get('ticket');
 
-  // Build a fresh close() on every render and stash it on a ref so the
-  // keydown effect can read the latest one without having to list it in
-  // the dependency array. The ref is updated in an effect (not during
-  // render) per the react-hooks/refs rule.
+  // Stash close() on a ref so the keydown effect reads the latest
+  // version without listing it in the dependency array.
   const closeRef = useRef<() => void>(() => {});
   useEffect(() => {
     if (!activeId) return;
@@ -53,13 +51,11 @@ export function TicketOverlay({
     }
     closeRef.current = close;
 
-    // Close on Escape.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', onKey);
 
-    // Lock body scroll while the overlay is open.
     const prev = document.documentElement.style.overflow;
     document.documentElement.style.overflow = 'hidden';
 
@@ -68,6 +64,11 @@ export function TicketOverlay({
       document.documentElement.style.overflow = prev;
     };
   }, [activeId, params, router]);
+
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (activeId) overlayRef.current?.focus();
+  }, [activeId]);
 
   if (!activeId) return null;
   if (typeof document === 'undefined') return null;
@@ -83,6 +84,8 @@ export function TicketOverlay({
 
   return createPortal(
     <div
+      ref={overlayRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex justify-end"
       data-testid="ticket-overlay"
       role="dialog"

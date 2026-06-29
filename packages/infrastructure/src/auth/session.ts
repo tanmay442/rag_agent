@@ -7,10 +7,11 @@ import { ForbiddenError, UnauthorizedError } from '@app/domain';
 export type AppRole = 'admin' | 'user';
 
 function computeAdminEmails(): readonly string[] {
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return (process.env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+    .filter((e) => e && EMAIL_RE.test(e));
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
