@@ -31,7 +31,7 @@ CREATE TABLE "ticket_audit" (
 	"actor_id" text NOT NULL,
 	"action" text NOT NULL,
 	"at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "ticket_audit_action_check" CHECK ("ticket_audit"."action" IN ('create','assign','status_change','note','impersonation'))
+	CONSTRAINT "ticket_audit_action_check" CHECK ("ticket_audit"."action" IN ('create','assign','status_change','note','impersonation','role_change'))
 );
 --> statement-breakpoint
 CREATE TABLE "tickets" (

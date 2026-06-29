@@ -76,8 +76,9 @@ export async function updateTicket(
     }
     const updated = await deps.tickets.update(input.ticketId, patch);
     if (!updated) return ok({ ok: false, reason: 'not_found' });
+    const auditAction = input.status ? 'status_change' : input.assignedTo !== undefined ? 'assign' : 'note';
     await deps.audit.logTicketEvent({
-      action: 'status_change',
+      action: auditAction,
       ticketId: input.ticketId,
       actorId: input.actorId,
     }).catch((auditErr) => {

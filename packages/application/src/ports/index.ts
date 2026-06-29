@@ -73,7 +73,7 @@ export interface TicketRepository {
   findByTicketId(ticketId: string): Promise<TicketRow | null>;
   list(
     opts: {
-      status?: string;
+      status?: 'created' | 'in_progress' | 'closed';
       assignee?: string | null;
       search?: string;
       limit: number;
@@ -107,6 +107,7 @@ export interface UserRepository {
     role: 'admin' | 'user';
   }): Promise<UserRow>;
   findByClerkId(clerkUserId: string): Promise<UserRow | null>;
+  findByIds(clerkUserIds: string[]): Promise<UserRow[]>;
   setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<UserRow | null>;
   touchLastSeen(clerkUserId: string): Promise<void>;
   list(opts: {
