@@ -39,7 +39,7 @@ export class ForbiddenError extends DomainError {
 export class NotFoundError extends DomainError {
   readonly code = 'not_found';
   readonly status = 404;
-  constructor(message: string) {
+  constructor(message: string = 'The requested resource was not found') {
     super(message);
   }
 }
@@ -76,6 +76,6 @@ export class ExternalServiceError extends DomainError {
   readonly code = 'external_service';
   readonly status = 502;
   constructor(message: string, readonly cause?: unknown) {
-    super(message);
+    super(message, { cause });
   }
 }
