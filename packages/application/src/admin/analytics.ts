@@ -1,4 +1,4 @@
-import { ok, type Result } from '@app/domain';
+import { err, ok, type Result, ExternalServiceError } from '@app/domain';
 import type { DocumentRepository, ChunkRepository, TicketRepository, UserRepository, QueryStats } from '../ports/index';
 
 export interface AnalyticsSummary {
@@ -20,20 +20,24 @@ export async function getAnalyticsSummary(
     stats: QueryStats;
   },
 ): Promise<Result<AnalyticsSummary>> {
-  const [docCount, chunkCount, ticketCount, openTicketCount, usersCount] = await Promise.all([
-    deps.documents.list({ limit: 1, offset: 0 }).then((r) => r.total),
-    deps.chunks.countForAll(),
-    deps.tickets.countAll(),
-    deps.tickets.countOpen(),
-    deps.users.countAll(),
-  ]);
-  return ok({
-    documentCount: docCount,
-    chunkCount,
-    ticketCount,
-    openTicketCount,
-    usersCount,
-    topQueries: deps.stats.top(10),
-    coldStart: docCount === 0,
-  });
+  try {
+    const [docCount, chunkCount, ticketCount, openTicketCount, usersCount] = await Promise.all([
+      deps.documents.list({ limit: 1, offset: 0 }).then((r) => r.total),
+      deps.chunks.countForAll(),
+      deps.tickets.countAll(),
+      deps.tickets.countOpen(),
+      deps.users.countAll(),
+    ]);
+    return ok({
+      documentCount: docCount,
+      chunkCount,
+      ticketCount,
+      openTicketCount,
+      usersCount,
+      topQueries: deps.stats.top(10),
+      coldStart: docCount === 0,
+    });
+  } catch (e) {
+    return err(new ExternalServiceError('Failed to load analytics', e));
+  }
 }

@@ -23,7 +23,7 @@ export interface TicketRow {
   name: string;
   email: string;
   issue: string;
-  status: string;
+  status: 'created' | 'in_progress' | 'closed';
   createdAt: Date;
   assignedTo: string | null;
   notes: string | null;
@@ -34,7 +34,7 @@ export interface UserRow {
   email: string;
   name: string | null;
   imageUrl: string | null;
-  role: string;
+  role: 'admin' | 'user';
   lastSeenAt: Date | null;
   createdAt: Date;
 }

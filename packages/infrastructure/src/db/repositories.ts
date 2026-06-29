@@ -13,9 +13,8 @@ import {
   documentAudit,
   ticketAudit,
   type Document,
-  type Ticket,
-  type User,
 } from './schema';
+import type { TicketRow, UserRow } from '@app/application/ports';
 
 // ---- Documents / Chunks ----
 
@@ -79,7 +78,10 @@ export async function searchChunksByVector(
 
 export async function insertChunks(rows: Array<{ documentId: number; content: string; embedding: number[] }>): Promise<void> {
   if (rows.length === 0) return;
-  await db.insert(chunks).values(rows);
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    await db.insert(chunks).values(rows.slice(i, i + BATCH_SIZE));
+  }
 }
 
 export async function countChunksForDocuments(documentIds: number[]): Promise<Map<number, number>> {
@@ -128,7 +130,14 @@ export async function listDocuments(opts: {
       ? whereParts[0]
       : and(...whereParts);
   const rows = (await db
-    .select()
+    .select({
+      id: documents.id,
+      fileName: documents.fileName,
+      fileHash: documents.fileHash,
+      uploadedBy: documents.uploadedBy,
+      uploadedAt: documents.uploadedAt,
+      deletedAt: documents.deletedAt,
+    })
     .from(documents)
     .where(where)
     .orderBy(desc(documents.uploadedAt))
@@ -144,9 +153,9 @@ export async function listDocuments(opts: {
 // ---- Tickets ----
 
 export const ticketRepo = {
-  async findByTicketId(ticketId: string): Promise<Ticket | null> {
+  async findByTicketId(ticketId: string): Promise<TicketRow | null> {
     const row = await db.query.tickets.findFirst({ where: eq(tickets.ticketId, ticketId) });
-    return (row as Ticket | undefined) ?? null;
+    return (row as TicketRow | undefined) ?? null;
   },
   async list(opts: {
     status?: string;
@@ -154,7 +163,7 @@ export const ticketRepo = {
     search?: string;
     limit: number;
     offset: number;
-  }): Promise<{ rows: Ticket[]; total: number }> {
+  }): Promise<{ rows: TicketRow[]; total: number }> {
     const whereParts = [] as ReturnType<typeof eq>[];
     if (opts.status) whereParts.push(eq(tickets.status, opts.status));
     if (opts.assignee !== undefined && opts.assignee !== null) {
@@ -172,7 +181,7 @@ export const ticketRepo = {
       .where(where)
       .orderBy(desc(tickets.createdAt))
       .limit(opts.limit)
-      .offset(opts.offset)) as Ticket[];
+      .offset(opts.offset)) as TicketRow[];
     const [totalRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(tickets)
@@ -187,14 +196,15 @@ export const ticketRepo = {
       .limit(1);
     return latest ?? null;
   },
-  async insert(input: { ticketId: string; userId: string; name: string; email: string; issue: string }): Promise<Ticket> {
+  async insert(input: { ticketId: string; userId: string; name: string; email: string; issue: string }): Promise<TicketRow> {
     const [row] = await db.insert(tickets).values(input).returning();
     if (!row) throw new Error('Failed to insert ticket');
-    return row as Ticket;
+    return row as TicketRow;
   },
-  async update(ticketId: string, patch: Partial<Pick<Ticket, 'status' | 'assignedTo' | 'notes'>>): Promise<Ticket | null> {
+  async update(ticketId: string, patch: Partial<Pick<TicketRow, 'status' | 'assignedTo' | 'notes'>>): Promise<TicketRow | null> {
+    if (Object.keys(patch).length === 0) return null;
     const [row] = await db.update(tickets).set(patch).where(eq(tickets.ticketId, ticketId)).returning();
-    return (row as Ticket | null) ?? null;
+    return (row as TicketRow | null) ?? null;
   },
   async countAll(): Promise<number> {
     const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(tickets);
@@ -218,7 +228,7 @@ export const userRepo = {
     name?: string | null;
     imageUrl?: string | null;
     role: 'admin' | 'user';
-  }): Promise<User> {
+  }): Promise<UserRow> {
     const [row] = await db
       .insert(users)
       .values(input)
@@ -233,20 +243,20 @@ export const userRepo = {
       })
       .returning();
     if (!row) throw new Error('Failed to upsert user');
-    return row as User;
+    return row as UserRow;
   },
-  async findByClerkId(clerkUserId: string): Promise<User | null> {
+  async findByClerkId(clerkUserId: string): Promise<UserRow | null> {
     const row = await db.query.users.findFirst({ where: eq(users.clerkUserId, clerkUserId) });
-    return (row as User | undefined) ?? null;
+    return (row as UserRow | undefined) ?? null;
   },
-  async setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<User | null> {
+  async setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<UserRow | null> {
     const [row] = await db.update(users).set({ role }).where(eq(users.clerkUserId, clerkUserId)).returning();
-    return (row as User | null) ?? null;
+    return (row as UserRow | null) ?? null;
   },
   async touchLastSeen(clerkUserId: string): Promise<void> {
     await db.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.clerkUserId, clerkUserId));
   },
-  async list(opts: { search?: string; limit: number; offset: number }): Promise<{ rows: User[]; total: number }> {
+  async list(opts: { search?: string; limit: number; offset: number }): Promise<{ rows: UserRow[]; total: number }> {
     const search = opts.search?.trim();
     const where = search
       ? or(
@@ -260,7 +270,7 @@ export const userRepo = {
       .where(where)
       .orderBy(users.createdAt)
       .limit(opts.limit)
-      .offset(opts.offset)) as User[];
+      .offset(opts.offset)) as UserRow[];
     const [totalRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(users)
@@ -298,6 +308,9 @@ export const auditRepo = {
     }>;
     total: number;
   }> {
+    // When both documentId and ticketId are provided, the total is the sum of
+    // document_audit rows matching documentId plus ticket_audit rows matching
+    // ticketId. If only one filter is provided the other count is 0.
     const wantDoc = !input.ticketId || input.documentId !== undefined;
     const wantTix = !input.documentId || input.ticketId !== undefined;
     const [docCount, tixCount] = await Promise.all([

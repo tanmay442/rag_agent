@@ -90,6 +90,7 @@ function buildChatTools(deps: {
           ),
         issue: z
           .string()
+          .max(10_000)
           .describe(
             'Structured ticket summary in the form: Question: ...\nWhat was tried: ...\nDocs searched: ...\nUser context: ...',
           ),
