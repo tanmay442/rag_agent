@@ -74,9 +74,9 @@ export default clerkMiddleware(async (auth, req) => {
     }
     return NextResponse.next();
   }
-  // TODO: Unmatched routes should return 401 for API routes to prevent
-  // accidental exposure of protected resources. Currently returns next()
-  // for backward compatibility.
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   return NextResponse.next();
 });
 

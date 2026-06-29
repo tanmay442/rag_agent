@@ -199,6 +199,22 @@ export interface TextSplitter {
 
 // ---- Misc ----
 
+/** Context provided inside a transaction. Each property is a
+ *  repository instance whose operations participate in the
+ *  active database transaction. */
+export interface TransactionContext {
+  documents: DocumentRepository;
+  chunks: ChunkRepository;
+  audit: AuditLog;
+}
+
+/** Runs a callback inside a database transaction. The callback
+ *  receives a `TransactionContext` whose repository instances
+ *  are scoped to the transaction. */
+export interface TransactionRunner {
+  run<T>(fn: (ctx: TransactionContext) => Promise<T>): Promise<T>;
+}
+
 export interface Clock {
   now(): Date;
 }

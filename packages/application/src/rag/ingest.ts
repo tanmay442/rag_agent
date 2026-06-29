@@ -69,8 +69,8 @@ export async function ingestFile(
     return err(new ExternalServiceError('Embedding count mismatch'));
   }
 
-  // NOTE: These operations should be wrapped in a database transaction
-  // once transaction support is added to the DB layer (see Issue #4).
+  // NOTE: Callers should wrap these operations in a database transaction
+  // when atomicity is required (see TransactionRunner).
   if (existing) {
     await deps.documents.deleteById(existing.id);
   }

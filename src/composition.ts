@@ -121,11 +121,11 @@ function createComposition() {
     listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
       listDocuments(input, { documents: documentRepo, chunks: chunkRepo, users: Db.userRepo }).then(unwrap),
     uploadPdf: (input: Parameters<typeof uploadPdf>[0]) =>
-      uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
+      uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     softDeleteDocument: (input: Parameters<typeof softDeleteDocument>[0]) =>
       softDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
     restoreDocument: (id: number, actorId: string) =>
-      restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock }).then(unwrap),
+      restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock, runner: Db.transactionRunner }).then(unwrap),
     listTickets: (input: Parameters<typeof listTickets>[0]) =>
       listTickets(input, { tickets: Db.ticketRepo }).then(unwrap),
     updateTicket: (input: Parameters<typeof updateTicket>[0]) =>
@@ -133,9 +133,9 @@ function createComposition() {
     getDocumentById: (id: number) =>
       getDocumentById(id, { documents: documentRepo }).then((r) => unwrap(r).document),
     hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
-      hardDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
+      hardDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     replacePdf: (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) =>
-      replacePdf(input, { ...ingestDeps, audit: Db.auditRepo }).then(unwrap),
+      replacePdf(input, { ...ingestDeps, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     recountChunksForDocument: (id: number) =>
       recountChunksForDocument(id, { chunks: chunkRepo }).then(unwrap),
     recountChunksForAllDocuments: () =>
