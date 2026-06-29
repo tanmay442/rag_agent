@@ -16,9 +16,13 @@ export async function POST(
   }
   const result = await comp.restoreDocument(docId, session.user.id);
   if (!result.ok) {
-    return result.reason === 'not_found'
-      ? respond(new NotFoundError('Document not found'))
-      : respond(new GoneError('Document is gone'));
+    if (result.reason === 'not_found') {
+      return respond(new NotFoundError('Document not found'));
+    }
+    if (result.reason === 'not_soft_deleted') {
+      return respond(new ValidationError('Document is not deleted'));
+    }
+    return respond(new GoneError('Restore window expired'));
   }
   return respond({ ok: true });
 }

@@ -26,12 +26,16 @@ export async function setUserRole(
   try {
     const row = await deps.users.setRole(input.clerkUserId, input.role);
     if (!row) return err(new NotFoundError(`User not found: ${input.clerkUserId}`));
-    void deps.users.syncClerkRole(input.clerkUserId, input.role).catch(() => {});
+    void deps.users.syncClerkRole(input.clerkUserId, input.role).catch((err) => {
+      console.error(`Failed to sync Clerk role for ${input.clerkUserId}:`, err);
+    });
     void deps.audit.logTicketEvent({
       action: 'role_change',
       ticketId: `user:${input.clerkUserId}`,
       actorId: input.actorId,
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error(`Failed to log role change audit for ${input.clerkUserId}:`, err);
+    });
     return ok({ user: { clerkUserId: row.clerkUserId, role: row.role } });
   } catch (e) {
     return err(new ExternalServiceError('Failed to set user role', e));

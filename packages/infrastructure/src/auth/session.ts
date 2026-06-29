@@ -92,6 +92,10 @@ export async function getAppSession(): Promise<AppSessionFull | null> {
       imageUrl: local.imageUrl,
       role: 'admin',
     });
+    // Sync the promoted role back to Clerk so the JWT carries the correct role.
+    const { clerkClient } = await import('./clerk-session');
+    const client = await clerkClient();
+    client.users.updateUserMetadata(userId, { publicMetadata: { role: 'admin' } }).catch(() => {});
   }
   void touchLastSeen(userId).catch(() => {});
   return {

@@ -1,9 +1,9 @@
-// TODO: Dual role resolution — this adapter resolves roles
-// solely from Clerk publicMetadata, while other code paths
-// may resolve roles from the DB users table. This inconsistency
-// can cause stale or conflicting role values. A proper fix
-// requires a single source-of-truth for role resolution.
+// Role resolution uses the DB users table as the single source of truth,
+// consistent with getAppSession() / requireAdmin() in session.ts.
 import { auth, currentUser, clerkClient } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/client';
+import { users } from '../db/schema';
 import type { SessionStore } from '@app/application/ports';
 
 export const clerkSessionStore: SessionStore = {
@@ -12,15 +12,15 @@ export const clerkSessionStore: SessionStore = {
     if (!userId) return null;
     const user = await currentUser();
     if (!user) return null;
+    const local = await db.query.users.findFirst({ where: eq(users.clerkUserId, userId) });
+    const role = (local?.role as 'admin' | 'user') ?? 'user';
     return {
       user: {
         id: userId,
         email: user.emailAddresses[0]?.emailAddress ?? '',
         name: user.fullName ?? user.firstName ?? user.username ?? 'User',
         imageUrl: user.imageUrl ?? null,
-        role: ((user.publicMetadata as { role?: string } | null)?.role === 'admin'
-          ? 'admin'
-          : 'user'),
+        role,
       },
     };
   },

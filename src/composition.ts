@@ -114,7 +114,7 @@ function createComposition() {
     uploadPdf: (input: Parameters<typeof uploadPdf>[0]) =>
       uploadPdf(input, { ...ingestDeps, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     softDeleteDocument: (input: Parameters<typeof softDeleteDocument>[0]) =>
-      softDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo }).then(unwrap),
+      softDeleteDocument(input, { documents: documentRepo, audit: Db.auditRepo, runner: Db.transactionRunner }).then(unwrap),
     restoreDocument: (id: number, actorId: string) =>
       restoreDocument(id, actorId, { documents: documentRepo, audit: Db.auditRepo, clock: systemClock, runner: Db.transactionRunner }).then(unwrap),
     listTickets: (input: Parameters<typeof listTickets>[0]) =>
