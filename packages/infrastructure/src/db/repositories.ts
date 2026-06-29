@@ -121,7 +121,7 @@ export async function listDocuments(opts: {
 }): Promise<{ documents: Document[]; total: number }> {
   const whereParts = [] as ReturnType<typeof eq>[];
   if (!opts.includeDeleted) whereParts.push(isNull(documents.deletedAt));
-  if (opts.search) whereParts.push(ilike(documents.fileName, `%${opts.search}%`));
+  if (opts.search) whereParts.push(ilike(documents.fileName, `%${opts.search.replace(/[%_]/g, '\\$&')}%`));
   const where = whereParts.length === 0
     ? undefined
     : whereParts.length === 1
@@ -160,7 +160,7 @@ export const ticketRepo = {
     if (opts.assignee !== undefined && opts.assignee !== null) {
       whereParts.push(eq(tickets.assignedTo, opts.assignee));
     }
-    if (opts.search) whereParts.push(ilike(tickets.issue, `%${opts.search}%`));
+    if (opts.search) whereParts.push(ilike(tickets.issue, `%${opts.search.replace(/[%_]/g, '\\$&')}%`));
     const where = whereParts.length === 0
       ? undefined
       : whereParts.length === 1

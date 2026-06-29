@@ -65,6 +65,16 @@ export async function ingestFile(
     return err(new ExternalServiceError('Embedding API failed', cause));
   }
 
+  if (embeddings.length !== texts.length) {
+    return err(new ExternalServiceError('Embedding count mismatch'));
+  }
+
+  // NOTE: These operations should be wrapped in a database transaction
+  // once transaction support is added to the DB layer (see Issue #4).
+  if (existing) {
+    await deps.documents.deleteById(existing.id);
+  }
+
   const inserted = await deps.documents.insert({
     fileName,
     fileHash,
@@ -78,10 +88,6 @@ export async function ingestFile(
       embedding: embeddings[i],
     })),
   );
-
-  if (existing) {
-    await deps.documents.deleteById(existing.id);
-  }
 
   return ok({
     documentId: inserted.id,

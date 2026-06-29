@@ -15,7 +15,9 @@ export function buildPool(): Pool {
     !connectionString.includes('sslmode=') &&
     !connectionString.includes('uselibpqcompat=')
   ) {
-    connectionString += '&sslmode=verify-full';
+    connectionString += connectionString.includes('?')
+      ? '&sslmode=verify-full'
+      : '?sslmode=verify-full';
   }
   return new PgPool({ connectionString, max: 10 });
 }

@@ -6,7 +6,7 @@ import {
   type Result,
   NotFoundError,
 } from '@app/domain';
-import type { DocumentRepository, ChunkRepository, AuditLog, Clock } from '../ports/index';
+import type { DocumentRepository, ChunkRepository, AuditLog, Clock, UserRepository } from '../ports/index';
 import { ingestFile } from '../rag/ingest';
 import type { IngestDeps, IngestResult } from '../rag/ingest';
 
@@ -22,6 +22,7 @@ export async function listDocuments(
   deps: {
     documents: DocumentRepository;
     chunks: ChunkRepository;
+    users: UserRepository;
   },
 ): Promise<Result<{
   documents: Array<{
@@ -47,9 +48,15 @@ export async function listDocuments(
   });
   const ids = documents.map((d) => d.id);
   const chunkCounts = ids.length > 0 ? await deps.chunks.countForDocuments(ids) : new Map<number, number>();
+  const uploaderIds = [...new Set(documents.map((d) => d.uploadedBy))];
+  const uploaderMap = new Map<string, string | null>();
+  for (const uid of uploaderIds) {
+    const user = await deps.users.findByClerkId(uid);
+    uploaderMap.set(uid, user?.name ?? null);
+  }
   const result = documents.map((d) => ({
     ...d,
-    uploaderName: null as string | null,
+    uploaderName: uploaderMap.get(d.uploadedBy) ?? null,
     chunkCount: chunkCounts.get(d.id) ?? 0,
   }));
   return ok({ documents: result, total });
@@ -136,6 +143,9 @@ export async function replacePdf(
   input: { documentId: number; fileName: string; buffer: Buffer; actorId: string },
   deps: IngestDeps & { audit: AuditLog },
 ): Promise<Result<IngestResult>> {
+  const existing = await deps.documents.findById(input.documentId);
+  if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+
   const r = await ingestFile(
     { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
     deps,
@@ -145,7 +155,7 @@ export async function replacePdf(
   if (r.value.status !== 'unchanged') {
     await deps.audit.logDocumentEvent({
       action: 'replace',
-      documentId: r.value.documentId,
+      documentId: input.documentId,
       actorId: input.actorId,
     });
   }

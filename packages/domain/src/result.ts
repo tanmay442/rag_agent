@@ -41,9 +41,7 @@ export function mapErr<T, E, F>(r: Result<T, E>, fn: (e: E) => F): Result<T, F> 
 
 export function unwrap<T, E>(r: Result<T, E>): T {
   if (r.ok) return r.value;
-  throw new Error(
-    `Result.unwrap called on err: ${(r.error as { message?: string }).message ?? JSON.stringify(r.error)}`,
-  );
+  throw r.error;
 }
 
 export function unwrapOr<T, E>(r: Result<T, E>, fallback: T): T {

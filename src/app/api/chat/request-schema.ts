@@ -15,5 +15,5 @@ export const ChatRequestSchema = z.object({
       role: z.enum(['user', 'assistant', 'system']),
       parts: z.array(MessagePartSchema),
     }).passthrough(),
-  ),
+  ).max(100),
 });
