@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { updateTicketAction } from '../actions';
-import { VALID_TRANSITIONS, type TicketStatus } from '@/composition';
+import { VALID_TRANSITIONS, type TicketStatus } from '@app/application/admin/tickets';
 
 export interface UserOption {
   clerkUserId: string;
