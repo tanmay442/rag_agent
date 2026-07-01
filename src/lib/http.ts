@@ -1,4 +1,4 @@
-import { DomainError } from '@app/domain';
+import { DomainError, type Result } from '@app/domain';
 
 const SAFE_MESSAGES: Record<string, string> = {
   validation_error: 'Invalid input provided',
@@ -16,6 +16,12 @@ export function toSafeError(err: unknown): { error: string; code: string } {
     return { error: SAFE_MESSAGES[err.code] ?? err.message, code: err.code };
   }
   return { error: 'An unexpected error occurred', code: 'internal_error' };
+}
+
+/** Convert a Result to a server-action-friendly shape. */
+export function toActionResult<T>(result: Result<T>): T | { error: string; code: string } {
+  if (result.ok) return result.value;
+  return toSafeError(result.error);
 }
 
 export function respond<T>(result: T | Error | DomainError): Response {

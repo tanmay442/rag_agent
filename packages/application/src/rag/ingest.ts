@@ -17,6 +17,8 @@ export interface IngestResult {
   status: 'inserted' | 'updated' | 'unchanged';
 }
 
+/** Dependencies required by the ingest pipeline. Each property
+ *  maps to a port interface from the application layer. */
 export interface IngestDeps {
   documents: DocumentRepository;
   chunks: ChunkRepository;
