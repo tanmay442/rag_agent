@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { ChatRequestSchema } from './request-schema';
 import { sanitizeText } from '@/lib/sanitize';
 import { CITATION_SNIPPET_MAX, TOOL_CONTENT_CAP, CHAT_RATE_LIMIT } from '../../../../config/constants';
+import { logger } from '@/lib/logger';
 
 function emitCitations(
   chunks: RetrievedChunk[],
@@ -68,7 +69,7 @@ function buildChatTools(deps: {
           }
           return capped;
         } catch (err) {
-          console.error('RAG retrieval failed:', err);
+          logger.error('RAG retrieval failed', { error: String(err) });
           return [];
         }
       },
@@ -107,9 +108,7 @@ function buildChatTools(deps: {
             'User';
           realEmail = clerkUser.emailAddresses[0]?.emailAddress ?? '';
         } else {
-          console.warn(
-            'createSupportTicket: currentUser() returned null after auth() succeeded; storing placeholder identity',
-          );
+          logger.warn('createSupportTicket: currentUser() returned null after auth() succeeded');
           realName = 'Unknown';
           realEmail = '';
         }
@@ -135,6 +134,10 @@ async function streamChatResponse(req: Request): Promise<Response> {
   const contentType = req.headers.get('content-type');
   if (!contentType?.includes('application/json')) {
     return new Response('Content-Type must be application/json', { status: 415 });
+  }
+  const contentLength = Number(req.headers.get('content-length') ?? '0');
+  if (contentLength > 1_000_000) {
+    return new Response('Request body too large', { status: 413 });
   }
   const comp = getComposition();
   const limit = comp.rateLimit(`chat:${userId}`, CHAT_RATE_LIMIT);
@@ -171,7 +174,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
     try {
       prefetch = await comp.searchChunks(lastUserText, {});
     } catch (err) {
-      console.error('First-turn pre-fetch failed:', err);
+      logger.error('First-turn pre-fetch failed', { error: String(err) });
       prefetch = null;
     }
     if (prefetch) {
@@ -186,6 +189,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
     system: buildSystemPrompt(appConfig, prefetch),
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
+    abortSignal: req.signal,
     tools: buildChatTools({
       searchChunks: comp.searchChunks,
       capturedCitations,
