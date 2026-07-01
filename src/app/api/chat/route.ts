@@ -1,7 +1,7 @@
 import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
 import { z } from 'zod';
-import { desc } from 'drizzle-orm';
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { randomUUID } from 'node:crypto';
 import { getComposition, appConfig, type MyUIMessage, type Composition } from '@/composition';
 import type { RetrievedChunk } from '@app/application/rag/search';
 import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
@@ -115,42 +115,14 @@ function buildChatTools(deps: {
           realName = 'Unknown';
           realEmail = '';
         }
-        // Unique ticket ID with retry on collision; handles legacy non-standard IDs.
-        let ticketId = '';
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const [latest] = await db
-            .select({ id: schema.tickets.id, ticketId: schema.tickets.ticketId })
-            .from(schema.tickets)
-            .orderBy(desc(schema.tickets.id))
-            .limit(1);
-          let nextNum: number;
-          if (latest) {
-            const parsed = parseInt(latest.ticketId.split('-')[1] ?? '', 10);
-            nextNum = Number.isFinite(parsed) ? parsed + 1 : latest.id + 1000;
-          } else {
-            nextNum = 1001;
-          }
-          ticketId = `TKT-${nextNum}`;
-          try {
-            await db.insert(schema.tickets).values({
-              ticketId,
-              userId: uid,
-              name: realName,
-              email: realEmail,
-              issue: sanitizeText(issue),
-            });
-            break;
-          } catch (err: unknown) {
-            if (
-              attempt < 4 &&
-              err instanceof Error &&
-              err.message.includes('unique')
-            ) {
-              continue;
-            }
-            throw err;
-          }
-        }
+        const ticketId = `TKT-${randomUUID().slice(0, 8)}`;
+        await db.insert(schema.tickets).values({
+          ticketId,
+          userId: uid,
+          name: realName,
+          email: realEmail,
+          issue: sanitizeText(issue),
+        });
         return { ticketId, status: 'created' };
       },
     }),
