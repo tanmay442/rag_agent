@@ -38,11 +38,13 @@ export const googleEmbeddingService: EmbeddingService = {
         if (r.status === 'fulfilled') {
           batchEmbeddings[j] = r.value;
         } else {
+          console.error(`Embedding failed for chunk ${i + j}:`, r.reason);
           failedIndices.push(j);
         }
       }
       // Retry failed items individually
       if (failedIndices.length > 0) {
+        console.warn(`Retrying ${failedIndices.length} failed embedding(s) from batch starting at ${i}`);
         const retryResults = await Promise.allSettled(
           failedIndices.map((idx) =>
             embed({
@@ -56,10 +58,18 @@ export const googleEmbeddingService: EmbeddingService = {
           const rr = retryResults[j];
           if (rr.status === 'fulfilled') {
             batchEmbeddings[failedIndices[j]] = rr.value;
+          } else {
+            console.error(`Embedding retry failed for chunk ${failedIndices[j]}:`, rr.reason);
           }
         }
       }
-      out.push(...(batchEmbeddings.filter(Boolean) as number[][]));
+      const filtered = batchEmbeddings.filter((e): e is number[] => e !== null);
+      if (filtered.length !== batch.length) {
+        throw new Error(
+          `Embedding batch incomplete: ${filtered.length}/${batch.length} succeeded for batch starting at index ${i}`,
+        );
+      }
+      out.push(...filtered);
     }
     return out;
   },
