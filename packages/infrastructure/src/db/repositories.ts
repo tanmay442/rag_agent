@@ -343,23 +343,6 @@ export const auditRepo = {
     // ticketId. If only one filter is provided the other count is 0.
     const wantDoc = !input.ticketId || input.documentId !== undefined;
     const wantTix = !input.documentId || input.ticketId !== undefined;
-    const [docCount, tixCount] = await Promise.all([
-      wantDoc
-        ? db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(documentAudit)
-            .where(input.documentId ? eq(documentAudit.documentId, input.documentId) : undefined)
-            .then((r) => r[0]?.count ?? 0)
-        : Promise.resolve(0),
-      wantTix
-        ? db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(ticketAudit)
-            .where(input.ticketId ? eq(ticketAudit.ticketId, input.ticketId) : undefined)
-            .then((r) => r[0]?.count ?? 0)
-        : Promise.resolve(0),
-    ]);
-    const total = docCount + tixCount;
     const docWhere = input.documentId
       ? sql`WHERE document_id = ${input.documentId}`
       : wantDoc
@@ -370,6 +353,14 @@ export const auditRepo = {
       : wantTix
         ? sql``
         : sql`WHERE 1 = 0`;
+    const countResult = await db.execute<{ count: number }>(sql`
+      SELECT count(*)::int AS count FROM (
+        SELECT id FROM document_audit ${docWhere}
+        UNION ALL
+        SELECT id FROM ticket_audit ${tixWhere}
+      ) c
+    `);
+    const total = (countResult as unknown as { rows?: Array<{ count: number }> }).rows?.[0]?.count ?? 0;
     const actorResult = await db.execute<{
       id: number; kind: string; document_id: number | null; ticket_id: string | null;
       actor_id: string; action: string; at: Date; actor_name: string | null;
