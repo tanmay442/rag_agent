@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { getComposition } from '@/composition';
 
+// TODO: Add explicit requireAdmin() guard if this page is ever
+// decoupled from AdminLayout. Currently relies on the layout guard.
+
 export const dynamic = 'force-dynamic';
 
 export default async function AdminOverviewPage() {
