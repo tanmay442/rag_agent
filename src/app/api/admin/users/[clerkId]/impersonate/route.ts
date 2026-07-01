@@ -26,7 +26,7 @@ export async function POST(
     const { clerkClient } = await import('@clerk/nextjs/server');
     const client = await clerkClient();
     const signInToken = await client.signInTokens.createSignInToken({
-      userId: clerkId, expiresInSeconds: 600,
+      userId: clerkId, expiresInSeconds: 120,
     });
     await comp.logTicketEvent({
       action: 'impersonation',

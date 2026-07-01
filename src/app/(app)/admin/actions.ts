@@ -197,7 +197,7 @@ export async function impersonateUserAction(
     const { clerkClient } = await import('@clerk/nextjs/server');
     const client = await clerkClient();
     const signInToken = await client.signInTokens.createSignInToken({
-      userId: clerkUserId, expiresInSeconds: 600,
+      userId: clerkUserId, expiresInSeconds: 120,
     });
     await getComposition().logTicketEvent({
       action: 'impersonation',
