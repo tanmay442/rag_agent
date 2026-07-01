@@ -7,6 +7,7 @@ import type { RetrievedChunk } from '@app/application/rag/search';
 import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
 import { ChatRequestSchema } from './request-schema';
+import { sanitizeText } from '@/lib/sanitize';
 
 const CITATION_SNIPPET_MAX = 150;
 
@@ -136,7 +137,7 @@ function buildChatTools(deps: {
               userId: uid,
               name: realName,
               email: realEmail,
-              issue,
+              issue: sanitizeText(issue),
             });
             break;
           } catch (err: unknown) {

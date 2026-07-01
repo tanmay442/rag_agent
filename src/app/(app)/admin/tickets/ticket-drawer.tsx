@@ -155,12 +155,12 @@ export function TicketDrawer({
           className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 text-sm"
           data-testid={`ticket-notes-${ticketId}`}
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+          <span className="mt-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
             Notes
           </span>
-          <pre className="mt-1 whitespace-pre-wrap text-[var(--foreground)]">
+          <div className="mt-1 whitespace-pre-wrap text-[var(--foreground)]">
             {notes}
-          </pre>
+          </div>
         </div>
       ) : null}
       {error ? (

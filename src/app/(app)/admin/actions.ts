@@ -6,6 +6,7 @@ import { UnauthorizedError } from '@app/domain';
 import type { TicketStatus } from '@app/application/admin/tickets';
 import type { AppRole } from '@app/infrastructure/auth';
 import { toSafeError } from '@/lib/http';
+import { sanitizeText } from '@/lib/sanitize';
 
 async function requireAdminOrError(): Promise<
   | { user: { id: string; email: string; name: string; imageUrl: string | null; role: 'admin' | 'user' } }
@@ -166,7 +167,7 @@ export async function updateTicketAction(
       ticketId,
       status: patch.status,
       assignedTo: patch.assignedTo,
-      note: patch.note,
+      note: patch.note ? sanitizeText(patch.note) : undefined,
       actorId: session.user.id,
     });
     if (!result.ok) {
