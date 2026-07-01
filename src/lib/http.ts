@@ -11,11 +11,11 @@ const SAFE_MESSAGES: Record<string, string> = {
   external_service: 'An external service is temporarily unavailable',
 };
 
-export function toSafeError(err: unknown): { error: string; code?: string } {
+export function toSafeError(err: unknown): { error: string; code: string } {
   if (err instanceof DomainError) {
     return { error: SAFE_MESSAGES[err.code] ?? err.message, code: err.code };
   }
-  return { error: 'An unexpected error occurred' };
+  return { error: 'An unexpected error occurred', code: 'internal_error' };
 }
 
 export function respond<T>(result: T | Error | DomainError): Response {
