@@ -204,53 +204,29 @@ describe('/api/chat createSupportTicket tool', () => {
       email: 'hallucinated@example.com',
       issue: 'Cannot reset my password.',
     });
-    expect(out).toEqual({ ticketId: 'TKT-1001', status: 'created' });
+    expect(out).toHaveProperty('status', 'created');
+    expect(out).toHaveProperty('ticketId');
+    expect((out as { ticketId: string }).ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
     expect(ticketInsertedValues.length).toBe(1);
     const row = ticketInsertedValues[0]!;
-    // Identity is stamped from Clerk, not the LLM.
     expect(row.name).toBe('Real Person');
     expect(row.email).toBe('real@example.com');
     expect(row.issue).toBe('Cannot reset my password.');
-    expect(row.ticketId).toBe('TKT-1001');
+    expect(row.ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
   });
 
-  it('retries on a unique-constraint collision and surfaces a new ticket id', async () => {
-    // Make the db.insert throw once with a "unique" error message,
-    // then succeed on the retry. The route's retry loop should
-    // re-query the latest ticket id and bump it.
-    let inserted = 0;
-    const realInsert = ticketInsertedValues.push.bind(ticketInsertedValues);
-    ticketInsertedValues.length = 0;
-    const originalInsert = compositionMock.db.insert;
-    compositionMock.db.insert = vi.fn(() => ({
-      values: vi.fn((v: Record<string, unknown>) => {
-        if (inserted === 0) {
-          inserted++;
-          const err = new Error(
-            'duplicate key value violates unique constraint "tickets_ticket_id_unique"',
-          );
-          throw err;
-        }
-        realInsert(v);
-        return { returning: async () => [{ id: 'TKT-1002' }] };
-      }),
-    }));
-    try {
-      const tools = await captureToolsFromStreamText<{
-        createSupportTicket: {
-          execute: (args: { name: string; email: string; issue: string }) => Promise<unknown>;
-        };
-      }>();
-      const out = await tools!.createSupportTicket.execute({
-        name: 'x',
-        email: 'x@x.com',
-        issue: 'collision test',
-      });
-      expect(out).toEqual({ ticketId: 'TKT-1001', status: 'created' });
-      expect(ticketInsertedValues.length).toBe(1);
-    } finally {
-      compositionMock.db.insert = originalInsert;
-    }
+  it('generates unique ticket ids (UUID-based, no collision retry needed)', async () => {
+    const out1 = await invokeToolFromStreamText({
+      name: 'A',
+      email: 'a@a.com',
+      issue: 'first ticket',
+    });
+    const out2 = await invokeToolFromStreamText({
+      name: 'B',
+      email: 'b@b.com',
+      issue: 'second ticket',
+    });
+    expect((out1 as { ticketId: string }).ticketId).not.toBe((out2 as { ticketId: string }).ticketId);
   });
 });
 
