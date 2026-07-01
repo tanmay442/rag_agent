@@ -163,12 +163,12 @@ export async function hardDeleteDocument(
     const existing = await deps.documents.findById(input.documentId);
     if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
     await deps.runner.run(async (tx) => {
-      await tx.documents.deleteById(input.documentId);
       await tx.audit.logDocumentEvent({
         action: 'delete',
         documentId: input.documentId,
         actorId: input.actorId,
       });
+      await tx.documents.deleteById(input.documentId);
     });
     return ok(undefined);
   } catch (e) {
