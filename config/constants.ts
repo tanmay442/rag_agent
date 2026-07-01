@@ -1,5 +1,8 @@
 // Centralised business-logic constants. Keep sorted alphabetically.
 // Tune these to change behaviour without hunting through source files.
+//
+// TODO: Add tests for rate limiter concurrency, ticket ID collision,
+// embedding batch retry logic, and composition root wiring.
 
 export const CHAT_RATE_LIMIT = { limit: 30, windowMs: 60_000 };
 export const CITATION_SNIPPET_MAX = 150;
