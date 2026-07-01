@@ -1,5 +1,6 @@
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
 import type { TicketRepository, AuditLog, TicketRow } from '../ports/index';
+import { MAX_TICKET_NOTES_LENGTH, MAX_LIST_LIMIT } from '../../../../config/constants';
 
 export const TICKET_STATUSES = ['created', 'in_progress', 'closed'] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
@@ -25,7 +26,7 @@ export async function listTickets(
   deps: { tickets: TicketRepository },
 ): Promise<Result<{ tickets: TicketRow[]; total: number }>> {
   try {
-    const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
+    const limit = Math.min(Math.max(input.limit ?? 25, 1), MAX_LIST_LIMIT);
     const offset = Math.max(input.offset ?? 0, 0);
     const r = await deps.tickets.list({
       status: input.status,
@@ -68,9 +69,8 @@ export async function updateTicket(
     if (input.status) patch.status = input.status;
     if (input.assignedTo !== undefined) patch.assignedTo = input.assignedTo;
     if (input.note) {
-      const MAX_NOTES_LENGTH = 10000;
       const newNotes = existing.notes
-        ? (existing.notes + '\n' + input.note).slice(-MAX_NOTES_LENGTH)
+        ? (existing.notes + '\n' + input.note).slice(-MAX_TICKET_NOTES_LENGTH)
         : input.note;
       patch.notes = newNotes;
     }

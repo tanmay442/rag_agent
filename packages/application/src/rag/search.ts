@@ -5,6 +5,7 @@
 // consumes.
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
 import type { ChunkRepository, EmbeddingService } from '../ports/index';
+import { SIMILARITY_THRESHOLD, DEFAULT_SEARCH_LIMIT } from '../../../../config/constants';
 
 export interface RetrievedChunk {
   content: string;
@@ -15,9 +16,6 @@ export interface SearchDeps {
   chunks: ChunkRepository;
   embeddings: EmbeddingService;
 }
-
-const SIMILARITY_THRESHOLD = 0.5;
-const DEFAULT_LIMIT = 3;
 
 export interface SearchOpts {
   threshold?: number;
@@ -30,7 +28,7 @@ export async function searchChunks(
   deps: SearchDeps,
 ): Promise<Result<RetrievedChunk[]>> {
   const threshold = opts.threshold ?? SIMILARITY_THRESHOLD;
-  const limit = opts.limit ?? DEFAULT_LIMIT;
+  const limit = opts.limit ?? DEFAULT_SEARCH_LIMIT;
   let embedding: number[];
   try {
     embedding = await deps.embeddings.embed(query);

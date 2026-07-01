@@ -11,6 +11,7 @@ import {
 import type { DocumentRepository, ChunkRepository, AuditLog, Clock, UserRepository, TransactionRunner } from '../ports/index';
 import { ingestFile } from '../rag/ingest';
 import type { IngestDeps, IngestResult } from '../rag/ingest';
+import { RESTORE_WINDOW_MS, MAX_LIST_LIMIT } from '../../../../config/constants';
 
 interface ListDocumentsInput {
   search?: string;
@@ -41,7 +42,7 @@ export async function listDocuments(
   total: number;
 }>> {
   try {
-  const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
+  const limit = Math.min(Math.max(input.limit ?? 25, 1), MAX_LIST_LIMIT);
   const offset = Math.max(input.offset ?? 0, 0);
   const { documents, total } = await deps.documents.list({
     search: input.search,
@@ -114,8 +115,6 @@ export async function softDeleteDocument(
     return err(new ExternalServiceError('Failed to soft-delete document', e));
   }
 }
-
-const RESTORE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface RestoreResult {
   ok: boolean;

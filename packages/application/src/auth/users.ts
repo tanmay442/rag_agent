@@ -1,13 +1,14 @@
 import { err, ok, type Result, NotFoundError, ValidationError, ExternalServiceError } from '@app/domain';
 import type { UserRepository } from '../ports/index';
 import type { AuditLog } from '../ports/index';
+import { MAX_LIST_LIMIT } from '../../../../config/constants';
 
 export async function listUsers(
   input: { search?: string; limit?: number; offset?: number },
   deps: { users: UserRepository },
 ): Promise<Result<{ users: Array<{ clerkUserId: string; email: string; name: string | null; role: string; lastSeenAt: Date | null; createdAt: Date }>; total: number }>> {
   try {
-    const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
+    const limit = Math.min(Math.max(input.limit ?? 25, 1), MAX_LIST_LIMIT);
     const offset = Math.max(input.offset ?? 0, 0);
     const r = await deps.users.list({ search: input.search, limit, offset });
     return ok({ users: r.rows, total: r.total });

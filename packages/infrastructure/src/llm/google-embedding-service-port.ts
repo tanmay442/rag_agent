@@ -5,8 +5,7 @@
 import { embed } from 'ai';
 import { getEmbeddingModel, EMBEDDING_OPTIONS } from './google-embedding-service';
 import type { EmbeddingService } from '@app/application/ports';
-
-const BATCH_SIZE = 20;
+import { EMBEDDING_BATCH_SIZE } from '../../../../config/constants';
 
 export const googleEmbeddingService: EmbeddingService = {
   async embed(value: string): Promise<number[]> {
@@ -20,8 +19,8 @@ export const googleEmbeddingService: EmbeddingService = {
   async embedBatch(values: string[]): Promise<number[][]> {
     const out: number[][] = [];
     const model = getEmbeddingModel();
-    for (let i = 0; i < values.length; i += BATCH_SIZE) {
-      const batch = values.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < values.length; i += EMBEDDING_BATCH_SIZE) {
+      const batch = values.slice(i, i + EMBEDDING_BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map((v) =>
           embed({

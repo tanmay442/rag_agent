@@ -8,8 +8,7 @@ import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
 import { ChatRequestSchema } from './request-schema';
 import { sanitizeText } from '@/lib/sanitize';
-
-const CITATION_SNIPPET_MAX = 150;
+import { CITATION_SNIPPET_MAX, TOOL_CONTENT_CAP, CHAT_RATE_LIMIT } from '../../../../config/constants';
 
 function emitCitations(
   chunks: RetrievedChunk[],
@@ -55,7 +54,6 @@ function buildChatTools(deps: {
           ),
       }),
       execute: async ({ query, limit }) => {
-        const TOOL_CONTENT_CAP = 800;
         try {
           const matches = await searchFn(query, { limit });
           const capped = matches.map((m) => ({
@@ -139,7 +137,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
     return new Response('Content-Type must be application/json', { status: 415 });
   }
   const comp = getComposition();
-  const limit = comp.rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });
+  const limit = comp.rateLimit(`chat:${userId}`, CHAT_RATE_LIMIT);
   if (!limit.ok) {
     return new Response('Too Many Requests', {
       status: 429,
