@@ -127,7 +127,7 @@ export async function listDocuments(
     offset: number;
   },
   client: Client = db,
-): Promise<{ documents: Document[]; total: number }> {
+): Promise<{ documents: Array<Document & { hasBlob: boolean }>; total: number }> {
   const whereParts = [] as ReturnType<typeof eq>[];
   if (!opts.includeDeleted) whereParts.push(isNull(documents.deletedAt));
   if (opts.search) whereParts.push(ilike(documents.fileName, `%${opts.search.replace(/[%_]/g, '\\$&')}%`));
@@ -154,7 +154,7 @@ export async function listDocuments(
     .limit(opts.limit)
     .offset(opts.offset);
   const total = rows[0]?.total ?? 0;
-  return { documents: rows as unknown as Document[], total };
+  return { documents: rows as unknown as Array<Document & { hasBlob: boolean }>, total };
 }
 
 // ---- Tickets ----
