@@ -38,6 +38,7 @@ export async function listDocuments(
     deletedAt: Date | null;
     uploaderName: string | null;
     chunkCount: number;
+    hasBlob: boolean;
   }>;
   total: number;
 }>> {

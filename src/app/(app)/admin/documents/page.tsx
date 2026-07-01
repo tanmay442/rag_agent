@@ -132,7 +132,7 @@ export default async function DocumentsPage({
                     <DocumentRowActions
                       id={d.id}
                       fileName={d.fileName}
-                      hasBlob={d.blob != null}
+                      hasBlob={d.hasBlob}
                       isDeleted={d.deletedAt != null}
                     />
                   </td>

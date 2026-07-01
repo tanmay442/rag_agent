@@ -144,6 +144,7 @@ export async function listDocuments(
       uploadedBy: documents.uploadedBy,
       uploadedAt: documents.uploadedAt,
       blob: sql<Buffer | null>`null::bytea`.as('blob'),
+      hasBlob: sql<boolean>`${documents.blob} IS NOT NULL`.as('hasBlob'),
       deletedAt: documents.deletedAt,
       total: sql<number>`count(*) over()`.as('total'),
     })
