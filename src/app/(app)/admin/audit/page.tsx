@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition } from '@/composition';
+import { getComposition, unwrap } from '@/composition';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +15,12 @@ export default async function AuditPage({
   const offset = (page - 1) * PAGE_SIZE;
   const documentId = params.documentId ? Number(params.documentId) : undefined;
   const ticketId = params.ticketId;
-  const result = await getComposition().listAudit({
+  const result = unwrap(await getComposition().listAudit({
     documentId: Number.isFinite(documentId) ? documentId : undefined,
     ticketId,
     limit: PAGE_SIZE,
     offset,
-  });
+  }));
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">

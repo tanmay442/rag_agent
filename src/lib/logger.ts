@@ -4,12 +4,45 @@
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
+const LEVEL_PRIORITY: Record<LogLevel, number> = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  debug: 3,
+};
+
+const configuredLevel: LogLevel =
+  (process.env.LOG_LEVEL as LogLevel | undefined) ?? 'info';
+
+/** Serialise Error objects so JSON.stringify captures their
+ *  properties (Error props are non-enumerable by default). */
+function serializeMeta(meta: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if (value instanceof Error) {
+      const errObj: Record<string, unknown> = {
+        message: value.message,
+        ...(value.stack ? { stack: value.stack } : {}),
+      };
+      const code = (value as { code?: unknown }).code;
+      if (code !== undefined) errObj.code = code;
+      const cause = (value as { cause?: unknown }).cause;
+      if (cause !== undefined) errObj.cause = String(cause);
+      out[key] = errObj;
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
+  if (LEVEL_PRIORITY[level] > LEVEL_PRIORITY[configuredLevel]) return;
   const entry = {
     level,
     time: new Date().toISOString(),
     msg: message,
-    ...meta,
+    ...(meta ? serializeMeta(meta) : {}),
   };
   const line = JSON.stringify(entry);
   if (level === 'error') console.error(line);

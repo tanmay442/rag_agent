@@ -1,4 +1,11 @@
-import { err, ok, type Result, ExternalServiceError } from '@app/domain';
+import {
+  err,
+  ok,
+  type Result,
+  ExternalServiceError,
+  NotFoundError,
+  ConflictError,
+} from '@app/domain';
 import type { TicketRepository, AuditLog, TicketRow } from '../ports/index';
 import { MAX_TICKET_NOTES_LENGTH, MAX_LIST_LIMIT } from '../../../../config/constants';
 
@@ -49,21 +56,19 @@ export interface UpdateTicketInput {
   actorId: string;
 }
 
-export interface UpdateTicketResult {
-  ok: boolean;
-  reason?: 'not_found' | 'invalid_transition';
-  ticket?: unknown;
-}
-
 export async function updateTicket(
   input: UpdateTicketInput,
   deps: { tickets: TicketRepository; audit: AuditLog },
-): Promise<Result<UpdateTicketResult>> {
+): Promise<Result<TicketRow>> {
   try {
     const existing = await deps.tickets.findByTicketId(input.ticketId);
-    if (!existing) return ok({ ok: false, reason: 'not_found' });
-    if (input.status && isTicketStatus(existing.status) && !VALID_TRANSITIONS[existing.status].includes(input.status)) {
-      return ok({ ok: false, reason: 'invalid_transition' });
+    if (!existing) return err(new NotFoundError('Ticket not found'));
+    if (
+      input.status &&
+      isTicketStatus(existing.status) &&
+      !VALID_TRANSITIONS[existing.status].includes(input.status)
+    ) {
+      return err(new ConflictError('Invalid status transition'));
     }
     const patch: Partial<Pick<TicketRow, 'status' | 'assignedTo' | 'notes'>> = {};
     if (input.status) patch.status = input.status;
@@ -75,16 +80,22 @@ export async function updateTicket(
       patch.notes = newNotes;
     }
     const updated = await deps.tickets.update(input.ticketId, patch);
-    if (!updated) return ok({ ok: false, reason: 'not_found' });
-    const auditAction = input.status ? 'status_change' : input.assignedTo !== undefined ? 'assign' : 'note';
-    await deps.audit.logTicketEvent({
-      action: auditAction,
-      ticketId: input.ticketId,
-      actorId: input.actorId,
-    }).catch((auditErr) => {
-      console.error('Audit logging failed:', auditErr);
-    });
-    return ok({ ok: true, ticket: updated });
+    if (!updated) return err(new NotFoundError('Ticket not found'));
+    const auditAction = input.status
+      ? 'status_change'
+      : input.assignedTo !== undefined
+        ? 'assign'
+        : 'note';
+    void deps.audit
+      .logTicketEvent({
+        action: auditAction,
+        ticketId: input.ticketId,
+        actorId: input.actorId,
+      })
+      .catch((auditErr) => {
+        console.error('Audit logging failed:', auditErr);
+      });
+    return ok(updated);
   } catch (e) {
     return err(new ExternalServiceError('Failed to update ticket', e));
   }

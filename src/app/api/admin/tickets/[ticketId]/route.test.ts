@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ok, err, NotFoundError, ConflictError } from '@app/domain';
 
 const { requireAdminMock, updateTicketMock, requireAdminRouteMock } = vi.hoisted(() => {
   const requireAdminMock = vi.fn();
@@ -19,15 +20,18 @@ const { requireAdminMock, updateTicketMock, requireAdminRouteMock } = vi.hoisted
 
 vi.mock('@/composition', async () => {
   const { ForbiddenError } = await import('@app/domain');
+  const { respond, respondResult } = await import('@/lib/http');
   return {
     requireAdmin: requireAdminMock,
     requireAdminRoute: requireAdminRouteMock,
     requireSession: requireAdminMock,
     getAppSession: vi.fn(),
     ForbiddenError,
-    getComposition: () => ({ updateTicket: updateTicketMock }),
+    respond,
+    respondResult,
     TICKET_STATUSES: ['created', 'in_progress', 'closed'],
     isTicketStatus: (s: string) => ['created', 'in_progress', 'closed'].includes(s),
+    getComposition: () => ({ updateTicket: updateTicketMock }),
   };
 });
 
@@ -71,7 +75,7 @@ describe('PATCH /api/admin/tickets/[ticketId]', () => {
 
   it('returns 404 for missing ticket', async () => {
     requireAdminMock.mockResolvedValue({ user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' } });
-    updateTicketMock.mockResolvedValue({ ok: false, reason: 'not_found' });
+    updateTicketMock.mockResolvedValue(err(new NotFoundError('Ticket not found')));
     const res = await route.PATCH(
       makeReq({ status: 'closed' }),
       makeParams('TKT-MISSING'),
@@ -81,10 +85,7 @@ describe('PATCH /api/admin/tickets/[ticketId]', () => {
 
   it('returns 409 for invalid transition', async () => {
     requireAdminMock.mockResolvedValue({ user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' } });
-    updateTicketMock.mockResolvedValue({
-      ok: false,
-      reason: 'invalid_transition',
-    });
+    updateTicketMock.mockResolvedValue(err(new ConflictError('Invalid status transition')));
     const res = await route.PATCH(
       makeReq({ status: 'in_progress' }),
       makeParams('TKT-1001'),
@@ -94,10 +95,10 @@ describe('PATCH /api/admin/tickets/[ticketId]', () => {
 
   it('returns the updated ticket for a valid patch', async () => {
     requireAdminMock.mockResolvedValue({ user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' } });
-    updateTicketMock.mockResolvedValue({
-      ok: true,
-      ticket: { ticketId: 'TKT-1001', status: 'closed' },
-    });
+    updateTicketMock.mockResolvedValue(ok({
+      ticketId: 'TKT-1001',
+      status: 'closed',
+    }) as never);
     const res = await route.PATCH(
       makeReq({ status: 'closed' }),
       makeParams('TKT-1001'),

@@ -8,8 +8,8 @@ import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
 import { ChatRequestSchema } from './request-schema';
 import { sanitizeText } from '@/lib/sanitize';
-import { CITATION_SNIPPET_MAX, TOOL_CONTENT_CAP, CHAT_RATE_LIMIT } from '../../../../config/constants';
 import { logger } from '@/lib/logger';
+import { CITATION_SNIPPET_MAX, TOOL_CONTENT_CAP, CHAT_RATE_LIMIT } from '../../../../config/constants';
 
 function emitCitations(
   chunks: RetrievedChunk[],
@@ -55,23 +55,23 @@ function buildChatTools(deps: {
           ),
       }),
       execute: async ({ query, limit }) => {
-        try {
-          const matches = await searchFn(query, { limit });
-          const capped = matches.map((m) => ({
-            content:
-              m.content.length > TOOL_CONTENT_CAP
-                ? m.content.slice(0, TOOL_CONTENT_CAP) + '\u2026'
-                : m.content,
-            similarity: m.similarity,
-          }));
-          for (const citation of emitCitations(matches)) {
-            citationTarget.push(citation);
-          }
-          return capped;
-        } catch (err) {
-          logger.error('RAG retrieval failed', { error: String(err) });
+        const r = await searchFn(query, { limit });
+        if (!r.ok) {
+          logger.error('RAG retrieval failed', { error: r.error });
           return [];
         }
+        const matches = r.value;
+        const capped = matches.map((m) => ({
+          content:
+            m.content.length > TOOL_CONTENT_CAP
+              ? m.content.slice(0, TOOL_CONTENT_CAP) + '\u2026'
+              : m.content,
+          similarity: m.similarity,
+        }));
+        for (const citation of emitCitations(matches)) {
+          citationTarget.push(citation);
+        }
+        return capped;
       },
     }),
     createSupportTicket: tool({
@@ -113,13 +113,18 @@ function buildChatTools(deps: {
           realEmail = '';
         }
         const ticketId = `TKT-${randomUUID().slice(0, 8)}`;
-        await db.insert(schema.tickets).values({
-          ticketId,
-          userId: uid,
-          name: realName,
-          email: realEmail,
-          issue: sanitizeText(issue),
-        });
+        try {
+          await db.insert(schema.tickets).values({
+            ticketId,
+            userId: uid,
+            name: realName,
+            email: realEmail,
+            issue: sanitizeText(issue),
+          });
+        } catch (err) {
+          logger.error('createSupportTicket: DB insert failed', { error: err });
+          return { ticketId: null, status: 'error' };
+        }
         return { ticketId, status: 'created' };
       },
     }),
@@ -148,7 +153,10 @@ async function streamChatResponse(req: Request): Promise<Response> {
     });
   }
 
-  const raw = await req.json().catch(() => null);
+  const raw = await req.json().catch((e) => {
+    logger.debug('JSON parse failed', { error: String(e) });
+    return null;
+  });
   const parsed = ChatRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request', issues: parsed.error.issues }, { status: 400 });
@@ -171,13 +179,12 @@ async function streamChatResponse(req: Request): Promise<Response> {
   const isFirstTurn = messages.length <= 1;
   let prefetch: RetrievedChunk[] | null = null;
   if (appConfig.prefetchFirstTurn && isFirstTurn && lastUserText.trim() !== '') {
-    try {
-      prefetch = await comp.searchChunks(lastUserText, {});
-    } catch (err) {
-      logger.error('First-turn pre-fetch failed', { error: String(err) });
+    const prefetchResult = await comp.searchChunks(lastUserText, {});
+    if (!prefetchResult.ok) {
+      logger.error('First-turn pre-fetch failed', { error: prefetchResult.error });
       prefetch = null;
-    }
-    if (prefetch) {
+    } else {
+      prefetch = prefetchResult.value;
       for (const citation of emitCitations(prefetch)) {
         capturedCitations.push(citation);
       }
@@ -218,6 +225,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
             } as InferUIMessageChunk<MyUIMessage>);
           }
         } catch (err) {
+          logger.error('Chat stream error', { error: err });
           controller.error(err);
           return;
         }

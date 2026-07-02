@@ -1,6 +1,6 @@
-import { requireAdminRoute } from '@/composition';
-import { respond } from '@/lib/http';
-import { ValidationError } from '@app/domain';
+import { requireAdminRoute, respond } from '@/composition';
+import { ValidationError, NotFoundError } from '@app/domain';
+import { logger } from '@/lib/logger';
 
 export async function POST(
   _req: Request,
@@ -11,14 +11,16 @@ export async function POST(
   const { session, comp } = auth;
   const { clerkId } = await context.params;
 
-  // Block self-impersonation
   if (session.user.id === clerkId) {
     return respond(new ValidationError('Cannot impersonate yourself'));
   }
 
-  // Block admin→admin impersonation
-  const targetUser = await comp.getUserByClerkId(clerkId);
-  if (targetUser?.user?.role === 'admin') {
+  const userResult = await comp.getUserByClerkId(clerkId);
+  if (!userResult.ok) return respond(userResult.error);
+  if (!userResult.value.user) {
+    return respond(new NotFoundError('User not found'));
+  }
+  if (userResult.value.user.role === 'admin') {
     return respond(new ValidationError('Cannot impersonate another admin'));
   }
 
@@ -26,14 +28,18 @@ export async function POST(
     const { clerkClient } = await import('@clerk/nextjs/server');
     const client = await clerkClient();
     const signInToken = await client.signInTokens.createSignInToken({
-      userId: clerkId, expiresInSeconds: 120,
+      userId: clerkId,
+      expiresInSeconds: 120,
     });
-    await comp.logTicketEvent({
+    const auditResult = await comp.logTicketEvent({
       action: 'impersonation',
       ticketId: `user:${clerkId}`,
       actorId: session.user.id,
     });
-    return respond({ url: signInToken.url });
+    if (!auditResult.ok) {
+      logger.error('Impersonation audit logging failed', { error: auditResult.error });
+    }
+    return Response.json({ url: signInToken.url });
   } catch (err) {
     return respond(err);
   }

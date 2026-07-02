@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition } from '@/composition';
+import { getComposition, unwrap } from '@/composition';
 import { DocumentRowActions } from './document-row-actions';
 import { RecountAllButton } from './recount-all-button';
 
@@ -38,12 +38,12 @@ export default async function DocumentsPage({
     !Number.isNaN(recountedDocs) &&
     recountedTotal !== null &&
     !Number.isNaN(recountedTotal);
-  const result = await getComposition().listDocuments({
+  const result = unwrap(await getComposition().listDocuments({
     search: search || undefined,
     includeDeleted: true,
     limit: PAGE_SIZE,
     offset,
-  });
+  }));
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">

@@ -6,7 +6,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireAdminDocument(context, { allowDeleted: true });
-  if (!auth.ok) return new NextResponse(auth.response.body, { status: auth.response.status });
+  if (!auth.ok) return auth.response;
   const safeName = auth.document.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
   return new NextResponse(new Uint8Array(auth.document.blob!), {
     status: 200,

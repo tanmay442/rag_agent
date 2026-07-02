@@ -1,6 +1,5 @@
-import { requireAdminRoute } from '@/composition';
-import { respond } from '@/lib/http';
-import { ValidationError, NotFoundError, GoneError } from '@app/domain';
+import { requireAdminRoute, respond } from '@/composition';
+import { ValidationError } from '@app/domain';
 
 export async function POST(
   _req: Request,
@@ -15,14 +14,6 @@ export async function POST(
     return respond(new ValidationError('Invalid id'));
   }
   const result = await comp.restoreDocument(docId, session.user.id);
-  if (!result.ok) {
-    if (result.reason === 'not_found') {
-      return respond(new NotFoundError('Document not found'));
-    }
-    if (result.reason === 'not_soft_deleted') {
-      return respond(new ValidationError('Document is not deleted'));
-    }
-    return respond(new GoneError('Restore window expired'));
-  }
-  return respond({ ok: true });
+  if (!result.ok) return respond(result.error);
+  return Response.json({ ok: true });
 }

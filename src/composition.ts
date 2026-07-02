@@ -12,19 +12,23 @@ import {
 } from '@app/application';
 import { Db, Llm, Auth, Pdf } from '@app/infrastructure';
 import { requireAdmin, requireSession, getAppSession } from '@app/infrastructure/auth';
-import { ForbiddenError, UnauthorizedError, unwrap } from '@app/domain';
+import { ForbiddenError, UnauthorizedError, unwrap, type Result } from '@app/domain';
 import { type MyUIMessage } from '@app/domain';
+import type { DocumentRow } from '@app/application/ports';
 import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
+import { logger } from './lib/logger';
+import { respond, respondResult, toActionResult, isActionError } from './lib/http';
 
 const systemClock = { now: () => new Date() };
 const systemHasher = { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') };
 
-/** Wrap a Result-returning use-case: unwrap the Result or throw. */
+/** Wrap a Result-returning use-case with partially-applied deps.
+ *  Returns the Result directly — the caller inspects `.ok`. */
 const bind = <Args extends unknown[], T>(
-  fn: (...args: Args) => Promise<import('@app/domain').Result<T>>,
+  fn: (...args: Args) => Promise<Result<T>>,
   ...bound: Args
-) => fn(...bound).then(unwrap);
+): Promise<Result<T>> => fn(...bound);
 
 const documentRepo = {
   findByName: (n: string) => Db.findDocumentByName(n),
@@ -74,8 +78,8 @@ function createComposition() {
     getUserByClerkId: (id: string) => bind(getUserByClerkId, id, userDeps),
     logDocumentEvent: (input: Parameters<typeof logDocumentEvent>[0]) => bind(logDocumentEvent, input, auditDeps),
     logTicketEvent: (input: Parameters<typeof logTicketEvent>[0]) => bind(logTicketEvent, input, auditDeps),
-    recordQuery: (userId: string, query: string) => unwrap(recordQuery(userId, query, { stats: Auth.inMemoryQueryStats })),
-    getTopQueries: (limit: number) => unwrap(getTopQueries(limit, { stats: Auth.inMemoryQueryStats })),
+    recordQuery: (userId: string, query: string) => recordQuery(userId, query, { stats: Auth.inMemoryQueryStats }),
+    getTopQueries: (limit: number) => getTopQueries(limit, { stats: Auth.inMemoryQueryStats }),
     enforceRateLimit: (input: Parameters<typeof enforceRateLimit>[0]) => bind(enforceRateLimit, input, rateLimitDeps),
     listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
       bind(listDocuments, input, { documents: documentRepo, chunks: chunkRepo, ...userDeps }),
@@ -88,8 +92,7 @@ function createComposition() {
     listTickets: (input: Parameters<typeof listTickets>[0]) => bind(listTickets, input, { tickets: Db.ticketRepo }),
     updateTicket: (input: Parameters<typeof updateTicket>[0]) =>
       bind(updateTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
-    getDocumentById: (id: number) =>
-      getDocumentById(id, { documents: documentRepo }).then((r) => unwrap(r).document),
+    getDocumentById: (id: number) => getDocumentById(id, { documents: documentRepo }),
     hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
       bind(hardDeleteDocument, input, { documents: documentRepo, ...auditDeps, runner: txRunner }),
     replacePdf: (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) =>
@@ -110,7 +113,9 @@ function createComposition() {
 }
 
 export { appConfig, isTicketStatus, TICKET_STATUSES, VALID_TRANSITIONS, type TicketStatus, type MyUIMessage };
-export { requireAdmin, requireSession, getAppSession, ForbiddenError, UnauthorizedError };
+export { requireAdmin, requireSession, getAppSession, ForbiddenError, UnauthorizedError, unwrap };
+export { respond, respondResult, toActionResult, isActionError };
+export type { SafeErrorBody } from './lib/http';
 
 export type Composition = ReturnType<typeof createComposition>;
 
@@ -134,7 +139,7 @@ export async function requireAdminRoute(): Promise<
   } catch (err) {
     if (err instanceof UnauthorizedError) return { ok: false, response: new Response('Unauthorized', { status: 401 }) };
     if (err instanceof ForbiddenError) return { ok: false, response: new Response('Forbidden', { status: 403 }) };
-    console.error('requireAdminRoute failed', err);
+    logger.error('requireAdminRoute failed', { error: err });
     return { ok: false, response: new Response('Service Unavailable', { status: 503 }) };
   }
 }
@@ -170,7 +175,7 @@ export async function requireAdminDocument(
       ok: true;
       session: Awaited<ReturnType<typeof requireAdmin>>;
       comp: Composition;
-      document: NonNullable<Awaited<ReturnType<Composition['getDocumentById']>>>;
+      document: DocumentRow;
     }
   | { ok: false; response: Response }
 > {
@@ -179,7 +184,9 @@ export async function requireAdminDocument(
   const { id } = await context.params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) return { ok: false, response: new Response('Invalid id', { status: 400 }) };
-  const doc = await auth.comp.getDocumentById(docId);
+  const r = await auth.comp.getDocumentById(docId);
+  if (!r.ok) return { ok: false, response: respond(r.error) };
+  const doc = r.value.document;
   if (!doc) return { ok: false, response: new Response('Not found', { status: 404 }) };
   if (!opts.allowDeleted && doc.deletedAt) return { ok: false, response: new Response('Gone', { status: 410 }) };
   if (!doc.blob) return { ok: false, response: new Response('File unavailable', { status: 404 }) };

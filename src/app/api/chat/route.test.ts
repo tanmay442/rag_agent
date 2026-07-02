@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ok } from '@app/domain';
 
 // Mocks for the route's deps. We control:
 const { searchValue, ticketInserted, ticketInsertedValues, streamTextImpl } = vi.hoisted(() => ({
@@ -50,7 +51,7 @@ vi.mock('@clerk/nextjs/server', () => ({
 const { compositionMock } = vi.hoisted(() => ({
   compositionMock: {
     rateLimit: () => rateLimitResult,
-    searchChunks: vi.fn(async () => searchValue),
+    searchChunks: vi.fn(async () => ok(searchValue) as never),
     db: {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -244,7 +245,7 @@ describe('/api/chat searchDocumentation tool', () => {
     const longContent = 'x'.repeat(2000);
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
-      .mockResolvedValueOnce([{ content: longContent, similarity: 0.8 }]);
+      .mockResolvedValueOnce(ok([{ content: longContent, similarity: 0.8 }]) as never);
     const { tools } = await captureTools();
     const result = (await tools?.searchDocumentation?.execute({ query: 'q' })) as Array<{
       content: string;
@@ -257,7 +258,7 @@ describe('/api/chat searchDocumentation tool', () => {
   it('passes a user-supplied limit through to searchChunks', async () => {
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce(ok([]) as never);
     const { tools } = await captureTools();
     await tools?.searchDocumentation?.execute({ query: 'q', limit: 5 });
     expect(searchChunksSpy).toHaveBeenCalledWith('q', { limit: 5 });

@@ -1,5 +1,4 @@
-import { requireAdminGet, parseQueryPagination } from '@/composition';
-import { respond } from '@/lib/http';
+import { requireAdminGet, parseQueryPagination, respondResult } from '@/composition';
 
 export async function GET(req: Request) {
   const auth = await requireAdminGet(req);
@@ -14,5 +13,5 @@ export async function GET(req: Request) {
     limit,
     offset,
   });
-  return respond(result);
+  return respondResult(result);
 }

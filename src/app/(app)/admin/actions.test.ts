@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ok, err, ExternalServiceError } from '@app/domain';
 
 const { requireAdminMock } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
@@ -37,13 +38,31 @@ const {
 }));
 
 vi.mock('@/composition', async () => {
-  const { ForbiddenError, UnauthorizedError } = await import('@app/domain');
+  const { ForbiddenError, UnauthorizedError, ok, err } = await import('@app/domain');
   return {
     requireAdmin: requireAdminMock,
     requireSession: requireAdminMock,
     getAppSession: vi.fn(),
     ForbiddenError,
     UnauthorizedError,
+    unwrap: <T>(r: { ok: true; value: T } | { ok: false; error: unknown }): T => {
+      if (r.ok) return r.value;
+      throw r.error;
+    },
+    respond: (e: unknown) => new Response(JSON.stringify(e), { status: 500 }),
+    respondResult: <T>(r: { ok: true; value: T } | { ok: false; error: unknown }): Response => {
+      if (r.ok) return Response.json(r.value);
+      return new Response(JSON.stringify(e), { status: 500 });
+      function e(): unknown { return r.ok ? r.value : r.error; }
+    },
+    toActionResult: <T>(r: { ok: true; value: T } | { ok: false; error: unknown }): T | { error: string; code: string } => {
+      if (r.ok) return r.value;
+      return { error: 'An error occurred', code: 'internal_error' };
+    },
+    isActionError: (r: unknown): r is { error: string; code: string } =>
+      typeof r === 'object' && r !== null && 'error' in r && 'code' in r,
+    ok,
+    err,
     getComposition: () => ({
       uploadPdf: uploadPdfMock,
       replacePdf: replacePdfMock,
@@ -125,11 +144,11 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    uploadPdfMock.mockResolvedValue({
+    uploadPdfMock.mockResolvedValue(ok({
       documentId: 7,
       status: 'inserted',
       chunks: 12,
-    });
+    }));
     const fd = new FormData();
     const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x20, 0x74, 0x65, 0x73, 0x74]);
     fd.append('file', new File([pdfBytes], 'a.pdf', { type: 'application/pdf' }));
@@ -143,28 +162,29 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    softDeleteDocumentMock.mockResolvedValue(undefined);
+    softDeleteDocumentMock.mockResolvedValue(ok(undefined));
     const result = await deleteDocumentAction(42);
     expect(softDeleteDocumentMock).toHaveBeenCalledWith({ documentId: 42, actorId: 'admin_1' });
     expect(result).toEqual({});
   });
 
-  it('deleteDocumentAction surfaces errors', async () => {
+  it('deleteDocumentAction surfaces Result errors', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    softDeleteDocumentMock.mockRejectedValue(new Error('boom'));
+    softDeleteDocumentMock.mockResolvedValue(err(new ExternalServiceError('db down')));
     const result = await deleteDocumentAction(42);
-    expect(result.error).toBe('An unexpected error occurred');
+    expect(result.error).toBe('An external service is temporarily unavailable');
   });
 
-  it('restoreDocumentAction surfaces non-ok reasons', async () => {
+  it('restoreDocumentAction surfaces Result errors (expired)', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    restoreDocumentMock.mockResolvedValue({ ok: false, reason: 'expired' });
+    const { GoneError } = await import('@app/domain');
+    restoreDocumentMock.mockResolvedValue(err(new GoneError('Restore window expired')));
     const result = await restoreDocumentAction(42);
-    expect(result.error).toBe('An error occurred');
+    expect(result.error).toBe('This resource is no longer available');
   });
 
   it('setRoleAction rejects invalid role values', async () => {
@@ -180,29 +200,31 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    setUserRoleMock.mockResolvedValue({
+    setUserRoleMock.mockResolvedValue(ok({
       clerkUserId: 'user_1',
       role: 'admin',
-    } as never);
+    }) as never);
     const result = await setRoleAction('user_1', 'admin');
     expect(setUserRoleMock).toHaveBeenCalledWith({ clerkUserId: 'user_1', role: 'admin', actorId: 'admin_1' });
     expect(result).toEqual({});
   });
 
-  it('updateTicketAction surfaces non-ok results', async () => {
+  it('updateTicketAction surfaces Result errors (invalid transition)', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    updateTicketMock.mockResolvedValue({ ok: false, reason: 'invalid_transition' });
+    const { ConflictError } = await import('@app/domain');
+    updateTicketMock.mockResolvedValue(err(new ConflictError('Invalid status transition')));
     const result = await updateTicketAction('TKT-1001', { status: 'closed' });
-    expect(result.error).toBe('An error occurred');
+    expect(result.error).toBe('A conflict occurred');
   });
 
   it('impersonateUserAction returns a Clerk sign-in URL', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    getUserByClerkIdMock.mockResolvedValue({ user: { role: 'user' } });
+    getUserByClerkIdMock.mockResolvedValue(ok({ user: { role: 'user' } }));
+    logTicketEventMock.mockResolvedValue(ok(undefined));
     clerkClientMock.mockResolvedValue({
       signInTokens: {
         createSignInToken: vi
@@ -226,9 +248,18 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    getUserByClerkIdMock.mockResolvedValue({ user: { role: 'admin' } });
+    getUserByClerkIdMock.mockResolvedValue(ok({ user: { role: 'admin' } }));
     const result = await impersonateUserAction('admin_2');
     expect(result.error).toBe('Cannot impersonate another admin');
+  });
+
+  it('impersonateUserAction blocks impersonation of non-existent user', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
+    });
+    getUserByClerkIdMock.mockResolvedValue(ok({ user: null }));
+    const result = await impersonateUserAction('missing_user');
+    expect(result.error).toBe('User not found');
   });
 
   it('recountChunksAction 403s when requireAdmin throws', async () => {
@@ -244,20 +275,20 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    recountChunksForDocumentMock.mockResolvedValue({ documentId: 42, count: 12 });
+    recountChunksForDocumentMock.mockResolvedValue(ok({ documentId: 42, count: 12 }));
     const result = await recountChunksAction(42);
     expect(result).toEqual({ count: 12 });
     expect(recountChunksForDocumentMock).toHaveBeenCalledWith(42);
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin/documents');
   });
 
-  it('recountChunksAction surfaces errors thrown by the helper', async () => {
+  it('recountChunksAction surfaces Result errors', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    recountChunksForDocumentMock.mockRejectedValue(new Error('db down'));
+    recountChunksForDocumentMock.mockResolvedValue(err(new ExternalServiceError('db down')));
     const result = await recountChunksAction(42);
-    expect(result.error).toBe('An unexpected error occurred');
+    expect(result.error).toBe('An external service is temporarily unavailable');
   });
 
   it('recountAllChunksAction 403s when requireAdmin throws', async () => {
@@ -273,21 +304,21 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    recountChunksForAllDocumentsMock.mockResolvedValue([
+    recountChunksForAllDocumentsMock.mockResolvedValue(ok([
       { documentId: 1, count: 5 },
       { documentId: 2, count: 7 },
-    ]);
+    ]));
     const result = await recountAllChunksAction();
     expect(result).toEqual({ documents: 2, total: 12 });
     expect(revalidatePathMock).toHaveBeenCalledWith('/admin/documents');
   });
 
-  it('recountAllChunksAction surfaces errors thrown by the helper', async () => {
+  it('recountAllChunksAction surfaces Result errors', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
-    recountChunksForAllDocumentsMock.mockRejectedValue(new Error('nope'));
+    recountChunksForAllDocumentsMock.mockResolvedValue(err(new ExternalServiceError('nope')));
     const result = await recountAllChunksAction();
-    expect(result.error).toBe('An unexpected error occurred');
+    expect(result.error).toBe('An external service is temporarily unavailable');
   });
 });

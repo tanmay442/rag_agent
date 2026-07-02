@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition } from '@/composition';
+import { getComposition, unwrap } from '@/composition';
 import { UserRowActions } from './user-row-actions';
 
 export const dynamic = 'force-dynamic';
@@ -15,11 +15,11 @@ export default async function UsersPage({
   const search = params.search?.trim() ?? '';
   const page = Math.max(1, Number(params.page ?? 1));
   const offset = (page - 1) * PAGE_SIZE;
-  const result = await getComposition().listUsers({
+  const result = unwrap(await getComposition().listUsers({
     search: search || undefined,
     limit: PAGE_SIZE,
     offset,
-  });
+  }));
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">

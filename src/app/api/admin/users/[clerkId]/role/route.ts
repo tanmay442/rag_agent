@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { requireAdminRoute } from '@/composition';
-import { respond } from '@/lib/http';
+import { requireAdminRoute, respond } from '@/composition';
 import { ValidationError } from '@app/domain';
 
 const RoleSchema = z.object({
@@ -20,10 +19,11 @@ export async function POST(
   if (!parsed.success) {
     return respond(new ValidationError('invalid_role', { issues: parsed.error.issues }));
   }
-  try {
-    const user = await comp.setUserRole({ clerkUserId: clerkId, role: parsed.data.role as 'admin' | 'user', actorId: session.user.id });
-    return respond({ user });
-  } catch (err) {
-    return respond(err);
-  }
+  const result = await comp.setUserRole({
+    clerkUserId: clerkId,
+    role: parsed.data.role as 'admin' | 'user',
+    actorId: session.user.id,
+  });
+  if (!result.ok) return respond(result.error);
+  return Response.json({ user: result.value });
 }
