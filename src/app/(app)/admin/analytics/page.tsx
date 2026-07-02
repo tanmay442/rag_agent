@@ -29,6 +29,7 @@ export default async function AnalyticsPage() {
             <table
               className="w-full text-sm"
               data-testid="analytics-top-queries"
+              aria-label="Top queries"
             >
               <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
                 <tr>

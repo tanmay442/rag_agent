@@ -49,8 +49,12 @@ export default async function DocumentsPage({
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-medium">Documents</h2>
       <div className="flex flex-col gap-2">
-        <form className="flex gap-2" method="get">
+        <form className="flex gap-2" method="get" aria-label="Search documents">
+          <label className="sr-only" htmlFor="documents-search">
+            Search documents
+          </label>
           <input
+            id="documents-search"
             type="search"
             name="search"
             defaultValue={search}
@@ -77,7 +81,7 @@ export default async function DocumentsPage({
         ) : null}
       </div>
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <table className="w-full text-sm" data-testid="documents-table">
+        <table className="w-full text-sm" data-testid="documents-table" aria-label="Documents">
           <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="px-3 py-2">File</th>
@@ -142,7 +146,7 @@ export default async function DocumentsPage({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm">
+      <nav className="flex items-center justify-between text-sm" aria-label="Pagination">
         <span>
           Page {page} of {totalPages} ({result.total} total)
         </span>
@@ -170,7 +174,7 @@ export default async function DocumentsPage({
             </Link>
           ) : null}
         </div>
-      </div>
+      </nav>
     </section>
   );
 }

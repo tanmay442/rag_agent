@@ -26,15 +26,23 @@ export default async function AuditPage({
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-medium">Audit log</h2>
-      <form className="flex flex-wrap gap-2" method="get">
+      <form className="flex flex-wrap gap-2" method="get" aria-label="Filter audit log">
+        <label className="sr-only" htmlFor="audit-documentId">
+          Document id
+        </label>
         <input
+          id="audit-documentId"
           type="number"
           name="documentId"
           defaultValue={documentId ?? ''}
           placeholder="Document id"
           className="w-32 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)]"
         />
+        <label className="sr-only" htmlFor="audit-ticketId">
+          Ticket id
+        </label>
         <input
+          id="audit-ticketId"
           type="text"
           name="ticketId"
           defaultValue={ticketId ?? ''}
@@ -49,7 +57,7 @@ export default async function AuditPage({
         </button>
       </form>
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <table className="w-full text-sm" data-testid="audit-table">
+        <table className="w-full text-sm" data-testid="audit-table" aria-label="Audit events">
           <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="px-3 py-2">When</th>
@@ -98,7 +106,7 @@ export default async function AuditPage({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm">
+      <nav className="flex items-center justify-between text-sm" aria-label="Pagination">
         <span>
           Page {page} of {totalPages} ({result.total} total)
         </span>
@@ -126,7 +134,7 @@ export default async function AuditPage({
             </Link>
           ) : null}
         </div>
-      </div>
+      </nav>
     </section>
   );
 }

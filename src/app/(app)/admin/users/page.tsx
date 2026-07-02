@@ -24,8 +24,12 @@ export default async function UsersPage({
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-medium">Users</h2>
-      <form className="flex gap-2" method="get">
+      <form className="flex gap-2" method="get" aria-label="Search users">
+        <label className="sr-only" htmlFor="users-search">
+          Search users
+        </label>
         <input
+          id="users-search"
           type="search"
           name="search"
           defaultValue={search}
@@ -41,7 +45,7 @@ export default async function UsersPage({
         </button>
       </form>
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <table className="w-full text-sm" data-testid="users-table">
+        <table className="w-full text-sm" data-testid="users-table" aria-label="Users">
           <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="px-3 py-2">Name</th>
@@ -106,7 +110,7 @@ export default async function UsersPage({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm">
+      <nav className="flex items-center justify-between text-sm" aria-label="Pagination">
         <span>
           Page {page} of {totalPages} ({result.total} total)
         </span>
@@ -134,7 +138,7 @@ export default async function UsersPage({
             </Link>
           ) : null}
         </div>
-      </div>
+      </nav>
     </section>
   );
 }
