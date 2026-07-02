@@ -54,7 +54,7 @@ export interface DocumentRepository {
     includeDeleted?: boolean;
     limit: number;
     offset: number;
-  }): Promise<{ documents: DocumentRow[]; total: number }>;
+  }): Promise<{ documents: (DocumentRow & { hasBlob: boolean })[]; total: number }>;
   countChunksForDocuments(documentIds: number[]): Promise<Map<number, number>>;
   countChunksForAll(): Promise<number>;
 }

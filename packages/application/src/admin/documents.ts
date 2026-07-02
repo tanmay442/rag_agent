@@ -76,7 +76,7 @@ export async function listDocuments(
     }
     const result = documents.map((d) => ({
       ...d,
-      hasBlob: d.blob !== null && d.blob.length > 0,
+      hasBlob: Boolean(d.hasBlob),
       uploaderName: uploaderMap.get(d.uploadedBy) ?? null,
       chunkCount: chunkCounts.get(d.id) ?? 0,
     }));
