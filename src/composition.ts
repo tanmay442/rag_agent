@@ -4,6 +4,7 @@ import {
   getUserByClerkId, logDocumentEvent, logTicketEvent, recordQuery,
   getTopQueries, enforceRateLimit, listDocuments, uploadPdf,
   softDeleteDocument, restoreDocument, listTickets, updateTicket,
+  createTicket,
   isTicketStatus, TICKET_STATUSES, VALID_TRANSITIONS, type TicketStatus,
   getDocumentById, hardDeleteDocument, replacePdf,
   recountChunksForDocument, recountChunksForAllDocuments,
@@ -93,6 +94,8 @@ function createComposition() {
     listTickets: (input: Parameters<typeof listTickets>[0]) => bind(listTickets, input, { tickets: Db.ticketRepo }),
     updateTicket: (input: Parameters<typeof updateTicket>[0]) =>
       bind(updateTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
+    createTicket: (input: Parameters<typeof createTicket>[0]) =>
+      bind(createTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
     getDocumentById: (id: number) => getDocumentById(id, { documents: documentRepo }),
     hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
       bind(hardDeleteDocument, input, { documents: documentRepo, ...auditDeps, runner: txRunner }),

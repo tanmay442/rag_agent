@@ -1,7 +1,6 @@
 import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
 import { z } from 'zod';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { randomUUID } from 'node:crypto';
 import { getComposition, appConfig, type MyUIMessage, type Composition } from '@/composition';
 import type { RetrievedChunk } from '@app/application/rag/search';
 import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
@@ -27,11 +26,10 @@ function emitCitations(
 function buildChatTools(deps: {
   searchChunks: Composition['searchChunks'];
   capturedCitations: Array<{ similarity: number; snippet: string }>;
-  db: Composition['db'];
-  schema: Composition['schema'];
+  createTicket: Composition['createTicket'];
   userId: string;
 }) {
-  const { searchChunks: searchFn, capturedCitations: citationTarget, db, schema, userId: uid } = deps;
+  const { searchChunks: searchFn, capturedCitations: citationTarget, createTicket: createTicketFn, userId: uid } = deps;
   return {
     searchDocumentation: tool({
       description:
@@ -112,20 +110,17 @@ function buildChatTools(deps: {
           realName = 'Unknown';
           realEmail = '';
         }
-        const ticketId = `TKT-${randomUUID().slice(0, 8)}`;
-        try {
-          await db.insert(schema.tickets).values({
-            ticketId,
-            userId: uid,
-            name: realName,
-            email: realEmail,
-            issue: sanitizeText(issue),
-          });
-        } catch (err) {
-          logger.error('createSupportTicket: DB insert failed', { error: err });
+        const result = await createTicketFn({
+          userId: uid,
+          name: realName,
+          email: realEmail,
+          issue: sanitizeText(issue),
+        });
+        if (!result.ok) {
+          logger.error('createSupportTicket: createTicket failed', { error: result.error });
           return { ticketId: null, status: 'error' };
         }
-        return { ticketId, status: 'created' };
+        return result.value;
       },
     }),
   };
@@ -140,10 +135,8 @@ async function streamChatResponse(req: Request): Promise<Response> {
   if (!contentType?.includes('application/json')) {
     return new Response('Content-Type must be application/json', { status: 415 });
   }
-  const contentLength = Number(req.headers.get('content-length') ?? '0');
-  if (contentLength > 1_000_000) {
-    return new Response('Request body too large', { status: 413 });
-  }
+  // Body size is enforced by next.config.ts experimental.bodySizeLimit
+  // at the framework level (not via a spoofable Content-Length header).
   const comp = getComposition();
   const limit = comp.rateLimit(`chat:${userId}`, CHAT_RATE_LIMIT);
   if (!limit.ok) {
@@ -200,8 +193,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
     tools: buildChatTools({
       searchChunks: comp.searchChunks,
       capturedCitations,
-      db: comp.db,
-      schema: comp.schema,
+      createTicket: comp.createTicket,
       userId,
     }),
   });

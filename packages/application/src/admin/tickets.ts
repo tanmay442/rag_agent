@@ -7,6 +7,7 @@ import {
   ConflictError,
 } from '@app/domain';
 import type { TicketRepository, AuditLog, TicketRow } from '../ports/index';
+import { randomUUID } from 'node:crypto';
 import { MAX_TICKET_NOTES_LENGTH, MAX_LIST_LIMIT } from '../../../../config/constants';
 
 export const TICKET_STATUSES = ['created', 'in_progress', 'closed'] as const;
@@ -98,5 +99,40 @@ export async function updateTicket(
     return ok(updated);
   } catch (e) {
     return err(new ExternalServiceError('Failed to update ticket', e));
+  }
+}
+
+export interface CreateTicketInput {
+  userId: string;
+  name: string;
+  email: string;
+  issue: string;
+}
+
+export async function createTicket(
+  input: CreateTicketInput,
+  deps: { tickets: TicketRepository; audit: AuditLog },
+): Promise<Result<{ ticketId: string; status: 'created' }>> {
+  try {
+    const ticketId = `TKT-${randomUUID().slice(0, 8)}`;
+    const row = await deps.tickets.insert({
+      ticketId,
+      userId: input.userId,
+      name: input.name,
+      email: input.email,
+      issue: input.issue,
+    });
+    void deps.audit
+      .logTicketEvent({
+        action: 'create',
+        ticketId: row.ticketId,
+        actorId: input.userId,
+      })
+      .catch((auditErr) => {
+        console.error('Audit logging failed:', auditErr);
+      });
+    return ok({ ticketId: row.ticketId, status: 'created' as const });
+  } catch (e) {
+    return err(new ExternalServiceError('Failed to create ticket', e));
   }
 }

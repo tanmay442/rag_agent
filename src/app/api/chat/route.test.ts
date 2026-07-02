@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ok } from '@app/domain';
+import { ok, err } from '@app/domain';
 
 // Mocks for the route's deps. We control:
-const { searchValue, ticketInserted, ticketInsertedValues, streamTextImpl } = vi.hoisted(() => ({
+const { searchValue, ticketInsertedValues, streamTextImpl, createTicketMock } = vi.hoisted(() => ({
   searchValue: [
     { content: 'The dental plan covers two cleanings per year.', similarity: 0.91 },
     { content: 'Submit claims via the HR portal.', similarity: 0.62 },
   ],
-  ticketInserted: { id: 'TKT-1001' },
   ticketInsertedValues: [] as Array<Record<string, unknown>>,
   streamTextImpl: vi.fn(),
+  createTicketMock: vi.fn(),
 }));
 
 const { authMock, rateLimitResult } = vi.hoisted(() => ({
@@ -52,22 +52,7 @@ const { compositionMock } = vi.hoisted(() => ({
   compositionMock: {
     rateLimit: () => rateLimitResult,
     searchChunks: vi.fn(async () => ok(searchValue) as never),
-    db: {
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          orderBy: vi.fn(() => ({
-            limit: vi.fn(async () => []),
-          })),
-        })),
-      })),
-      insert: vi.fn(() => ({
-        values: vi.fn((v: Record<string, unknown>) => {
-          ticketInsertedValues.push(v);
-          return { returning: async () => [ticketInserted] };
-        }),
-      })),
-    },
-    schema: { tickets: {} },
+    createTicket: createTicketMock,
     recordQuery: vi.fn(),
     getChatModel: vi.fn(() => ({ modelId: 'mock' })),
     getEmbeddingModel: vi.fn(() => ({ modelId: 'mock-embed' })),
@@ -130,7 +115,10 @@ beforeEach(() => {
   }));
   authMock.mockReset();
   currentUserMock.mockReset();
+  createTicketMock.mockReset();
   ticketInsertedValues.length = 0;
+  // Default: createTicket succeeds with a TKT-prefixed id.
+  createTicketMock.mockResolvedValue(ok({ ticketId: 'TKT-abcd1234', status: 'created' }) as never);
   // Default Clerk identity: every test gets a known user unless it
   // explicitly overrides the mock.
   currentUserMock.mockResolvedValue({
@@ -199,7 +187,8 @@ describe('/api/chat createSupportTicket tool', () => {
     return tool!.execute(overrides);
   }
 
-  it('inserts a ticket with a TKT- prefixed id, ignoring LLM-supplied name/email', async () => {
+  it('creates a ticket with a TKT- prefixed id, ignoring LLM-supplied name/email', async () => {
+    createTicketMock.mockResolvedValueOnce(ok({ ticketId: 'TKT-abcd1234', status: 'created' }) as never);
     const out = await invokeToolFromStreamText({
       name: 'Hallucinated Name',
       email: 'hallucinated@example.com',
@@ -208,15 +197,20 @@ describe('/api/chat createSupportTicket tool', () => {
     expect(out).toHaveProperty('status', 'created');
     expect(out).toHaveProperty('ticketId');
     expect((out as { ticketId: string }).ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
-    expect(ticketInsertedValues.length).toBe(1);
-    const row = ticketInsertedValues[0]!;
-    expect(row.name).toBe('Real Person');
-    expect(row.email).toBe('real@example.com');
-    expect(row.issue).toBe('Cannot reset my password.');
-    expect(row.ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
+    // The use-case receives the signed-in user's identity, not the
+    // LLM-supplied name/email.
+    expect(createTicketMock).toHaveBeenCalledWith({
+      userId: 'user_test',
+      name: 'Real Person',
+      email: 'real@example.com',
+      issue: 'Cannot reset my password.',
+    });
   });
 
   it('generates unique ticket ids (UUID-based, no collision retry needed)', async () => {
+    createTicketMock
+      .mockResolvedValueOnce(ok({ ticketId: 'TKT-aaaaaaaa', status: 'created' }) as never)
+      .mockResolvedValueOnce(ok({ ticketId: 'TKT-bbbbbbbb', status: 'created' }) as never);
     const out1 = await invokeToolFromStreamText({
       name: 'A',
       email: 'a@a.com',
@@ -228,6 +222,18 @@ describe('/api/chat createSupportTicket tool', () => {
       issue: 'second ticket',
     });
     expect((out1 as { ticketId: string }).ticketId).not.toBe((out2 as { ticketId: string }).ticketId);
+  });
+
+  it('returns an error status when createTicket fails', async () => {
+    const { ExternalServiceError } = await import('@app/domain');
+    createTicketMock.mockResolvedValueOnce(err(new ExternalServiceError('db down')) as never);
+    const out = await invokeToolFromStreamText({
+      name: 'A',
+      email: 'a@a.com',
+      issue: 'my issue',
+    });
+    expect(out).toHaveProperty('status', 'error');
+    expect(out).toHaveProperty('ticketId', null);
   });
 });
 
