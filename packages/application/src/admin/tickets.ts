@@ -6,7 +6,7 @@ import {
   NotFoundError,
   ConflictError,
 } from '@app/domain';
-import type { TicketRepository, AuditLog, TicketRow } from '../ports/index';
+import type { TicketRepository, AuditLog, TicketRow } from '@app/domain';
 import { randomUUID } from 'node:crypto';
 import { MAX_TICKET_NOTES_LENGTH, MAX_LIST_LIMIT } from '../../../../config/constants';
 

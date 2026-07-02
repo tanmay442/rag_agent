@@ -10,7 +10,7 @@ import {
   ticketAudit,
   type Document,
 } from './schema';
-import type { TicketRow, UserRow } from '@app/application/ports';
+import type { TicketRow, UserRow } from '@app/domain';
 
 type Client = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -160,8 +160,8 @@ export async function listDocuments(
 // ---- Tickets ----
 
 export const ticketRepo = {
-  async findByTicketId(ticketId: string): Promise<TicketRow | null> {
-    const row = await db.query.tickets.findFirst({ where: eq(tickets.ticketId, ticketId) });
+  async findByTicketId(ticketId: string, client: Client = db): Promise<TicketRow | null> {
+    const row = await client.query.tickets.findFirst({ where: eq(tickets.ticketId, ticketId) });
     return (row as TicketRow | undefined) ?? null;
   },
   async list(opts: {
@@ -170,7 +170,7 @@ export const ticketRepo = {
     search?: string;
     limit: number;
     offset: number;
-  }): Promise<{ rows: TicketRow[]; total: number }> {
+  }, client: Client = db): Promise<{ rows: TicketRow[]; total: number }> {
     // Defense-in-depth: enforce a hard maximum at the repository level.
     const limit = Math.min(Math.max(opts.limit, 1), 500);
     const whereParts = [] as ReturnType<typeof eq>[];
@@ -184,7 +184,7 @@ export const ticketRepo = {
       : whereParts.length === 1
         ? whereParts[0]
         : and(...whereParts);
-    const rows = await db
+    const rows = await client
       .select({
         id: tickets.id,
         ticketId: tickets.ticketId,
@@ -206,30 +206,30 @@ export const ticketRepo = {
     const total = rows[0]?.total ?? 0;
     return { rows: rows as unknown as TicketRow[], total };
   },
-  async latest(): Promise<{ id: number; ticketId: string } | null> {
-    const [latest] = await db
+  async latest(client: Client = db): Promise<{ id: number; ticketId: string } | null> {
+    const [latest] = await client
       .select({ id: tickets.id, ticketId: tickets.ticketId })
       .from(tickets)
       .orderBy(desc(tickets.id))
       .limit(1);
     return latest ?? null;
   },
-  async insert(input: { ticketId: string; userId: string; name: string; email: string; issue: string }): Promise<TicketRow> {
-    const [row] = await db.insert(tickets).values(input).returning();
+  async insert(input: { ticketId: string; userId: string; name: string; email: string; issue: string }, client: Client = db): Promise<TicketRow> {
+    const [row] = await client.insert(tickets).values(input).returning();
     if (!row) throw new Error('Failed to insert ticket');
     return row as TicketRow;
   },
-  async update(ticketId: string, patch: Partial<Pick<TicketRow, 'status' | 'assignedTo' | 'notes'>>): Promise<TicketRow | null> {
+  async update(ticketId: string, patch: Partial<Pick<TicketRow, 'status' | 'assignedTo' | 'notes'>>, client: Client = db): Promise<TicketRow | null> {
     if (Object.keys(patch).length === 0) return null;
-    const [row] = await db.update(tickets).set(patch).where(eq(tickets.ticketId, ticketId)).returning();
+    const [row] = await client.update(tickets).set(patch).where(eq(tickets.ticketId, ticketId)).returning();
     return (row as TicketRow | null) ?? null;
   },
-  async countAll(): Promise<number> {
-    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(tickets);
+  async countAll(client: Client = db): Promise<number> {
+    const [row] = await client.select({ count: sql<number>`count(*)::int` }).from(tickets);
     return row?.count ?? 0;
   },
-  async countOpen(): Promise<number> {
-    const [row] = await db
+  async countOpen(client: Client = db): Promise<number> {
+    const [row] = await client
       .select({ count: sql<number>`count(*)::int` })
       .from(tickets)
       .where(sql`${tickets.status} <> 'closed'`);
@@ -246,8 +246,8 @@ export const userRepo = {
     name?: string | null;
     imageUrl?: string | null;
     role: 'admin' | 'user';
-  }): Promise<UserRow> {
-    const [row] = await db
+  }, client: Client = db): Promise<UserRow> {
+    const [row] = await client
       .insert(users)
       .values(input)
       .onConflictDoUpdate({
@@ -263,25 +263,25 @@ export const userRepo = {
     if (!row) throw new Error('Failed to upsert user');
     return row as UserRow;
   },
-  async findByClerkId(clerkUserId: string): Promise<UserRow | null> {
-    const row = await db.query.users.findFirst({ where: eq(users.clerkUserId, clerkUserId) });
+  async findByClerkId(clerkUserId: string, client: Client = db): Promise<UserRow | null> {
+    const row = await client.query.users.findFirst({ where: eq(users.clerkUserId, clerkUserId) });
     return (row as UserRow | undefined) ?? null;
   },
-  async findByIds(clerkUserIds: string[]): Promise<UserRow[]> {
+  async findByIds(clerkUserIds: string[], client: Client = db): Promise<UserRow[]> {
     if (clerkUserIds.length === 0) return [];
-    const rows = await db.query.users.findMany({
+    const rows = await client.query.users.findMany({
       where: (u, { inArray }) => inArray(u.clerkUserId, clerkUserIds),
     });
     return rows as UserRow[];
   },
-  async setRole(clerkUserId: string, role: 'admin' | 'user'): Promise<UserRow | null> {
-    const [row] = await db.update(users).set({ role }).where(eq(users.clerkUserId, clerkUserId)).returning();
+  async setRole(clerkUserId: string, role: 'admin' | 'user', client: Client = db): Promise<UserRow | null> {
+    const [row] = await client.update(users).set({ role }).where(eq(users.clerkUserId, clerkUserId)).returning();
     return (row as UserRow | null) ?? null;
   },
-  async touchLastSeen(clerkUserId: string): Promise<void> {
-    await db.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.clerkUserId, clerkUserId));
+  async touchLastSeen(clerkUserId: string, client: Client = db): Promise<void> {
+    await client.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.clerkUserId, clerkUserId));
   },
-  async list(opts: { search?: string; limit: number; offset: number }): Promise<{ rows: UserRow[]; total: number }> {
+  async list(opts: { search?: string; limit: number; offset: number }, client: Client = db): Promise<{ rows: UserRow[]; total: number }> {
     const search = opts.search?.trim();
     const where = search
       ? or(
@@ -289,21 +289,21 @@ export const userRepo = {
           ilike(users.name, `%${search.replace(/[%_]/g, '\\$&')}%`),
         )
       : undefined;
-    const rows = (await db
+    const rows = (await client
       .select()
       .from(users)
       .where(where)
       .orderBy(users.createdAt)
       .limit(opts.limit)
       .offset(opts.offset)) as UserRow[];
-    const [totalRow] = await db
+    const [totalRow] = await client
       .select({ count: sql<number>`count(*)::int` })
       .from(users)
       .where(where);
     return { rows, total: totalRow?.count ?? 0 };
   },
-  async countAll(): Promise<number> {
-    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
+  async countAll(client: Client = db): Promise<number> {
+    const [row] = await client.select({ count: sql<number>`count(*)::int` }).from(users);
     return row?.count ?? 0;
   },
   async syncClerkRole(clerkUserId: string, role: 'admin' | 'user'): Promise<void> {
@@ -330,7 +330,7 @@ export const auditRepo = {
   ): Promise<void> {
     await client.insert(ticketAudit).values(input);
   },
-  async list(input: { documentId?: number; ticketId?: string; limit: number; offset: number }): Promise<{
+  async list(input: { documentId?: number; ticketId?: string; limit: number; offset: number }, client: Client = db): Promise<{
     events: Array<{
       id: number; kind: 'document' | 'ticket';
       documentId: number | null; ticketId: string | null;
@@ -354,7 +354,7 @@ export const auditRepo = {
       : wantTix
         ? sql``
         : sql`WHERE 1 = 0`;
-    const countResult = await db.execute<{ count: number }>(sql`
+    const countResult = await client.execute<{ count: number }>(sql`
       SELECT count(*)::int AS count FROM (
         SELECT id FROM document_audit ${docWhere}
         UNION ALL
@@ -362,7 +362,7 @@ export const auditRepo = {
       ) c
     `);
     const total = (countResult as unknown as { rows?: Array<{ count: number }> }).rows?.[0]?.count ?? 0;
-    const actorResult = await db.execute<{
+    const actorResult = await client.execute<{
       id: number; kind: string; document_id: number | null; ticket_id: string | null;
       actor_id: string; action: string; at: Date; actor_name: string | null;
     }>(sql`
@@ -397,9 +397,9 @@ export const auditRepo = {
 // Wraps Drizzle's db.transaction() so the application layer
 // can execute multiple repository calls atomically.
 
-import type { TransactionRunner, TransactionContext, DocumentRepository, ChunkRepository, AuditLog } from '@app/application/ports';
+import type { TransactionRunner, TransactionContext, DocumentRepository, ChunkRepository, AuditLog, TicketRepository, UserRepository } from '@app/domain';
 
-function createDocumentRepo(client: Client): DocumentRepository {
+export function createDocumentRepo(client: Client): DocumentRepository {
   return {
     findByName: (name) => findDocumentByName(name, client),
     findById: (id) => findDocumentById(id, client),
@@ -408,7 +408,6 @@ function createDocumentRepo(client: Client): DocumentRepository {
     deleteById: (id) => deleteDocumentById(id, client),
     softDelete: (id, at) => softDeleteDocument(id, at, client),
     restore: (id) => restoreDocument(id, client),
-    listDeletedSince: () => Promise.resolve([]),
     updateBlob: (id, blob) => updateDocumentBlob(id, blob, client),
     list: (opts) => listDocuments(opts, client),
     countChunksForDocuments: (ids) => countChunksForDocuments(ids, client),
@@ -416,7 +415,7 @@ function createDocumentRepo(client: Client): DocumentRepository {
   };
 }
 
-function createChunkRepo(client: Client): ChunkRepository {
+export function createChunkRepo(client: Client): ChunkRepository {
   return {
     searchByVector: (embedding, opts) => searchChunksByVector(embedding, opts, client),
     insertMany: (rows) => insertChunks(rows, client),
@@ -431,7 +430,32 @@ function createAuditRepo(client: Client): AuditLog {
   return {
     logDocumentEvent: (input) => auditRepo.logDocumentEvent(input, client),
     logTicketEvent: (input) => auditRepo.logTicketEvent(input, client),
-    list: (input) => auditRepo.list(input),
+    list: (input) => auditRepo.list(input, client),
+  };
+}
+
+function createTicketRepo(client: Client): TicketRepository {
+  return {
+    findByTicketId: (ticketId) => ticketRepo.findByTicketId(ticketId, client),
+    list: (opts) => ticketRepo.list(opts, client),
+    latest: () => ticketRepo.latest(client),
+    insert: (input) => ticketRepo.insert(input, client),
+    update: (ticketId, patch) => ticketRepo.update(ticketId, patch, client),
+    countAll: () => ticketRepo.countAll(client),
+    countOpen: () => ticketRepo.countOpen(client),
+  };
+}
+
+function createUserRepo(client: Client): UserRepository {
+  return {
+    upsertFromClerk: (input) => userRepo.upsertFromClerk(input, client),
+    findByClerkId: (clerkUserId) => userRepo.findByClerkId(clerkUserId, client),
+    findByIds: (clerkUserIds) => userRepo.findByIds(clerkUserIds, client),
+    setRole: (clerkUserId, role) => userRepo.setRole(clerkUserId, role, client),
+    touchLastSeen: (clerkUserId) => userRepo.touchLastSeen(clerkUserId, client),
+    list: (opts) => userRepo.list(opts, client),
+    countAll: () => userRepo.countAll(client),
+    syncClerkRole: (clerkUserId, role) => userRepo.syncClerkRole(clerkUserId, role),
   };
 }
 
@@ -442,6 +466,8 @@ export const transactionRunner: TransactionRunner = {
         documents: createDocumentRepo(tx),
         chunks: createChunkRepo(tx),
         audit: createAuditRepo(tx),
+        tickets: createTicketRepo(tx),
+        users: createUserRepo(tx),
       };
       return fn(ctx);
     });

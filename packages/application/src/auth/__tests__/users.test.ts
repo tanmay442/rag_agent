@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { setUserRole } from '../users';
-import type { UserRepository, AuditLog } from '../../ports/index';
+import type { UserRepository, AuditLog } from '@app/domain';
 
 function makeDeps(overrides?: {
   users?: Partial<UserRepository>;

@@ -15,7 +15,7 @@ import { Db, Llm, Auth, Pdf } from '@app/infrastructure';
 import { requireAdmin, requireSession, getAppSession } from '@app/infrastructure/auth';
 import { ForbiddenError, UnauthorizedError, unwrap, type Result } from '@app/domain';
 import { type MyUIMessage } from '@app/domain';
-import type { DocumentRow } from '@app/application/ports';
+import type { DocumentRow } from '@app/domain';
 import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
 import { logger } from './lib/logger';
@@ -32,31 +32,10 @@ const bind = <Args extends unknown[], T>(
   ...bound: Args
 ): Promise<Result<T>> => fn(...bound);
 
-const documentRepo = {
-  findByName: (n: string) => Db.findDocumentByName(n),
-  findById: (id: number) => Db.findDocumentById(id),
-  saveBlob: (id: number, b: Buffer) => Db.updateDocumentBlob(id, b),
-  insert: (i: { fileName: string; fileHash: string; uploadedBy: string }) => Db.insertDocument(i),
-  deleteById: (id: number) => Db.deleteDocumentById(id),
-  softDelete: (id: number, at: Date) => Db.softDeleteDocument(id, at),
-  restore: (id: number) => Db.restoreDocument(id),
-  listDeletedSince: () => Promise.resolve([]),
-  updateBlob: (id: number, b: Buffer) => Db.updateDocumentBlob(id, b),
-  list: Db.listDocuments,
-  countChunksForDocuments: Db.countChunksForDocuments,
-  countChunksForAll: Db.countChunksForAll,
-};
-
-const chunkRepo = {
-  insertMany: (rows: Array<{ documentId: number; content: string; embedding: number[] }>) =>
-    Db.insertChunks(rows),
-  countForDocuments: (ids: number[]) => Db.countChunksForDocuments(ids),
-  countForAll: () => Db.countChunksForAll(),
-  countForDocument: (id: number) => Db.countChunksForDocument(id),
-  recountAll: () => Db.recountChunksForAll(),
-  searchByVector: (e: number[], o: { threshold: number; limit: number }) =>
-    Db.searchChunksByVector(e, o),
-};
+// Reuse the factory functions from repositories.ts instead of
+// defining duplicate adapter wrappers here.
+const documentRepo = Db.createDocumentRepo(Db.db);
+const chunkRepo = Db.createChunkRepo(Db.db);
 
 const ingestDeps: IngestDeps = {
   documents: documentRepo, chunks: chunkRepo,

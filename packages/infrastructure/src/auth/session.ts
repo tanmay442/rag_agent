@@ -6,17 +6,17 @@ import { ForbiddenError, UnauthorizedError } from '@app/domain';
 
 export type AppRole = 'admin' | 'user';
 
-function computeAdminEmails(): readonly string[] {
-  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter((e) => e && EMAIL_RE.test(e));
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Parse once at module load — ADMIN_EMAILS never changes at runtime.
+const ADMIN_EMAILS: readonly string[] = (process.env.ADMIN_EMAILS ?? '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter((e) => e && EMAIL_RE.test(e));
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  return computeAdminEmails().includes(email.toLowerCase());
+  return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
 async function upsertUser(input: {

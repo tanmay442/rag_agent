@@ -1,5 +1,5 @@
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
-import type { AuditLog } from '../ports/index';
+import type { AuditLog } from '@app/domain';
 import { MAX_AUDIT_LIMIT } from '../../../../config/constants';
 
 export async function listAudit(

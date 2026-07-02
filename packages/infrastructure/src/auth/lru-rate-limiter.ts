@@ -1,7 +1,7 @@
 // In-process sliding-window rate limiter. Good enough for a single
 // Vercel function instance; in production with multiple concurrent
 // instances this is a soft cap.
-import type { RateLimiter } from '@app/application/ports';
+import type { RateLimiter } from '@app/domain';
 
 const MAX_KEYS = 5_000;
 const EVICT_BATCH = 500;

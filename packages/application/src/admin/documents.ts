@@ -17,7 +17,7 @@ import type {
   Clock,
   UserRepository,
   TransactionRunner,
-} from '../ports/index';
+} from '@app/domain';
 import { ingestFile } from '../rag/ingest';
 import type { IngestDeps, IngestResult } from '../rag/ingest';
 import { RESTORE_WINDOW_MS, MAX_LIST_LIMIT } from '../../../../config/constants';
@@ -161,7 +161,7 @@ export async function restoreDocument(
 export async function getDocumentById(
   documentId: number,
   deps: { documents: DocumentRepository },
-): Promise<Result<{ document: import('../ports/index').DocumentRow | null }>> {
+): Promise<Result<{ document: import('@app/domain').DocumentRow | null }>> {
   try {
     const doc = await deps.documents.findById(documentId);
     return ok({ document: doc });

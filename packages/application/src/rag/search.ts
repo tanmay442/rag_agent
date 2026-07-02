@@ -4,7 +4,7 @@
 // the (similarity, content) pairs the rest of the system
 // consumes.
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
-import type { ChunkRepository, EmbeddingService } from '../ports/index';
+import type { ChunkRepository, EmbeddingService } from '@app/domain';
 import { SIMILARITY_THRESHOLD, DEFAULT_SEARCH_LIMIT } from '../../../../config/constants';
 
 export interface RetrievedChunk {

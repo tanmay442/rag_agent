@@ -1,6 +1,6 @@
 import { err, ok, type Result, NotFoundError, ValidationError, ExternalServiceError } from '@app/domain';
-import type { UserRepository } from '../ports/index';
-import type { AuditLog } from '../ports/index';
+import type { UserRepository } from '@app/domain';
+import type { AuditLog } from '@app/domain';
 import { MAX_LIST_LIMIT } from '../../../../config/constants';
 
 export async function listUsers(

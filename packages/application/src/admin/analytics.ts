@@ -1,5 +1,5 @@
 import { err, ok, type Result, ExternalServiceError } from '@app/domain';
-import type { DocumentRepository, ChunkRepository, TicketRepository, UserRepository, QueryStats } from '../ports/index';
+import type { DocumentRepository, ChunkRepository, TicketRepository, UserRepository, QueryStats } from '@app/domain';
 
 export interface AnalyticsSummary {
   documentCount: number;

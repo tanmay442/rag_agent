@@ -1,10 +1,14 @@
-// Role resolution uses the DB users table as the single source of truth,
-// consistent with getAppSession() / requireAdmin() in session.ts.
+// Read-only session resolution for SSR. Reads the role from the DB
+// users table but does NOT upsert or perform admin-email promotion
+// (that is handled by getAppSession() in session.ts). Use
+// getAppSession() when you need the full promotion/upsert path;
+// use this store for lightweight SSR where the user is already
+// known to exist in the DB.
 import { auth, currentUser, clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { users } from '../db/schema';
-import type { SessionStore } from '@app/application/ports';
+import type { SessionStore } from '@app/domain';
 
 export const clerkSessionStore: SessionStore = {
   async getSession() {
