@@ -108,4 +108,48 @@ describe('PATCH /api/admin/tickets/[ticketId]', () => {
       ticket: { ticketId: 'TKT-1001', status: 'closed' },
     });
   });
+
+  it('returns 400 when body is empty and no status/note provided', async () => {
+    requireAdminMock.mockResolvedValue({ user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' } });
+    updateTicketMock.mockResolvedValue(ok({ ticketId: 'TKT-1001', status: 'created' }) as never);
+    const res = await route.PATCH(
+      makeReq({}),
+      makeParams('TKT-1001'),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('updates notes without status change', async () => {
+    requireAdminMock.mockResolvedValue({ user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' } });
+    updateTicketMock.mockResolvedValue(ok({
+      ticketId: 'TKT-1001',
+      status: 'created',
+      notes: 'new note',
+    }) as never);
+    const res = await route.PATCH(
+      makeReq({ note: 'new note' }),
+      makeParams('TKT-1001'),
+    );
+    expect(res.status).toBe(200);
+    expect(updateTicketMock).toHaveBeenCalledWith(
+      expect.objectContaining({ note: 'new note' }),
+    );
+  });
+
+  it('returns 200 with ticket when patch is valid', async () => {
+    requireAdminMock.mockResolvedValue({ user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' } });
+    updateTicketMock.mockResolvedValue(ok({
+      ticketId: 'TKT-1001',
+      status: 'created',
+      assignedTo: 'user_2',
+    }) as never);
+    const res = await route.PATCH(
+      makeReq({ assignedTo: 'user_2' }),
+      makeParams('TKT-1001'),
+    );
+    expect(res.status).toBe(200);
+    expect(updateTicketMock).toHaveBeenCalledWith(
+      expect.objectContaining({ assignedTo: 'user_2' }),
+    );
+  });
 });

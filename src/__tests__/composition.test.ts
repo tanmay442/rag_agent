@@ -54,6 +54,30 @@ describe('parseQueryPagination', () => {
     const { limit } = parseQueryPagination(url);
     expect(limit).toBe(1);
   });
+
+  it('handles empty string limit (Number("") is 0, clamps to 1)', () => {
+    const url = new URL('http://localhost/api/test?limit=');
+    const { limit } = parseQueryPagination(url);
+    expect(limit).toBe(1);
+  });
+
+  it('handles Infinity limit by falling back to default', () => {
+    const url = new URL('http://localhost/api/test?limit=Infinity');
+    const { limit } = parseQueryPagination(url);
+    expect(limit).toBe(25);
+  });
+
+  it('handles very large offset by clamping to 0 if negative', () => {
+    const url = new URL('http://localhost/api/test?offset=-999');
+    const { offset } = parseQueryPagination(url);
+    expect(offset).toBe(0);
+  });
+
+  it('accepts offset of exactly 0', () => {
+    const url = new URL('http://localhost/api/test?offset=0');
+    const { offset } = parseQueryPagination(url);
+    expect(offset).toBe(0);
+  });
 });
 
 describe('parsePageParam', () => {

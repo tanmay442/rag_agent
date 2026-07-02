@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { respond, respondResult, toSafeError } from '../http';
+import { respond, respondResult, toSafeError, isActionError, toActionResult } from '../http';
 import {
   ValidationError,
   NotFoundError,
   ForbiddenError,
+  GoneError,
+  ConflictError,
+  ExternalServiceError,
   RateLimitedError,
   ok,
   err,
@@ -103,5 +106,83 @@ describe('toSafeError', () => {
     const body = toSafeError(new Error('boom'));
     expect(body.code).toBe('internal_error');
     expect(body.error).toBe('An unexpected error occurred');
+  });
+
+  it('returns internal_error for unknown thrown value (string)', () => {
+    const body = toSafeError('something broke');
+    expect(body.code).toBe('internal_error');
+  });
+
+  it('returns internal_error for null', () => {
+    const body = toSafeError(null);
+    expect(body.code).toBe('internal_error');
+  });
+});
+
+describe('respond edge cases', () => {
+  it('maps ConflictError to 409', async () => {
+    const res = respond(new ConflictError('duplicate'));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.code).toBe('conflict');
+  });
+
+  it('maps GoneError to 410', async () => {
+    const res = respond(new GoneError('expired'));
+    expect(res.status).toBe(410);
+    const body = await res.json();
+    expect(body.code).toBe('gone');
+  });
+
+  it('maps ExternalServiceError to 502', async () => {
+    const res = respond(new ExternalServiceError('timeout'));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.code).toBe('external_service');
+  });
+
+  it('maps undefined to 500', async () => {
+    const res = respond(undefined);
+    expect(res.status).toBe(500);
+  });
+
+  it('maps number to 500', async () => {
+    const res = respond(42);
+    expect(res.status).toBe(500);
+  });
+});
+
+describe('isActionError', () => {
+  it('returns true for valid error body', () => {
+    expect(isActionError({ error: 'x', code: 'y' })).toBe(true);
+  });
+
+  it('returns false for null', () => {
+    expect(isActionError(null)).toBe(false);
+  });
+
+  it('returns false for string', () => {
+    expect(isActionError('error')).toBe(false);
+  });
+
+  it('returns false for object missing code', () => {
+    expect(isActionError({ error: 'x' })).toBe(false);
+  });
+
+  it('returns false for object missing error', () => {
+    expect(isActionError({ code: 'x' })).toBe(false);
+  });
+});
+
+describe('toActionResult', () => {
+  it('returns value on ok', () => {
+    const result = ok({ id: 1 });
+    expect(toActionResult(result)).toEqual({ id: 1 });
+  });
+
+  it('returns error body on err', () => {
+    const result = err(new NotFoundError('missing'));
+    const body = toActionResult(result);
+    expect(body).toEqual({ error: 'The requested resource was not found', code: 'not_found' });
   });
 });

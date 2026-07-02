@@ -9,13 +9,11 @@
 import { z } from 'zod';
 
 const toneSchema = z.enum(['friendly', 'formal', 'casual', 'concise']);
-type Tone = z.infer<typeof toneSchema>;
 
 const outOfScopeTopicSchema = z.object({
   topic: z.string().min(1),
   handling: z.string().min(1),
 });
-type OutOfScopeTopic = z.infer<typeof outOfScopeTopicSchema>;
 
 export const appConfigSchema = z.object({
   orgName: z.string().min(1).default('Your Company'),
