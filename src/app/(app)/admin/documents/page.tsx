@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition, unwrap } from '@/composition';
+import { getComposition, unwrap, parsePageParam } from '@/composition';
 import { DocumentRowActions } from './document-row-actions';
 import { RecountAllButton } from './recount-all-button';
 
@@ -19,7 +19,7 @@ export default async function DocumentsPage({
 }) {
   const params = await searchParams;
   const search = params.search?.trim() ?? '';
-  const page = Math.max(1, Number(params.page ?? 1));
+  const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
   // Read the success-banner params (set by RecountAllButton) so the
   // message survives the page reload triggered by revalidatePath.

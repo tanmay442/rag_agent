@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition, TICKET_STATUSES, unwrap } from '@/composition';
+import { getComposition, TICKET_STATUSES, unwrap, parsePageParam } from '@/composition';
 import { TicketOverlay, type TicketRow } from './ticket-overlay';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,7 @@ export default async function TicketsPage({
   const status = TICKET_STATUSES.find((s) => s === params.status);
   const assignee = params.assignee?.trim() || undefined;
   const search = params.q?.trim() || undefined;
-  const page = Math.max(1, Number(params.page ?? 1));
+  const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
   const comp = getComposition();
   const [result, userList] = await Promise.all([

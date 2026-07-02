@@ -33,8 +33,8 @@ export async function listTickets(
   deps: { tickets: TicketRepository },
 ): Promise<Result<{ tickets: TicketRow[]; total: number }>> {
   try {
-    const limit = Math.min(Math.max(input.limit ?? 25, 1), MAX_LIST_LIMIT);
-    const offset = Math.max(input.offset ?? 0, 0);
+    const limit = Math.min(Math.max(Math.floor(input.limit ?? 25), 1), MAX_LIST_LIMIT);
+    const offset = Math.max(Math.floor(input.offset ?? 0), 0);
     const r = await deps.tickets.list({
       status: input.status,
       assignee: input.assignee,

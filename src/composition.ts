@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
 import { logger } from './lib/logger';
 import { respond, respondResult, toActionResult, isActionError } from './lib/http';
+import { MAX_LIST_LIMIT } from '../config/constants';
 
 const systemClock = { now: () => new Date() };
 const systemHasher = { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') };
@@ -151,9 +152,16 @@ export function parseQueryPagination(
   const rawLimit = Number(url.searchParams.get('limit') ?? defaults.limit ?? 25);
   const rawOffset = Number(url.searchParams.get('offset') ?? defaults.offset ?? 0);
   return {
-    limit: Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25),
-    offset: Number.isFinite(rawOffset) ? rawOffset : (defaults.offset ?? 0),
+    limit: Math.min(Math.max(Math.floor(Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25)), 1), MAX_LIST_LIMIT),
+    offset: Math.max(Math.floor(Number.isFinite(rawOffset) ? rawOffset : (defaults.offset ?? 0)), 0),
   };
+}
+
+/** Parse a `page` search-param into a 1-based integer, falling
+ *  back gracefully on NaN, negatives, or floats. */
+export function parsePageParam(raw: string | undefined, fallback = 1): number {
+  const n = Number(raw ?? fallback);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : fallback;
 }
 
 export async function requireAdminGet(

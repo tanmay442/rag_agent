@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition, unwrap } from '@/composition';
+import { getComposition, unwrap, parsePageParam } from '@/composition';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,12 +11,13 @@ export default async function AuditPage({
   searchParams: Promise<{ documentId?: string; ticketId?: string; page?: string }>;
 }) {
   const params = await searchParams;
-  const page = Math.max(1, Number(params.page ?? 1));
+  const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
-  const documentId = params.documentId ? Number(params.documentId) : undefined;
+  const documentIdRaw = params.documentId ? Number(params.documentId) : undefined;
+  const documentId = Number.isFinite(documentIdRaw) ? documentIdRaw : undefined;
   const ticketId = params.ticketId;
   const result = unwrap(await getComposition().listAudit({
-    documentId: Number.isFinite(documentId) ? documentId : undefined,
+    documentId,
     ticketId,
     limit: PAGE_SIZE,
     offset,

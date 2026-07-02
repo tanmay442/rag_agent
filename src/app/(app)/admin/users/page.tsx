@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition, unwrap } from '@/composition';
+import { getComposition, unwrap, parsePageParam } from '@/composition';
 import { UserRowActions } from './user-row-actions';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export default async function UsersPage({
 }) {
   const params = await searchParams;
   const search = params.search?.trim() ?? '';
-  const page = Math.max(1, Number(params.page ?? 1));
+  const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
   const result = unwrap(await getComposition().listUsers({
     search: search || undefined,
