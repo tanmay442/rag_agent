@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition } from '@/composition';
+import { getComposition, unwrap, parsePageParam } from '@/composition';
 import { DocumentRowActions } from './document-row-actions';
 import { RecountAllButton } from './recount-all-button';
 
@@ -19,7 +19,7 @@ export default async function DocumentsPage({
 }) {
   const params = await searchParams;
   const search = params.search?.trim() ?? '';
-  const page = Math.max(1, Number(params.page ?? 1));
+  const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
   // Read the success-banner params (set by RecountAllButton) so the
   // message survives the page reload triggered by revalidatePath.
@@ -38,19 +38,23 @@ export default async function DocumentsPage({
     !Number.isNaN(recountedDocs) &&
     recountedTotal !== null &&
     !Number.isNaN(recountedTotal);
-  const result = await getComposition().listDocuments({
+  const result = unwrap(await getComposition().listDocuments({
     search: search || undefined,
     includeDeleted: true,
     limit: PAGE_SIZE,
     offset,
-  });
+  }));
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-medium">Documents</h2>
       <div className="flex flex-col gap-2">
-        <form className="flex gap-2" method="get">
+        <form className="flex gap-2" method="get" aria-label="Search documents">
+          <label className="sr-only" htmlFor="documents-search">
+            Search documents
+          </label>
           <input
+            id="documents-search"
             type="search"
             name="search"
             defaultValue={search}
@@ -77,7 +81,7 @@ export default async function DocumentsPage({
         ) : null}
       </div>
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <table className="w-full text-sm" data-testid="documents-table">
+        <table className="w-full text-sm" data-testid="documents-table" aria-label="Documents">
           <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="px-3 py-2">File</th>
@@ -132,7 +136,7 @@ export default async function DocumentsPage({
                     <DocumentRowActions
                       id={d.id}
                       fileName={d.fileName}
-                      hasBlob={d.blob != null}
+                      hasBlob={d.hasBlob}
                       isDeleted={d.deletedAt != null}
                     />
                   </td>
@@ -142,7 +146,7 @@ export default async function DocumentsPage({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm">
+      <nav className="flex items-center justify-between text-sm" aria-label="Pagination">
         <span>
           Page {page} of {totalPages} ({result.total} total)
         </span>
@@ -170,7 +174,7 @@ export default async function DocumentsPage({
             </Link>
           ) : null}
         </div>
-      </div>
+      </nav>
     </section>
   );
 }

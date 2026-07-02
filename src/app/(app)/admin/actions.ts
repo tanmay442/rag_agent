@@ -6,6 +6,8 @@ import { UnauthorizedError } from '@app/domain';
 import type { TicketStatus } from '@app/application/admin/tickets';
 import type { AppRole } from '@app/infrastructure/auth';
 import { toSafeError } from '@/lib/http';
+import { sanitizeText } from '@/lib/sanitize';
+import { logger } from '@/lib/logger';
 
 async function requireAdminOrError(): Promise<
   | { user: { id: string; email: string; name: string; imageUrl: string | null; role: 'admin' | 'user' } }
@@ -14,7 +16,6 @@ async function requireAdminOrError(): Promise<
   try {
     return await requireAdmin();
   } catch (err) {
-    // Handle both ForbiddenError and plain Error with status 403.
     if (err instanceof UnauthorizedError) {
       return { error: 'Unauthorized' };
     }
@@ -63,17 +64,18 @@ export async function uploadPdfAction(
       buffer,
       actorId: session.user.id,
     });
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin');
     revalidatePath('/admin/upload');
     revalidatePath('/admin/documents');
     return {
-      status: result.status,
-      chunks: result.chunks,
+      status: result.value.status,
+      chunks: result.value.chunks,
       fileName: file.name,
-      documentId: result.documentId,
+      documentId: result.value.documentId,
     };
   } catch (err) {
-    console.error('uploadPdfAction failed', err);
+    logger.error('uploadPdfAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -84,11 +86,12 @@ export async function deleteDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    await getComposition().softDeleteDocument({ documentId, actorId: session.user.id });
+    const result = await getComposition().softDeleteDocument({ documentId, actorId: session.user.id });
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
-    console.error('deleteDocumentAction failed', err);
+    logger.error('deleteDocumentAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -100,13 +103,11 @@ export async function restoreDocumentAction(
   if ('error' in session) return session;
   try {
     const result = await getComposition().restoreDocument(documentId, session.user.id);
-    if (!result.ok) {
-      return { error: 'An error occurred' };
-    }
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
-    console.error('restoreDocumentAction failed', err);
+    logger.error('restoreDocumentAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -117,11 +118,12 @@ export async function hardDeleteDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    await getComposition().hardDeleteDocument({ documentId, actorId: session.user.id });
+    const result = await getComposition().hardDeleteDocument({ documentId, actorId: session.user.id });
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
-    console.error('hardDeleteDocumentAction failed', err);
+    logger.error('hardDeleteDocumentAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -140,11 +142,12 @@ export async function setRoleAction(
     return { error: 'Invalid role' };
   }
   try {
-    await getComposition().setUserRole({ clerkUserId, role, actorId: session.user.id });
+    const result = await getComposition().setUserRole({ clerkUserId, role, actorId: session.user.id });
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/users');
     return {};
   } catch (err) {
-    console.error('setRoleAction failed', err);
+    logger.error('setRoleAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -166,47 +169,14 @@ export async function updateTicketAction(
       ticketId,
       status: patch.status,
       assignedTo: patch.assignedTo,
-      note: patch.note,
+      note: patch.note ? sanitizeText(patch.note) : undefined,
       actorId: session.user.id,
     });
-    if (!result.ok) {
-      return { error: 'An error occurred' };
-    }
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/tickets');
     return {};
   } catch (err) {
-    console.error('updateTicketAction failed', err);
-    return toSafeError(err);
-  }
-}
-
-export async function impersonateUserAction(
-  clerkUserId: string,
-): Promise<{ error?: string; url?: string }> {
-  const session = await requireAdminOrError();
-  if ('error' in session) return session;
-  if (session.user.id === clerkUserId) {
-    return { error: 'Cannot impersonate yourself' };
-  }
-  const comp = getComposition();
-  const targetUser = await comp.getUserByClerkId(clerkUserId);
-  if (targetUser?.user?.role === 'admin') {
-    return { error: 'Cannot impersonate another admin' };
-  }
-  try {
-    const { clerkClient } = await import('@clerk/nextjs/server');
-    const client = await clerkClient();
-    const signInToken = await client.signInTokens.createSignInToken({
-      userId: clerkUserId, expiresInSeconds: 600,
-    });
-    await getComposition().logTicketEvent({
-      action: 'impersonation',
-      ticketId: `user:${clerkUserId}`,
-      actorId: session.user.id,
-    });
-    return { url: signInToken.url };
-  } catch (err) {
-    console.error('impersonateUserAction failed', err);
+    logger.error('updateTicketAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -216,7 +186,6 @@ export interface RecountChunksResult {
   count?: number;
 }
 
-// Re-derives live chunk count for a single document. Returns fresh count.
 export async function recountChunksAction(
   documentId: number,
 ): Promise<RecountChunksResult> {
@@ -224,10 +193,11 @@ export async function recountChunksAction(
   if ('error' in session) return session;
   try {
     const result = await getComposition().recountChunksForDocument(documentId);
+    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/documents');
-    return { count: result.count };
+    return { count: result.value.count };
   } catch (err) {
-    console.error('recountChunksAction failed', err);
+    logger.error('recountChunksAction failed', { error: err });
     return toSafeError(err);
   }
 }
@@ -238,19 +208,17 @@ export interface RecountAllChunksResult {
   total?: number;
 }
 
-// Re-derives chunk counts for all documents. Returns summary numbers.
 export async function recountAllChunksAction(): Promise<RecountAllChunksResult> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const results = await getComposition().recountChunksForAllDocuments();
-    const total = results.reduce((acc, r) => acc + r.count, 0);
+    const result = await getComposition().recountChunksForAllDocuments();
+    if (!result.ok) return toSafeError(result.error);
+    const total = result.value.reduce((acc, r) => acc + r.count, 0);
     revalidatePath('/admin/documents');
-    return { documents: results.length, total };
+    return { documents: result.value.length, total };
   } catch (err) {
-    console.error('recountAllChunksAction failed', err);
+    logger.error('recountAllChunksAction failed', { error: err });
     return toSafeError(err);
   }
 }
-
-

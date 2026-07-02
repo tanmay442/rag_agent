@@ -31,7 +31,7 @@ vi.mock('drizzle-orm', () => ({
 // does not try to read the host's .env files.
 vi.mock('dotenv/config', () => ({}));
 
-import { runSeed, parseArgs, type SeedOptions } from './seed-docs';
+import { runSeed, parseArgs } from './seed-docs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';

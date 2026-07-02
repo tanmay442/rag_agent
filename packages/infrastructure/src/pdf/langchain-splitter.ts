@@ -2,7 +2,7 @@
 // overlap match the production settings used by the legacy
 // ingestFile helper.
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import type { TextSplitter } from '@app/application/ports';
+import type { TextSplitter } from '@app/domain';
 
 const splitter = new RecursiveCharacterTextSplitter({
   chunkSize: 350,

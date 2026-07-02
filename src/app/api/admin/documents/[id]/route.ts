@@ -1,5 +1,4 @@
-import { requireAdminRoute } from '@/composition';
-import { respond } from '@/lib/http';
+import { requireAdminRoute, respond } from '@/composition';
 import { ValidationError } from '@app/domain';
 
 export async function DELETE(
@@ -14,10 +13,7 @@ export async function DELETE(
   if (!Number.isInteger(docId)) {
     return respond(new ValidationError('Invalid id'));
   }
-  try {
-    await comp.hardDeleteDocument({ documentId: docId, actorId: session.user.id });
-    return respond({ ok: true });
-  } catch (err) {
-    return respond(err);
-  }
+  const result = await comp.hardDeleteDocument({ documentId: docId, actorId: session.user.id });
+  if (!result.ok) return respond(result.error);
+  return Response.json({ ok: true });
 }

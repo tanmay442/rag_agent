@@ -95,8 +95,10 @@ pnpm dev
   `requireAdmin()` as its second line. Server actions return
   `{ error: 'Forbidden' }`; API routes return HTTP 403.
 - **Security headers:** `next.config.ts` sets `X-Frame-Options: DENY`,
-  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and disables
-  the `X-Powered-By` header.
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
+  `Strict-Transport-Security` (HSTS), `Permissions-Policy`, a
+  `Content-Security-Policy` header, and disables the `X-Powered-By`
+  header. Server actions have a 4 MB `bodySizeLimit`.
 
 ## Admin console
 
@@ -114,29 +116,39 @@ pnpm dev
   `table-fixed` with bounded column widths and a compact
   `YYYY-MM-DD HH:mm` Created column so it never overflows the
   viewport — no horizontal page scroll. Each row links to
-  `?ticket=…`, which a client-side overlay (`ticket-overlay.tsx`)
+  `?ticket=...`, which a client-side overlay (`ticket-overlay.tsx`)
   reads via `useSearchParams` and renders the existing `TicketDrawer`
   body into a portal: the full issue, a notes thread, a status
   select, an assignee select, and an "Add note" textarea. Status
   transitions are validated (no `closed → created/in_progress`).
+  Ticket IDs are UUID-based (`TKT-<8-hex-chars>`) to avoid
+  race conditions on concurrent creation.
 - **`/admin/users`** — Searchable, paginated list of all Clerk users.
-  Per-row *Promote / Demote* and *Impersonate* (issues a short-lived
-  Clerk sign-in token and opens it in a new tab).
+  Per-row *Promote / Demote* buttons.
 - **`/admin/analytics`** — Read-only counts and an in-process top-queries
   table.
 - **`/admin/audit`** — Full audit log filterable by document id or
   ticket id. Document audit events: upload, replace, delete, restore.
   Ticket audit events: create, assign, status_change, note,
-  impersonation, role_change.
+  role_change.
 
 ## Rate limit
 
-`packages/application/src/auth/rate-limit.ts` is a single-instance,
-in-memory LRU keyed by `chat:${userId}`. Default budget: 30 requests /
-60 s, max 5 000 keys, evicts the least-recently-touched. The 31st
-request returns HTTP 429 with a `Retry-After` header. When the app
-moves to a multi-region deployment, swap this for an Upstash hash; the
-call sites do not need to change.
+`packages/infrastructure/src/auth/lru-rate-limiter.ts` is a single-instance,
+in-memory sliding-window limiter keyed by `chat:${userId}`. Default budget:
+30 requests / 60 s, max 5 000 keys. Periodic eviction prunes stale entries
+in batches to avoid O(n) scans. The 31st request returns HTTP 429 with a
+`Retry-After` header. When the app moves to a multi-region deployment, swap
+this for an Upstash hash; the call sites do not need to change.
+
+## Shared utilities
+
+| File | Purpose |
+| --- | --- |
+| `config/constants.ts` | Centralised business-logic constants (rate limits, thresholds, batch sizes) |
+| `src/lib/sanitize.ts` | `escapeHtml()` and `sanitizeText()` for user-supplied free-text fields |
+| `src/lib/logger.ts` | Lightweight structured JSON logger with `LOG_LEVEL` env gate (replace with pino for richer features) |
+| `src/lib/http.ts` | `respond()`, `respondResult()`, `toSafeError()`, `toActionResult()`, and `isActionError()` for consistent error mapping |
 
 ## Scripts
 
@@ -164,7 +176,7 @@ call sites do not need to change.
 
 ### Unit + integration (Vitest)
 
-122 tests across 18 files. Run with `pnpm test` (single run) or
+192 tests across 21 files. Run with `pnpm test` (single run) or
 `pnpm test:ui` (interactive). Highlights:
 
 - `src/app/api/chat/route.test.ts` — 401 / 429 paths, the
@@ -178,9 +190,9 @@ call sites do not need to change.
 - `src/app/api/admin/documents/[id]/blob/route.test.ts` —
   inline PDF preview route (auth + content-type + 404 paths)
 - `src/app/api/admin/tickets/[ticketId]/route.test.ts` —
-  single-ticket GET/PATCH (auth + 404 + status validation)
+  single-ticket GET/PATCH (auth + 404 + status validation + notes update)
 - `src/app/api/admin/users/[clerkId]/role/route.test.ts` —
-  role update route (auth + invalid role + forbidden)
+  role update route (auth + invalid role + forbidden + happy path)
 - `src/components/ChatInterface.test.tsx` — chat frame layout
   (`flex-1 min-h-0 overflow-y-auto`) + streaming / citations
   rendering
@@ -198,6 +210,19 @@ call sites do not need to change.
   empty-text and API-failure error paths
 - `packages/application/src/auth/__tests__/users.test.ts` —
   `setUserRole`: audit logging, invalid role, user-not-found
+- `packages/application/src/admin/__tests__/tickets.test.ts` —
+  `updateTicket`: missing ticket, invalid transition, race condition,
+  notes-only update, valid transitions; `createTicket`: generated ID,
+  audit logging, insert failure; `isTicketStatus`, `VALID_TRANSITIONS`
+- `packages/application/src/admin/__tests__/documents.test.ts` —
+  `restoreDocument`: missing doc, non-deleted, expired window,
+  within window; `softDeleteDocument`: missing doc, happy path
+- `src/lib/__tests__/http.test.ts` — `respond()` edge cases
+  (ConflictError→409, GoneError→410, ExternalServiceError→502,
+  non-Error→500), `isActionError`, `toActionResult`, `toSafeError`
+- `src/__tests__/composition.test.ts` — `parseQueryPagination` edge
+  cases (empty string, Infinity, negative offset, zero offset),
+  `parsePageParam`
 
 ## Architecture
 
@@ -229,11 +254,17 @@ src/
 │   ├── app/AppSidebar.tsx  # Unified sidebar + mobile drawer (Client)
 │   ├── landing/            # LandingHeader, LandingCard, LandingFooter
 │   └── icons/GithubIcon.tsx
-├── lib/http.ts             # respond() helper — maps DomainError → HTTP status
-├── lib/config/             # App-level config types
+├── lib/
+│   ├── http.ts             # respond() + respondResult() + toSafeError() + toActionResult()
+│   ├── logger.ts           # Structured JSON logger
+│   ├── sanitize.ts         # escapeHtml() + sanitizeText()
+│   └── config/             # App-level config types
 ├── proxy.ts                # clerkMiddleware (Next 16 convention)
-└── …
-scripts/                   # setup, seed, migration scripts
+└── ...
+config/
+├── app.config.ts           # Org name, persona, admin emails, out-of-scope topics
+└── constants.ts            # Centralised business-logic constants
+scripts/                    # setup, seed, migration scripts
 ```
 
 ### CI
@@ -252,12 +283,13 @@ inside `packages/`:
 ```
 packages/
 ├── domain/         # @app/domain — pure types, Zod schemas,
-│                   #   Result<T,E>, DomainError hierarchy
-├── application/    # @app/application — use-cases + port
-│                   #   interfaces (incl. TransactionRunner).
-│                   #   Returns Result<T, DomainError>.
+│                   #   Result<T,E>, DomainError hierarchy,
+│                   #   port interfaces (repositories, services)
+├── application/    # @app/application — use-cases that return
+│                   #   Result<T, DomainError>. Imports only domain.
 ├── infrastructure/ # @app/infrastructure — Drizzle repos, AI SDK
-│                   #   adapters, Clerk session, pdf-parse, bytea
+│                   #   adapters, Clerk session, pdf-parse, bytea.
+│                   #   Imports domain only (not application).
 ├── cli/            # @app/cli — `rag-agent` sub-commands:
                     #   init, setup, seed, db-migrate
 ```
@@ -271,8 +303,8 @@ place where adapters are instantiated; routes import from
 | Layer            | May import                                | May NOT import                |
 |------------------|-------------------------------------------|-------------------------------|
 | `domain`         | zod                                       | application, infrastructure, cli, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
-| `application`    | domain, its own port interfaces           | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
-| `infrastructure` | domain, application, drizzle, @ai-sdk, clerk, pdf-parse, pg, pdf-lib | src/app, src/components, next |
+| `application`    | domain                                    | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
+| `infrastructure` | domain, drizzle, @ai-sdk, clerk, pdf-parse, pg | application, src/app, src/components, next |
 | `src/app`, `src/components` | application, domain, src/lib/http, src/lib/config | drizzle, @ai-sdk, pdf-parse, infrastructure |
 | `cli`            | application, infrastructure, dotenv       | src/app, src/components |
 

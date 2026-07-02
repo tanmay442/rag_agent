@@ -1,18 +1,24 @@
-import { requireAdminGet, parseQueryPagination } from '@/composition';
-import { respond } from '@/lib/http';
+import { requireAdminGet, parseQueryPagination, respondResult, respond } from '@/composition';
+import { ValidationError } from '@app/domain';
 
 export async function GET(req: Request) {
   const auth = await requireAdminGet(req);
   if (!auth.ok) return auth.response;
   const { comp, url } = auth;
-  const documentId = url.searchParams.get('documentId');
+  const documentIdRaw = url.searchParams.get('documentId');
   const ticketId = url.searchParams.get('ticketId');
+  let documentId: number | undefined;
+  if (documentIdRaw !== null) {
+    const n = Number(documentIdRaw);
+    if (!Number.isInteger(n)) return respond(new ValidationError('Invalid documentId'));
+    documentId = n;
+  }
   const { limit, offset } = parseQueryPagination(url, { limit: 50 });
   const result = await comp.listAudit({
-    documentId: documentId ? Number(documentId) : undefined,
+    documentId,
     ticketId: ticketId ?? undefined,
     limit,
     offset,
   });
-  return respond(result);
+  return respondResult(result);
 }

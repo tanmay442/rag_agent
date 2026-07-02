@@ -1,9 +1,9 @@
 import { err, ok, type Result, ValidationError, ExternalServiceError } from '@app/domain';
-import type { DocumentRepository, ChunkRepository } from '../ports/index';
-import type { EmbeddingService } from '../ports/index';
-import type { Hasher } from '../ports/index';
-import type { PdfParser } from '../ports/index';
-import type { TextSplitter } from '../ports/index';
+import type { DocumentRepository, ChunkRepository } from '@app/domain';
+import type { EmbeddingService } from '@app/domain';
+import type { Hasher } from '@app/domain';
+import type { PdfParser } from '@app/domain';
+import type { TextSplitter } from '@app/domain';
 
 interface IngestFileInput {
   fileName: string;
@@ -17,6 +17,8 @@ export interface IngestResult {
   status: 'inserted' | 'updated' | 'unchanged';
 }
 
+/** Dependencies required by the ingest pipeline. Each property
+ *  maps to a port interface from the application layer. */
 export interface IngestDeps {
   documents: DocumentRepository;
   chunks: ChunkRepository;

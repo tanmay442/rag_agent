@@ -1,22 +1,22 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and, or, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import { users } from '../db/schema';
 import { ForbiddenError, UnauthorizedError } from '@app/domain';
 
 export type AppRole = 'admin' | 'user';
 
-function computeAdminEmails(): readonly string[] {
-  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter((e) => e && EMAIL_RE.test(e));
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Parse once at module load — ADMIN_EMAILS never changes at runtime.
+const ADMIN_EMAILS: readonly string[] = (process.env.ADMIN_EMAILS ?? '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter((e) => e && EMAIL_RE.test(e));
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  return computeAdminEmails().includes(email.toLowerCase());
+  return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
 async function upsertUser(input: {
@@ -49,11 +49,17 @@ async function findUserByClerkId(clerkUserId: string) {
 }
 
 async function touchLastSeen(clerkUserId: string): Promise<void> {
-  const user = await findUserByClerkId(clerkUserId);
-  if (user?.lastSeenAt && Date.now() - user.lastSeenAt.getTime() < 60_000) {
-    return;
-  }
-  await db.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.clerkUserId, clerkUserId));
+  // Single UPDATE with conditional WHERE avoids the extra SELECT.
+  // Only updates if last_seen_at is NULL or older than 60s.
+  await db.update(users).set({ lastSeenAt: sql`now()` }).where(
+    and(
+      eq(users.clerkUserId, clerkUserId),
+      or(
+        isNull(users.lastSeenAt),
+        sql`${users.lastSeenAt} < now() - interval '60 seconds'`,
+      ),
+    ),
+  );
 }
 
 export interface AppSessionFull {

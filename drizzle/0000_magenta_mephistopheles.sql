@@ -1,6 +1,6 @@
 CREATE TABLE "chunks" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"document_id" serial NOT NULL,
+	"document_id" integer NOT NULL,
 	"content" text NOT NULL,
 	"embedding" vector(768) NOT NULL
 );

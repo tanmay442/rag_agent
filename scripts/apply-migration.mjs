@@ -58,11 +58,17 @@ function isBenignError(err) {
  */
 export async function applyMigrations({
   dir = './drizzle',
-  poolFactory = () =>
-    new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-    }),
+  poolFactory = () => {
+    const cs = process.env.DATABASE_URL ?? '';
+    // Enforce TLS verification. If the connection string already
+    // specifies an sslmode, respect it; otherwise append verify-full
+    // to match the main app pool (see packages/infrastructure/src/db/pool.ts).
+    const connectionString =
+      /sslmode=/.test(cs) || /uselibpqcompat=true/i.test(cs)
+        ? cs
+        : `${cs}${cs.includes('?') ? '&' : '?'}sslmode=verify-full`;
+    return new Pool({ connectionString });
+  },
   logger = console,
 } = {}) {
   const pool = poolFactory();

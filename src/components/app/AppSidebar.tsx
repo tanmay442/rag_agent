@@ -35,6 +35,7 @@ export type AppRole = 'admin' | 'user';
 export interface AppSidebarUser {
   name: string;
   imageUrl: string | null;
+  email?: string;
 }
 
 export function AppSidebar({
@@ -321,7 +322,7 @@ function SidebarBody({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={user.imageUrl}
-                alt=""
+                alt={user.name ?? 'User avatar'}
                 className="h-8 w-8 shrink-0 rounded-full ring-1 ring-[var(--border-subtle)]"
               />
             ) : (
@@ -329,11 +330,11 @@ function SidebarBody({
                 aria-hidden
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-elevated)] text-xs font-semibold text-[var(--foreground)]"
               >
-                {user.name.charAt(0).toUpperCase()}
+                {(user.name ?? '?').charAt(0).toUpperCase()}
               </span>
             )}
             <span className="min-w-0 flex-1 truncate text-sm text-[var(--foreground)]">
-              {user.name}
+              {user.name ?? user.email}
             </span>
             <button
               type="button"

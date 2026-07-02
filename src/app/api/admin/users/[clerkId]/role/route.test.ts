@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ok } from '@app/domain';
 
 const { requireAdminMock, setUserRoleMock, requireAdminRouteMock } = vi.hoisted(() => {
   const requireAdminMock = vi.fn();
@@ -19,12 +20,14 @@ const { requireAdminMock, setUserRoleMock, requireAdminRouteMock } = vi.hoisted(
 
 vi.mock('@/composition', async () => {
   const { ForbiddenError } = await import('@app/domain');
+  const { respond } = await import('@/lib/http');
   return {
     requireAdmin: requireAdminMock,
     requireAdminRoute: requireAdminRouteMock,
     requireSession: requireAdminMock,
     getAppSession: vi.fn(),
     ForbiddenError,
+    respond,
     getComposition: () => ({ setUserRole: setUserRoleMock }),
   };
 });
@@ -67,10 +70,10 @@ describe('POST /api/admin/users/[clerkId]/role', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x', name: 'A', role: 'admin' },
     });
-    setUserRoleMock.mockResolvedValue({
+    setUserRoleMock.mockResolvedValue(ok({
       clerkUserId: 'user_1',
       role: 'admin',
-    });
+    }) as never);
     const res = await route.POST(makeReq({ role: 'admin' }), makeParams('user_1'));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
@@ -86,5 +89,20 @@ describe('POST /api/admin/users/[clerkId]/role', () => {
     });
     const res = await route.POST(req, makeParams('user_1'));
     expect(res.status).toBe(400);
+  });
+
+  it('returns 200 when setting role to user', async () => {
+    requireAdminMock.mockResolvedValue({
+      user: { id: 'admin_1', email: 'a@x', name: 'A', role: 'admin' },
+    });
+    setUserRoleMock.mockResolvedValue(ok({
+      clerkUserId: 'user_1',
+      role: 'user',
+    }) as never);
+    const res = await route.POST(makeReq({ role: 'user' }), makeParams('user_1'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      user: { clerkUserId: 'user_1', role: 'user' },
+    });
   });
 });

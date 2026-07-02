@@ -19,7 +19,12 @@ export function buildPool(): Pool {
       ? '&sslmode=verify-full'
       : '?sslmode=verify-full';
   }
-  return new PgPool({ connectionString, max: 10 });
+  return new PgPool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
 }
 
 interface QueryResult<T = Record<string, unknown>> { rows: T[]; }

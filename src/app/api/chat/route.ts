@@ -1,14 +1,14 @@
 import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
 import { z } from 'zod';
-import { desc } from 'drizzle-orm';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { getComposition, appConfig, type MyUIMessage, type Composition } from '@/composition';
 import type { RetrievedChunk } from '@app/application/rag/search';
 import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
 import { ChatRequestSchema } from './request-schema';
-
-const CITATION_SNIPPET_MAX = 150;
+import { sanitizeText } from '@/lib/sanitize';
+import { logger } from '@/lib/logger';
+import { CITATION_SNIPPET_MAX, TOOL_CONTENT_CAP, CHAT_RATE_LIMIT } from '../../../../config/constants';
 
 function emitCitations(
   chunks: RetrievedChunk[],
@@ -26,11 +26,10 @@ function emitCitations(
 function buildChatTools(deps: {
   searchChunks: Composition['searchChunks'];
   capturedCitations: Array<{ similarity: number; snippet: string }>;
-  db: Composition['db'];
-  schema: Composition['schema'];
+  createTicket: Composition['createTicket'];
   userId: string;
 }) {
-  const { searchChunks: searchFn, capturedCitations: citationTarget, db, schema, userId: uid } = deps;
+  const { searchChunks: searchFn, capturedCitations: citationTarget, createTicket: createTicketFn, userId: uid } = deps;
   return {
     searchDocumentation: tool({
       description:
@@ -54,24 +53,23 @@ function buildChatTools(deps: {
           ),
       }),
       execute: async ({ query, limit }) => {
-        const TOOL_CONTENT_CAP = 800;
-        try {
-          const matches = await searchFn(query, { limit });
-          const capped = matches.map((m) => ({
-            content:
-              m.content.length > TOOL_CONTENT_CAP
-                ? m.content.slice(0, TOOL_CONTENT_CAP) + '\u2026'
-                : m.content,
-            similarity: m.similarity,
-          }));
-          for (const citation of emitCitations(matches)) {
-            citationTarget.push(citation);
-          }
-          return capped;
-        } catch (err) {
-          console.error('RAG retrieval failed:', err);
+        const r = await searchFn(query, { limit });
+        if (!r.ok) {
+          logger.error('RAG retrieval failed', { error: r.error });
           return [];
         }
+        const matches = r.value;
+        const capped = matches.map((m) => ({
+          content:
+            m.content.length > TOOL_CONTENT_CAP
+              ? m.content.slice(0, TOOL_CONTENT_CAP) + '\u2026'
+              : m.content,
+          similarity: m.similarity,
+        }));
+        for (const citation of emitCitations(matches)) {
+          citationTarget.push(citation);
+        }
+        return capped;
       },
     }),
     createSupportTicket: tool({
@@ -108,49 +106,21 @@ function buildChatTools(deps: {
             'User';
           realEmail = clerkUser.emailAddresses[0]?.emailAddress ?? '';
         } else {
-          console.warn(
-            'createSupportTicket: currentUser() returned null after auth() succeeded; storing placeholder identity',
-          );
+          logger.warn('createSupportTicket: currentUser() returned null after auth() succeeded');
           realName = 'Unknown';
           realEmail = '';
         }
-        // Unique ticket ID with retry on collision; handles legacy non-standard IDs.
-        let ticketId = '';
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const [latest] = await db
-            .select({ id: schema.tickets.id, ticketId: schema.tickets.ticketId })
-            .from(schema.tickets)
-            .orderBy(desc(schema.tickets.id))
-            .limit(1);
-          let nextNum: number;
-          if (latest) {
-            const parsed = parseInt(latest.ticketId.split('-')[1] ?? '', 10);
-            nextNum = Number.isFinite(parsed) ? parsed + 1 : latest.id + 1000;
-          } else {
-            nextNum = 1001;
-          }
-          ticketId = `TKT-${nextNum}`;
-          try {
-            await db.insert(schema.tickets).values({
-              ticketId,
-              userId: uid,
-              name: realName,
-              email: realEmail,
-              issue,
-            });
-            break;
-          } catch (err: unknown) {
-            if (
-              attempt < 4 &&
-              err instanceof Error &&
-              err.message.includes('unique')
-            ) {
-              continue;
-            }
-            throw err;
-          }
+        const result = await createTicketFn({
+          userId: uid,
+          name: realName,
+          email: realEmail,
+          issue: sanitizeText(issue),
+        });
+        if (!result.ok) {
+          logger.error('createSupportTicket: createTicket failed', { error: result.error });
+          return { ticketId: null, status: 'error' };
         }
-        return { ticketId, status: 'created' };
+        return result.value;
       },
     }),
   };
@@ -165,8 +135,10 @@ async function streamChatResponse(req: Request): Promise<Response> {
   if (!contentType?.includes('application/json')) {
     return new Response('Content-Type must be application/json', { status: 415 });
   }
+  // Body size is enforced by next.config.ts experimental.bodySizeLimit
+  // at the framework level (not via a spoofable Content-Length header).
   const comp = getComposition();
-  const limit = comp.rateLimit(`chat:${userId}`, { limit: 30, windowMs: 60_000 });
+  const limit = comp.rateLimit(`chat:${userId}`, CHAT_RATE_LIMIT);
   if (!limit.ok) {
     return new Response('Too Many Requests', {
       status: 429,
@@ -174,7 +146,10 @@ async function streamChatResponse(req: Request): Promise<Response> {
     });
   }
 
-  const raw = await req.json().catch(() => null);
+  const raw = await req.json().catch((e) => {
+    logger.debug('JSON parse failed', { error: String(e) });
+    return null;
+  });
   const parsed = ChatRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request', issues: parsed.error.issues }, { status: 400 });
@@ -197,13 +172,12 @@ async function streamChatResponse(req: Request): Promise<Response> {
   const isFirstTurn = messages.length <= 1;
   let prefetch: RetrievedChunk[] | null = null;
   if (appConfig.prefetchFirstTurn && isFirstTurn && lastUserText.trim() !== '') {
-    try {
-      prefetch = await comp.searchChunks(lastUserText, {});
-    } catch (err) {
-      console.error('First-turn pre-fetch failed:', err);
+    const prefetchResult = await comp.searchChunks(lastUserText, {});
+    if (!prefetchResult.ok) {
+      logger.error('First-turn pre-fetch failed', { error: prefetchResult.error });
       prefetch = null;
-    }
-    if (prefetch) {
+    } else {
+      prefetch = prefetchResult.value;
       for (const citation of emitCitations(prefetch)) {
         capturedCitations.push(citation);
       }
@@ -215,11 +189,11 @@ async function streamChatResponse(req: Request): Promise<Response> {
     system: buildSystemPrompt(appConfig, prefetch),
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(5),
+    abortSignal: req.signal,
     tools: buildChatTools({
       searchChunks: comp.searchChunks,
       capturedCitations,
-      db: comp.db,
-      schema: comp.schema,
+      createTicket: comp.createTicket,
       userId,
     }),
   });
@@ -243,6 +217,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
             } as InferUIMessageChunk<MyUIMessage>);
           }
         } catch (err) {
+          logger.error('Chat stream error', { error: err });
           controller.error(err);
           return;
         }

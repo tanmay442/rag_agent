@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition, TICKET_STATUSES } from '@/composition';
+import { getComposition, TICKET_STATUSES, unwrap, parsePageParam } from '@/composition';
 import { TicketOverlay, type TicketRow } from './ticket-overlay';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,7 @@ export default async function TicketsPage({
   const status = TICKET_STATUSES.find((s) => s === params.status);
   const assignee = params.assignee?.trim() || undefined;
   const search = params.q?.trim() || undefined;
-  const page = Math.max(1, Number(params.page ?? 1));
+  const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
   const comp = getComposition();
   const [result, userList] = await Promise.all([
@@ -35,7 +35,7 @@ export default async function TicketsPage({
     // the users needed for the current page's assignee dropdown, rather
     // than loading up to 100 users upfront.
     comp.listUsers({ limit: 100 }),
-  ]);
+  ]).then(([t, u]) => [unwrap(t), unwrap(u)] as const);
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   // Index by clerkUserId; fall back to userList for tickets with placeholder identity fields.
   const userByClerkId = new Map<
@@ -67,11 +67,16 @@ export default async function TicketsPage({
       <form
         className="grid grid-cols-1 gap-2 sm:grid-cols-4"
         method="get"
+        aria-label="Filter tickets"
       >
+        <label className="sr-only" htmlFor="tickets-filter-status">
+          Status
+        </label>
         <select
+          id="tickets-filter-status"
           name="status"
           defaultValue={status ?? ''}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
           data-testid="tickets-filter-status"
         >
           <option value="">All statuses</option>
@@ -81,10 +86,14 @@ export default async function TicketsPage({
             </option>
           ))}
         </select>
+        <label className="sr-only" htmlFor="tickets-filter-assignee">
+          Assignee
+        </label>
         <select
+          id="tickets-filter-assignee"
           name="assignee"
           defaultValue={assignee ?? ''}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
           data-testid="tickets-filter-assignee"
         >
           <option value="">Any assignee</option>
@@ -94,27 +103,31 @@ export default async function TicketsPage({
             </option>
           ))}
         </select>
+        <label className="sr-only" htmlFor="tickets-search">
+          Search issue
+        </label>
         <input
+          id="tickets-search"
           type="search"
           name="q"
           defaultValue={search ?? ''}
           placeholder="Search issue…"
-          className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="rounded border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
           data-testid="tickets-search"
         />
         <button
           type="submit"
-          className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="rounded bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-foreground)] hover:bg-[var(--accent-hover)]"
         >
           Apply
         </button>
       </form>
-      <div className="overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800">
+      <div className="overflow-x-auto rounded border border-[var(--border-subtle)]">
         <table
           className="w-full table-fixed text-sm"
           data-testid="tickets-table"
         >
-          <thead className="bg-zinc-50 text-left text-xs uppercase text-zinc-500 dark:bg-zinc-900">
+          <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
             <tr>
               <th className="w-24 px-3 py-2">Ticket</th>
               <th className="w-44 px-3 py-2">User</th>
@@ -129,7 +142,7 @@ export default async function TicketsPage({
               <tr>
                 <td
                   colSpan={6}
-                  className="px-3 py-4 text-center text-zinc-500"
+                  className="px-3 py-4 text-center text-[var(--foreground-muted)]"
                 >
                   No tickets.
                 </td>
@@ -138,7 +151,7 @@ export default async function TicketsPage({
               result.tickets.map((t) => (
                 <tr
                   key={t.ticketId}
-                  className="border-t border-zinc-200 dark:border-zinc-800"
+                  className="border-t border-[var(--border-subtle)]"
                   data-testid={`tickets-row-${t.ticketId}`}
                 >
                   <td className="px-3 py-2 font-medium">
@@ -147,7 +160,7 @@ export default async function TicketsPage({
                         pathname: '/admin/tickets',
                         query: { ...params, ticket: t.ticketId },
                       }}
-                      className="text-blue-600 hover:underline"
+                      className="text-[var(--accent)] hover:underline"
                       data-testid={`tickets-open-${t.ticketId}`}
                     >
                       {t.ticketId}
@@ -174,7 +187,7 @@ export default async function TicketsPage({
                           return t.name;
                         })()}
                       </span>
-                      <span className="truncate text-xs text-zinc-500">
+                      <span className="truncate text-xs text-[var(--foreground-muted)]">
                         {(() => {
                           const looksLikeClerkId = t.userId.startsWith('user_');
                           if (
@@ -188,7 +201,7 @@ export default async function TicketsPage({
                         })()}
                       </span>
                       {t.userId === 'anonymous' ? (
-                        <span className="mt-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-800">
+                        <span className="mt-1 rounded bg-[var(--warning)]/10 px-1 py-0.5 text-[10px] text-[var(--warning)]">
                           (anonymous)
                         </span>
                       ) : null}
@@ -198,7 +211,7 @@ export default async function TicketsPage({
                     {t.issue}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">
-                    <span className="rounded bg-zinc-100 px-2 py-0.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                    <span className="rounded bg-[var(--surface-elevated)] px-2 py-0.5 text-[var(--foreground)]">
                       {t.status}
                     </span>
                   </td>
@@ -217,7 +230,7 @@ export default async function TicketsPage({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm">
+      <nav className="flex items-center justify-between text-sm" aria-label="Pagination">
         <span>
           Page {page} of {totalPages} ({result.total} total)
         </span>
@@ -228,7 +241,7 @@ export default async function TicketsPage({
                 pathname: '/admin/tickets',
                 query: { status, assignee, q: search, page: page - 1 },
               }}
-              className="rounded border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
             >
               Previous
             </Link>
@@ -239,13 +252,13 @@ export default async function TicketsPage({
                 pathname: '/admin/tickets',
                 query: { status, assignee, q: search, page: page + 1 },
               }}
-              className="rounded border border-zinc-300 px-3 py-1 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
             >
               Next
             </Link>
           ) : null}
         </div>
-      </div>
+      </nav>
     </section>
   );
 }

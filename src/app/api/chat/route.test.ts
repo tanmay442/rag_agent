@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ok, err } from '@app/domain';
 
 // Mocks for the route's deps. We control:
-const { searchValue, ticketInserted, ticketInsertedValues, streamTextImpl } = vi.hoisted(() => ({
+const { searchValue, ticketInsertedValues, streamTextImpl, createTicketMock } = vi.hoisted(() => ({
   searchValue: [
     { content: 'The dental plan covers two cleanings per year.', similarity: 0.91 },
     { content: 'Submit claims via the HR portal.', similarity: 0.62 },
   ],
-  ticketInserted: { id: 'TKT-1001' },
   ticketInsertedValues: [] as Array<Record<string, unknown>>,
   streamTextImpl: vi.fn(),
+  createTicketMock: vi.fn(),
 }));
 
 const { authMock, rateLimitResult } = vi.hoisted(() => ({
@@ -50,23 +51,8 @@ vi.mock('@clerk/nextjs/server', () => ({
 const { compositionMock } = vi.hoisted(() => ({
   compositionMock: {
     rateLimit: () => rateLimitResult,
-    searchChunks: vi.fn(async () => searchValue),
-    db: {
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          orderBy: vi.fn(() => ({
-            limit: vi.fn(async () => []),
-          })),
-        })),
-      })),
-      insert: vi.fn(() => ({
-        values: vi.fn((v: Record<string, unknown>) => {
-          ticketInsertedValues.push(v);
-          return { returning: async () => [ticketInserted] };
-        }),
-      })),
-    },
-    schema: { tickets: {} },
+    searchChunks: vi.fn(async () => ok(searchValue) as never),
+    createTicket: createTicketMock,
     recordQuery: vi.fn(),
     getChatModel: vi.fn(() => ({ modelId: 'mock' })),
     getEmbeddingModel: vi.fn(() => ({ modelId: 'mock-embed' })),
@@ -129,7 +115,10 @@ beforeEach(() => {
   }));
   authMock.mockReset();
   currentUserMock.mockReset();
+  createTicketMock.mockReset();
   ticketInsertedValues.length = 0;
+  // Default: createTicket succeeds with a TKT-prefixed id.
+  createTicketMock.mockResolvedValue(ok({ ticketId: 'TKT-abcd1234', status: 'created' }) as never);
   // Default Clerk identity: every test gets a known user unless it
   // explicitly overrides the mock.
   currentUserMock.mockResolvedValue({
@@ -198,59 +187,53 @@ describe('/api/chat createSupportTicket tool', () => {
     return tool!.execute(overrides);
   }
 
-  it('inserts a ticket with a TKT- prefixed id, ignoring LLM-supplied name/email', async () => {
+  it('creates a ticket with a TKT- prefixed id, ignoring LLM-supplied name/email', async () => {
+    createTicketMock.mockResolvedValueOnce(ok({ ticketId: 'TKT-abcd1234', status: 'created' }) as never);
     const out = await invokeToolFromStreamText({
       name: 'Hallucinated Name',
       email: 'hallucinated@example.com',
       issue: 'Cannot reset my password.',
     });
-    expect(out).toEqual({ ticketId: 'TKT-1001', status: 'created' });
-    expect(ticketInsertedValues.length).toBe(1);
-    const row = ticketInsertedValues[0]!;
-    // Identity is stamped from Clerk, not the LLM.
-    expect(row.name).toBe('Real Person');
-    expect(row.email).toBe('real@example.com');
-    expect(row.issue).toBe('Cannot reset my password.');
-    expect(row.ticketId).toBe('TKT-1001');
+    expect(out).toHaveProperty('status', 'created');
+    expect(out).toHaveProperty('ticketId');
+    expect((out as { ticketId: string }).ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
+    // The use-case receives the signed-in user's identity, not the
+    // LLM-supplied name/email.
+    expect(createTicketMock).toHaveBeenCalledWith({
+      userId: 'user_test',
+      name: 'Real Person',
+      email: 'real@example.com',
+      issue: 'Cannot reset my password.',
+    });
   });
 
-  it('retries on a unique-constraint collision and surfaces a new ticket id', async () => {
-    // Make the db.insert throw once with a "unique" error message,
-    // then succeed on the retry. The route's retry loop should
-    // re-query the latest ticket id and bump it.
-    let inserted = 0;
-    const realInsert = ticketInsertedValues.push.bind(ticketInsertedValues);
-    ticketInsertedValues.length = 0;
-    const originalInsert = compositionMock.db.insert;
-    compositionMock.db.insert = vi.fn(() => ({
-      values: vi.fn((v: Record<string, unknown>) => {
-        if (inserted === 0) {
-          inserted++;
-          const err = new Error(
-            'duplicate key value violates unique constraint "tickets_ticket_id_unique"',
-          );
-          throw err;
-        }
-        realInsert(v);
-        return { returning: async () => [{ id: 'TKT-1002' }] };
-      }),
-    }));
-    try {
-      const tools = await captureToolsFromStreamText<{
-        createSupportTicket: {
-          execute: (args: { name: string; email: string; issue: string }) => Promise<unknown>;
-        };
-      }>();
-      const out = await tools!.createSupportTicket.execute({
-        name: 'x',
-        email: 'x@x.com',
-        issue: 'collision test',
-      });
-      expect(out).toEqual({ ticketId: 'TKT-1001', status: 'created' });
-      expect(ticketInsertedValues.length).toBe(1);
-    } finally {
-      compositionMock.db.insert = originalInsert;
-    }
+  it('generates unique ticket ids (UUID-based, no collision retry needed)', async () => {
+    createTicketMock
+      .mockResolvedValueOnce(ok({ ticketId: 'TKT-aaaaaaaa', status: 'created' }) as never)
+      .mockResolvedValueOnce(ok({ ticketId: 'TKT-bbbbbbbb', status: 'created' }) as never);
+    const out1 = await invokeToolFromStreamText({
+      name: 'A',
+      email: 'a@a.com',
+      issue: 'first ticket',
+    });
+    const out2 = await invokeToolFromStreamText({
+      name: 'B',
+      email: 'b@b.com',
+      issue: 'second ticket',
+    });
+    expect((out1 as { ticketId: string }).ticketId).not.toBe((out2 as { ticketId: string }).ticketId);
+  });
+
+  it('returns an error status when createTicket fails', async () => {
+    const { ExternalServiceError } = await import('@app/domain');
+    createTicketMock.mockResolvedValueOnce(err(new ExternalServiceError('db down')) as never);
+    const out = await invokeToolFromStreamText({
+      name: 'A',
+      email: 'a@a.com',
+      issue: 'my issue',
+    });
+    expect(out).toHaveProperty('status', 'error');
+    expect(out).toHaveProperty('ticketId', null);
   });
 });
 
@@ -268,7 +251,7 @@ describe('/api/chat searchDocumentation tool', () => {
     const longContent = 'x'.repeat(2000);
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
-      .mockResolvedValueOnce([{ content: longContent, similarity: 0.8 }]);
+      .mockResolvedValueOnce(ok([{ content: longContent, similarity: 0.8 }]) as never);
     const { tools } = await captureTools();
     const result = (await tools?.searchDocumentation?.execute({ query: 'q' })) as Array<{
       content: string;
@@ -281,7 +264,7 @@ describe('/api/chat searchDocumentation tool', () => {
   it('passes a user-supplied limit through to searchChunks', async () => {
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce(ok([]) as never);
     const { tools } = await captureTools();
     await tools?.searchDocumentation?.execute({ query: 'q', limit: 5 });
     expect(searchChunksSpy).toHaveBeenCalledWith('q', { limit: 5 });

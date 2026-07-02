@@ -13,7 +13,6 @@
     "./pdf": "./src/pdf/index.ts"
   },
   "dependencies": {
-    "@app/application": "workspace:*",
     "@app/domain": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "@ai-sdk/google": "^3.0.83",

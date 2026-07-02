@@ -1,11 +1,11 @@
-import { getComposition } from '@/composition';
+import { getComposition, unwrap } from '@/composition';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AnalyticsPage() {
   const comp = getComposition();
-  const summary = await comp.getAnalyticsSummary();
-  const audit = await comp.listAudit({ limit: 20 });
+  const summary = unwrap(await comp.getAnalyticsSummary());
+  const audit = unwrap(await comp.listAudit({ limit: 20 }));
   return (
     <section className="flex flex-col gap-6">
       <h2 className="text-xl font-medium">Analytics</h2>
@@ -29,6 +29,7 @@ export default async function AnalyticsPage() {
             <table
               className="w-full text-sm"
               data-testid="analytics-top-queries"
+              aria-label="Top queries"
             >
               <thead className="bg-[var(--surface-elevated)] text-left text-xs uppercase text-[var(--foreground-muted)]">
                 <tr>

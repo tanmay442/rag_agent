@@ -1,7 +1,7 @@
 // Use-case: log document / ticket audit events.
 // Source: src/lib/auth/audit.ts (logDocumentEvent, logTicketEvent).
 import { ok, type Result } from '@app/domain';
-import type { AuditLog } from '../ports/index';
+import type { AuditLog } from '@app/domain';
 
 export async function logDocumentEvent(
   input: { action: 'upload' | 'replace' | 'delete' | 'restore'; documentId: number; actorId: string },
@@ -13,7 +13,7 @@ export async function logDocumentEvent(
 
 export async function logTicketEvent(
   input: {
-    action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change';
+    action: 'create' | 'assign' | 'status_change' | 'note' | 'role_change';
     ticketId: string;
     actorId: string;
   },

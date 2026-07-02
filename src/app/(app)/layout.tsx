@@ -31,6 +31,7 @@ export default async function AppLayout({
         user={{
           name: session.user.name,
           imageUrl: session.user.imageUrl,
+          email: session.user.email,
         }}
         role={role}
       />

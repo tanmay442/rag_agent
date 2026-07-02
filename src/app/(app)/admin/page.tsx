@@ -1,12 +1,15 @@
 import Link from 'next/link';
-import { getComposition } from '@/composition';
+import { getComposition, unwrap } from '@/composition';
+
+// TODO: Add explicit requireAdmin() guard if this page is ever
+// decoupled from AdminLayout. Currently relies on the layout guard.
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminOverviewPage() {
   const comp = getComposition();
-  const summary = await comp.getAnalyticsSummary();
-  const audit = await comp.listAudit({ limit: 10 });
+  const summary = unwrap(await comp.getAnalyticsSummary());
+  const audit = unwrap(await comp.listAudit({ limit: 10 }));
   return (
     <section className="flex flex-col gap-6">
       <h2 className="text-xl font-medium">Overview</h2>

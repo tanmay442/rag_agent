@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { requireAdminRoute, TICKET_STATUSES } from '@/composition';
-import { respond } from '@/lib/http';
-import { ValidationError, NotFoundError, ConflictError } from '@app/domain';
+import { requireAdminRoute, TICKET_STATUSES, respond } from '@/composition';
+import { ValidationError } from '@app/domain';
 
 const PatchSchema = z.object({
   status: z.enum(TICKET_STATUSES).optional(),
@@ -20,7 +19,7 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) {
-    return respond(new ValidationError('Invalid payload'));
+    return respond(new ValidationError('Invalid payload', { issues: parsed.error.issues }));
   }
   const result = await comp.updateTicket({
     ticketId,
@@ -29,10 +28,6 @@ export async function PATCH(
     note: parsed.data.note,
     actorId: session.user.id,
   });
-  if (!result.ok) {
-    return result.reason === 'not_found'
-      ? respond(new NotFoundError('Ticket not found'))
-      : respond(new ConflictError('Ticket update conflict'));
-  }
-  return respond({ ticket: result.ticket });
+  if (!result.ok) return respond(result.error);
+  return Response.json({ ticket: result.value });
 }

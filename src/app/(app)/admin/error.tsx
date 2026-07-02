@@ -1,6 +1,7 @@
 'use client';
 
 export default function AdminError({
+  // error prop required by Next.js ErrorBoundary API
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   error,
   reset,
