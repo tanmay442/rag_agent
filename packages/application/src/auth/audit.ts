@@ -13,7 +13,7 @@ export async function logDocumentEvent(
 
 export async function logTicketEvent(
   input: {
-    action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change';
+    action: 'create' | 'assign' | 'status_change' | 'note' | 'role_change';
     ticketId: string;
     actorId: string;
   },

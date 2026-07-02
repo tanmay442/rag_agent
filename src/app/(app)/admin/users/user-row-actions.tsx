@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useSession } from '@clerk/nextjs';
-import { setRoleAction, impersonateUserAction } from '../actions';
+import { setRoleAction } from '../actions';
 
 export function UserRowActions({
   clerkUserId,
@@ -37,27 +37,6 @@ export function UserRowActions({
         data-testid={`users-toggle-role-${clerkUserId}`}
       >
         {pending ? '…' : role === 'admin' ? 'Demote' : 'Promote'}
-      </button>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            setError(null);
-            setMessage(null);
-            const res = await impersonateUserAction(clerkUserId);
-            if (res.error) setError(res.error);
-            else if (res.url) {
-              setMessage('Sign-in token issued');
-              // Open the impersonation URL in a new tab.
-              window.open(res.url, '_blank', 'noopener');
-            }
-          })
-        }
-        className="rounded-xl border border-[var(--warning)]/40 px-2 py-1 text-xs text-[var(--warning)] transition-colors hover:bg-[var(--warning)]/10 disabled:opacity-50"
-        data-testid={`users-impersonate-${clerkUserId}`}
-      >
-        Impersonate
       </button>
       {error ? (
         <span className="text-xs text-[var(--danger)]" role="alert">

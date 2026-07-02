@@ -325,7 +325,7 @@ export const auditRepo = {
     await client.insert(documentAudit).values(input);
   },
   async logTicketEvent(
-    input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'impersonation' | 'role_change'; ticketId: string; actorId: string },
+    input: { action: 'create' | 'assign' | 'status_change' | 'note' | 'role_change'; ticketId: string; actorId: string },
     client: Client = db,
   ): Promise<void> {
     await client.insert(ticketAudit).values(input);

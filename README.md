@@ -123,14 +123,13 @@ pnpm dev
   Ticket IDs are UUID-based (`TKT-<8-hex-chars>`) to avoid
   race conditions on concurrent creation.
 - **`/admin/users`** — Searchable, paginated list of all Clerk users.
-  Per-row *Promote / Demote* and *Impersonate* (issues a 120-second
-  Clerk sign-in token and opens it in a new tab).
+  Per-row *Promote / Demote* buttons.
 - **`/admin/analytics`** — Read-only counts and an in-process top-queries
   table.
 - **`/admin/audit`** — Full audit log filterable by document id or
   ticket id. Document audit events: upload, replace, delete, restore.
   Ticket audit events: create, assign, status_change, note,
-  impersonation, role_change.
+  role_change.
 
 ## Rate limit
 

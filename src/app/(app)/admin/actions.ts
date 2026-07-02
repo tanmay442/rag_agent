@@ -181,50 +181,6 @@ export async function updateTicketAction(
   }
 }
 
-export async function impersonateUserAction(
-  clerkUserId: string,
-): Promise<{ error?: string; url?: string }> {
-  const session = await requireAdminOrError();
-  if ('error' in session) return session;
-  if (session.user.id === clerkUserId) {
-    return { error: 'Cannot impersonate yourself' };
-  }
-  const comp = getComposition();
-  try {
-    const userResult = await comp.getUserByClerkId(clerkUserId);
-    if (!userResult.ok) return toSafeError(userResult.error);
-    if (!userResult.value.user) {
-      return { error: 'User not found' };
-    }
-    if (userResult.value.user.role === 'admin') {
-      return { error: 'Cannot impersonate another admin' };
-    }
-  } catch (err) {
-    logger.error('impersonateUserAction: user lookup failed', { error: err });
-    return toSafeError(err);
-  }
-  try {
-    const { clerkClient } = await import('@clerk/nextjs/server');
-    const client = await clerkClient();
-    const signInToken = await client.signInTokens.createSignInToken({
-      userId: clerkUserId,
-      expiresInSeconds: 120,
-    });
-    const auditResult = await comp.logTicketEvent({
-      action: 'impersonation',
-      ticketId: `user:${clerkUserId}`,
-      actorId: session.user.id,
-    });
-    if (!auditResult.ok) {
-      logger.error('impersonateUserAction: audit logging failed', { error: auditResult.error });
-    }
-    return { url: signInToken.url };
-  } catch (err) {
-    logger.error('impersonateUserAction failed', { error: err });
-    return toSafeError(err);
-  }
-}
-
 export interface RecountChunksResult {
   error?: string;
   count?: number;
