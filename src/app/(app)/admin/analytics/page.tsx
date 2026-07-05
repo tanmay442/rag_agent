@@ -1,4 +1,6 @@
 import { getComposition, unwrap } from '@/composition';
+import { StatCard } from '@/components/admin/StatCard';
+import { AuditEventList } from '@/components/admin/AuditEventList';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +16,11 @@ export default async function AnalyticsPage() {
         start and only count queries made since the most recent deploy.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Stat label="Documents" value={summary.documentCount} />
-        <Stat label="Chunks" value={summary.chunkCount} />
-        <Stat label="Tickets" value={summary.ticketCount} />
-        <Stat label="Open tickets" value={summary.openTicketCount} />
-        <Stat label="Users" value={summary.usersCount} />
+        <StatCard label="Documents" value={summary.documentCount} />
+        <StatCard label="Chunks" value={summary.chunkCount} />
+        <StatCard label="Tickets" value={summary.ticketCount} />
+        <StatCard label="Open tickets" value={summary.openTicketCount} />
+        <StatCard label="Users" value={summary.usersCount} />
       </div>
       <div className="flex flex-col gap-2">
         <h3 className="text-lg font-medium">Top queries</h3>
@@ -56,48 +58,8 @@ export default async function AnalyticsPage() {
       </div>
       <div className="flex flex-col gap-2">
         <h3 className="text-lg font-medium">Recent activity</h3>
-        {audit.events.length === 0 ? (
-          <p className="text-sm text-[var(--foreground-muted)]">No audit events yet.</p>
-        ) : (
-          <ul
-            className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
-            data-testid="analytics-recent-activity"
-          >
-            {audit.events.map((e) => (
-              <li
-                key={`${e.kind}-${e.id}`}
-                className="flex flex-wrap gap-2"
-              >
-                <span className="text-xs text-[var(--foreground-muted)]">
-                  {e.at.toISOString()}
-                </span>
-                <span className="font-medium">{e.action}</span>
-                <span className="text-[var(--foreground-muted)]">
-                  {e.kind === 'document'
-                    ? `document #${e.documentId}`
-                    : `ticket ${e.ticketId}`}
-                </span>
-                <span className="text-[var(--foreground-muted)]">
-                  by {e.actorName ?? e.actorId}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <AuditEventList events={audit.events} testId="analytics-recent-activity" />
       </div>
     </section>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-      <span className="text-xs uppercase tracking-wide text-[var(--foreground-muted)]">
-        {label}
-      </span>
-      <span className="text-2xl font-semibold text-[var(--foreground)]">
-        {value}
-      </span>
-    </div>
   );
 }

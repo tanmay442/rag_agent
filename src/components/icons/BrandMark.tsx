@@ -63,7 +63,7 @@ interface BrandLogoProps extends BrandMarkProps {
   label?: string;
 }
 
-export function BrandLogo({ href, label = 'RAG Support', size = 'sm', className = '' }: BrandLogoProps) {
+function BrandLogo({ href, label = 'RAG Support', size = 'sm', className = '' }: BrandLogoProps) {
   const inner = (
     <>
       <BrandMark size={size} />

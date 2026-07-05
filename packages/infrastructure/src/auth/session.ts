@@ -2,6 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { eq, sql, and, or, isNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import { users } from '../db/schema';
+import { userRepo } from '../db/repositories';
 import { ForbiddenError, UnauthorizedError } from '@app/domain';
 
 export type AppRole = 'admin' | 'user';
@@ -14,33 +15,9 @@ const ADMIN_EMAILS: readonly string[] = (process.env.ADMIN_EMAILS ?? '')
   .map((s) => s.trim().toLowerCase())
   .filter((e) => e && EMAIL_RE.test(e));
 
-export function isAdminEmail(email: string | null | undefined): boolean {
+function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
-}
-
-async function upsertUser(input: {
-  clerkUserId: string;
-  email: string;
-  name?: string | null;
-  imageUrl?: string | null;
-  role: AppRole;
-}): Promise<{ clerkUserId: string; email: string; name: string | null; imageUrl: string | null; role: string; lastSeenAt: Date | null; createdAt: Date }> {
-  const [row] = await db
-    .insert(users)
-    .values(input)
-    .onConflictDoUpdate({
-      target: users.clerkUserId,
-      set: {
-        email: input.email,
-        name: input.name ?? null,
-        imageUrl: input.imageUrl ?? null,
-        role: input.role,
-      },
-    })
-    .returning();
-  if (!row) throw new Error('Failed to upsert user');
-  return row as { clerkUserId: string; email: string; name: string | null; imageUrl: string | null; role: string; lastSeenAt: Date | null; createdAt: Date };
 }
 
 async function findUserByClerkId(clerkUserId: string) {
@@ -83,7 +60,7 @@ export async function getAppSession(): Promise<AppSessionFull | null> {
     const clerkRole = parseClerkRole(
       (user.publicMetadata as { role?: unknown } | null)?.role,
     );
-    local = await upsertUser({
+    local = await userRepo.upsertFromClerk({
       clerkUserId: userId,
       email,
       name: user.fullName ?? user.firstName ?? user.username ?? null,
@@ -91,7 +68,7 @@ export async function getAppSession(): Promise<AppSessionFull | null> {
       role: clerkRole ?? (isAdminEmail(email) ? 'admin' : 'user'),
     });
   } else if (isAdminEmail(email) && local.role !== 'admin') {
-    local = await upsertUser({
+    local = await userRepo.upsertFromClerk({
       clerkUserId: userId,
       email,
       name: local.name,

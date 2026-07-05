@@ -21,6 +21,16 @@ import type {
 import { ingestFile } from '../rag/ingest';
 import type { IngestDeps, IngestResult } from '../rag/ingest';
 import { RESTORE_WINDOW_MS, MAX_LIST_LIMIT } from '../../../../config/constants';
+import { wrapServiceCall, serviceResult, sanitizePagination } from '../service-result';
+
+async function ensureDocument(
+  documentId: number,
+  dep: DocumentRepository,
+): Promise<Result<{ documentId: number }>> {
+  const existing = await dep.findById(documentId);
+  if (!existing) return err(new NotFoundError(`Document not found: ${documentId}`));
+  return ok({ documentId });
+}
 
 interface ListDocumentsInput {
   search?: string;
@@ -53,9 +63,8 @@ export async function listDocuments(
     total: number;
   }>
 > {
-  try {
-    const limit = Math.min(Math.max(Math.floor(input.limit ?? 25), 1), MAX_LIST_LIMIT);
-    const offset = Math.max(Math.floor(input.offset ?? 0), 0);
+  return wrapServiceCall(async () => {
+    const { limit, offset } = sanitizePagination(input.limit, input.offset, MAX_LIST_LIMIT);
     const { documents, total } = await deps.documents.list({
       search: input.search,
       includeDeleted: input.includeDeleted,
@@ -81,18 +90,14 @@ export async function listDocuments(
       chunkCount: chunkCounts.get(d.id) ?? 0,
     }));
     return ok({ documents: result, total });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to list documents', e));
-  }
+  }, 'Failed to list documents');
 }
 
 export async function uploadPdf(
   input: { fileName: string; buffer: Buffer; actorId: string },
   deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<IngestResult>> {
-  try {
-    // TODO: Large PDF blobs should be moved to external storage (S3/R2) instead of
-    // being stored directly in the database to avoid DB size limits and improve performance.
+  return wrapServiceCall(async () => {
     return await deps.runner.run(async (tx) => {
       const r = await ingestFile(
         { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
@@ -107,18 +112,16 @@ export async function uploadPdf(
       });
       return r;
     });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to upload PDF', e));
-  }
+  }, 'Failed to upload PDF');
 }
 
 export async function softDeleteDocument(
   input: { documentId: number; actorId: string },
   deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<void>> {
-  try {
-    const existing = await deps.documents.findById(input.documentId);
-    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+  return wrapServiceCall(async () => {
+    const check = await ensureDocument(input.documentId, deps.documents);
+    if (!check.ok) return check;
     await deps.runner.run(async (tx) => {
       await tx.documents.softDelete(input.documentId, new Date());
       await tx.audit.logDocumentEvent({
@@ -128,9 +131,7 @@ export async function softDeleteDocument(
       });
     });
     return ok(undefined);
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to soft-delete document', e));
-  }
+  }, 'Failed to soft-delete document');
 }
 
 export async function restoreDocument(
@@ -162,21 +163,19 @@ export async function getDocumentById(
   documentId: number,
   deps: { documents: DocumentRepository },
 ): Promise<Result<{ document: import('@app/domain').DocumentRow | null }>> {
-  try {
-    const doc = await deps.documents.findById(documentId);
-    return ok({ document: doc });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to get document', e));
-  }
+  return serviceResult(
+    () => deps.documents.findById(documentId).then((doc) => ({ document: doc })),
+    'Failed to get document',
+  );
 }
 
 export async function hardDeleteDocument(
   input: { documentId: number; actorId: string },
   deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<void>> {
-  try {
-    const existing = await deps.documents.findById(input.documentId);
-    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+  return wrapServiceCall(async () => {
+    const check = await ensureDocument(input.documentId, deps.documents);
+    if (!check.ok) return check;
     await deps.runner.run(async (tx) => {
       await tx.audit.logDocumentEvent({
         action: 'delete',
@@ -186,18 +185,16 @@ export async function hardDeleteDocument(
       await tx.documents.deleteById(input.documentId);
     });
     return ok(undefined);
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to hard-delete document', e));
-  }
+  }, 'Failed to hard-delete document');
 }
 
 export async function replacePdf(
   input: { documentId: number; fileName: string; buffer: Buffer; actorId: string },
   deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner },
 ): Promise<Result<IngestResult>> {
-  try {
-    const existing = await deps.documents.findById(input.documentId);
-    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
+  return wrapServiceCall(async () => {
+    const check = await ensureDocument(input.documentId, deps.documents);
+    if (!check.ok) return check;
 
     return await deps.runner.run(async (tx) => {
       const r = await ingestFile(
@@ -215,30 +212,21 @@ export async function replacePdf(
       }
       return r;
     });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to replace PDF', e));
-  }
+  }, 'Failed to replace PDF');
 }
 
 export async function recountChunksForDocument(
   documentId: number,
   deps: { chunks: ChunkRepository },
 ): Promise<Result<{ documentId: number; count: number }>> {
-  try {
-    const count = await deps.chunks.countForDocument(documentId);
-    return ok({ documentId, count });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to recount chunks', e));
-  }
+  return serviceResult(
+    () => deps.chunks.countForDocument(documentId).then((count) => ({ documentId, count })),
+    'Failed to recount chunks',
+  );
 }
 
 export async function recountChunksForAllDocuments(
   deps: { chunks: ChunkRepository },
 ): Promise<Result<Array<{ documentId: number; count: number }>>> {
-  try {
-    const rows = await deps.chunks.recountAll();
-    return ok(rows);
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to recount chunks for all documents', e));
-  }
+  return serviceResult(() => deps.chunks.recountAll(), 'Failed to recount chunks for all documents');
 }

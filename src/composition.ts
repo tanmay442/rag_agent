@@ -5,7 +5,7 @@ import {
   getTopQueries, enforceRateLimit, listDocuments, uploadPdf,
   softDeleteDocument, restoreDocument, listTickets, updateTicket,
   createTicket,
-  isTicketStatus, TICKET_STATUSES, VALID_TRANSITIONS, type TicketStatus,
+  isTicketStatus, TICKET_STATUSES,
   getDocumentById, hardDeleteDocument, replacePdf,
   recountChunksForDocument, recountChunksForAllDocuments,
   getAnalyticsSummary, listAudit,
@@ -95,10 +95,10 @@ function createComposition() {
   };
 }
 
-export { appConfig, isTicketStatus, TICKET_STATUSES, VALID_TRANSITIONS, type TicketStatus, type MyUIMessage };
-export { requireAdmin, requireSession, getAppSession, ForbiddenError, UnauthorizedError, unwrap };
-export { respond, respondResult, toActionResult, isActionError };
-export type { SafeErrorBody } from './lib/http';
+export { appConfig, isTicketStatus, TICKET_STATUSES, type MyUIMessage };
+export { requireAdmin, requireSession, getAppSession, ForbiddenError, unwrap };
+export { respond, respondResult };
+
 
 export type Composition = ReturnType<typeof createComposition>;
 
@@ -108,7 +108,7 @@ export function getComposition(): Composition {
   return _composition;
 }
 
-export function resetComposition() {
+function resetComposition() {
   _composition = null;
 }
 

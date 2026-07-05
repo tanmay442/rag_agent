@@ -7,6 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import 'dotenv/config';
+import { neonHeaders, neonApiUrl, fetchBranches, isMainModule } from './neon-api';
 
 export async function main() {
   const PROJECT_ID = process.env.NEON_PROJECT_ID;
@@ -19,28 +20,16 @@ export async function main() {
     return;
   }
 
-  // 1. Find or create the test branch.
-  const headers = {
-    Authorization: `Bearer ${API_KEY}`,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  };
-  const api = (path: string) =>
-    `https://console.neon.tech/api/v2/projects/${PROJECT_ID}${path}`;
+  const headers = neonHeaders(API_KEY);
+  const api = (path: string) => neonApiUrl(PROJECT_ID, path);
 
-  const list = await fetch(api(`/branches?search=${TEST_BRANCH}`), { headers });
-  if (!list.ok) {
-    throw new Error(`Failed to list branches: ${list.status} ${await list.text()}`);
-  }
-  const branchList = (await list.json()) as {
-    branches: Array<{ id: string; name: string; primary: boolean }>;
-  };
+  const branches = await fetchBranches(PROJECT_ID, TEST_BRANCH, API_KEY);
   let branch: { id: string; name: string } | undefined =
-    branchList.branches.find((b) => b.name === TEST_BRANCH);
+    branches.find((b) => b.name === TEST_BRANCH);
 
   if (!branch) {
     // Create the branch off the project's primary branch.
-    const primary = branchList.branches.find((b) => b.primary);
+    const primary = branches.find((b) => b.primary);
     const create = await fetch(api('/branches'), {
       method: 'POST',
       headers,
@@ -228,18 +217,9 @@ export async function main() {
   console.log('[setup-test-db] Done');
 }
 
-// CLI entry — only run when this module is the program root.
-const invokedDirectly = (() => {
-  try {
-    return import.meta.url === `file://${process.argv[1]}`;
-  } catch {
-    return false;
-  }
-})();
-
-if (invokedDirectly) {
+if (isMainModule()) {
   main().catch((err) => {
-  console.error('[setup-test-db] failed:', err);
+    console.error('[setup-test-db] failed:', err);
     process.exit(1);
   });
 }

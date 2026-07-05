@@ -100,24 +100,7 @@ const TONE_OPTIONS: ReadonlyArray<PromptOption<AppConfig['agentPersona']['tone']
   { value: 'concise', label: 'Concise', blurb: 'direct, minimal, one or two sentences' },
 ];
 
-const banner = (s: string) => console.log(`\n\x1b[1m${s}\x1b[0m`);
-const ok = (s: string) => console.log(`\x1b[32m  ✓\x1b[0m ${s}`);
-const warn = (s: string) => console.log(`\x1b[33m  ⚠\x1b[0m ${s}`);
-
-async function loadCurrentDefaults(repoRoot: string, configPath: string): Promise<AppConfig> {
-  if (existsSync(configPath)) {
-    try {
-      const { default: existing } = (await import(
-        configPath as unknown as string
-      )) as { default: AppConfig };
-      return appConfigSchema.parse(existing);
-    } catch {
-      // Fall through to defaults.
-    }
-  }
-  void repoRoot;
-  return appConfigSchema.parse({});
-}
+import { banner, ok, warn, loadCurrentDefaults } from './common';
 
 export interface InitOptions {
   repoRoot: string;
@@ -134,7 +117,7 @@ export interface InitResult {
   seedReason?: string;
 }
 
-export async function promptOrg(rl: Interface, config: AppConfig): Promise<void> {
+async function promptOrg(rl: Interface, config: AppConfig): Promise<void> {
   banner('Organisation');
   config.orgName = await ask(rl, 'Company / org name', config.orgName);
   config.orgShortName = await ask(rl, 'Short name (nav brand)', config.orgShortName);
@@ -145,7 +128,7 @@ export async function promptOrg(rl: Interface, config: AppConfig): Promise<void>
   );
 }
 
-export async function promptPersona(rl: Interface, config: AppConfig): Promise<void> {
+async function promptPersona(rl: Interface, config: AppConfig): Promise<void> {
   banner('Agent persona');
   const personaNameInput = await ask(
     rl,
@@ -158,7 +141,7 @@ export async function promptPersona(rl: Interface, config: AppConfig): Promise<v
   };
 }
 
-export async function promptOutOfScope(rl: Interface, config: AppConfig): Promise<void> {
+async function promptOutOfScope(rl: Interface, config: AppConfig): Promise<void> {
   banner('Out-of-scope topics');
   console.log('Current list:');
   for (const t of config.outOfScopeTopics) {
@@ -185,7 +168,7 @@ export async function promptOutOfScope(rl: Interface, config: AppConfig): Promis
   }
 }
 
-export async function promptCustomInstructions(rl: Interface, config: AppConfig): Promise<void> {
+async function promptCustomInstructions(rl: Interface, config: AppConfig): Promise<void> {
   banner('Custom instructions');
   console.log('Anything extra the agent should always do or never do?');
   const custom = await askMultiLine(
@@ -196,7 +179,7 @@ export async function promptCustomInstructions(rl: Interface, config: AppConfig)
   config.customInstructions = custom === '' ? undefined : custom;
 }
 
-export async function promptAdmin(rl: Interface, config: AppConfig): Promise<void> {
+async function promptAdmin(rl: Interface, config: AppConfig): Promise<void> {
   banner('Admin emails');
   console.log('Comma-separated. The first time one of these emails signs in via Clerk,');
   console.log('they are auto-promoted to admin.');
@@ -212,7 +195,7 @@ export async function promptAdmin(rl: Interface, config: AppConfig): Promise<voi
   config.adminEmails = parsedEmails;
 }
 
-export async function promptBranding(rl: Interface, config: AppConfig): Promise<void> {
+async function promptBranding(rl: Interface, config: AppConfig): Promise<void> {
   banner('Branding');
   config.branding = {
     title: await ask(rl, 'Browser tab title', config.branding.title),
@@ -220,7 +203,7 @@ export async function promptBranding(rl: Interface, config: AppConfig): Promise<
   };
 }
 
-export async function promptSeed(rl: Interface, config: AppConfig, repoRoot: string): Promise<string> {
+async function promptSeed(rl: Interface, config: AppConfig, repoRoot: string): Promise<string> {
   banner('Seed PDFs');
   const sourceDir = await ask(
     rl,
@@ -234,6 +217,36 @@ export async function promptSeed(rl: Interface, config: AppConfig, repoRoot: str
   const absSource = isAbsolute(sourceDir) ? sourceDir : resolve(repoRoot, sourceDir);
   console.log(`  resolved: ${absSource}`);
   return absSource;
+}
+
+export async function runConfigPrompts(
+  rl: Interface,
+  config: AppConfig,
+  repoRoot: string,
+): Promise<string> {
+  await promptOrg(rl, config);
+  await promptPersona(rl, config);
+  await promptOutOfScope(rl, config);
+  await promptCustomInstructions(rl, config);
+  await promptAdmin(rl, config);
+  await promptBranding(rl, config);
+  return promptSeed(rl, config, repoRoot);
+}
+
+export function validateConfig(
+  rl: Interface,
+  config: AppConfig,
+): AppConfig {
+  const validated = appConfigSchema.safeParse(config);
+  if (!validated.success) {
+    console.error('\nInvalid configuration:');
+    for (const i of validated.error.issues) {
+      console.error(`  - ${i.path.join('.') || '(root)'}: ${i.message}`);
+    }
+    rl.close();
+    throw new Error('Invalid configuration');
+  }
+  return validated.data;
 }
 
 export async function writeOutputs(opts: {
@@ -310,24 +323,8 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
   console.log('\n\x1b[1mRAG Support Agent — setup\x1b[0m');
   console.log('Press Enter to keep the current value shown in [brackets].\n');
 
-  await promptOrg(rl, config);
-  await promptPersona(rl, config);
-  await promptOutOfScope(rl, config);
-  await promptCustomInstructions(rl, config);
-  await promptAdmin(rl, config);
-  await promptBranding(rl, config);
-  const absSource = await promptSeed(rl, config, REPO_ROOT);
-
-  const validated = appConfigSchema.safeParse(config);
-  if (!validated.success) {
-    console.error('\nInvalid configuration:');
-    for (const i of validated.error.issues) {
-      console.error(`  - ${i.path.join('.') || '(root)'}: ${i.message}`);
-    }
-    rl.close();
-    throw new Error('Invalid configuration');
-  }
-  config = validated.data;
+  const absSource = await runConfigPrompts(rl, config, REPO_ROOT);
+  config = validateConfig(rl, config);
 
   const destDir = isAbsolute(config.seedDocsDir)
     ? config.seedDocsDir
@@ -344,7 +341,7 @@ export async function runInit(opts: InitOptions): Promise<InitResult> {
   });
 }
 
-export function writeConfigFile(configPath: string, config: AppConfig): void {
+function writeConfigFile(configPath: string, config: AppConfig): void {
   mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, renderConfigFile(config));
 }
@@ -420,13 +417,10 @@ function runSeedIfPossible(repoRoot: string, destDir: string): { ran: boolean; r
   return { ran: true };
 }
 
-// CLI entry — only run when this module is the program root.
-import { isMainModule } from '../is-main-module';
+// CLI entry
+import { cliMain } from './common';
 
-if (isMainModule()) {
+cliMain(() => {
   const repoRoot = process.cwd();
-  runInit({ repoRoot }).catch((err) => {
-    console.error('init failed:', err);
-    process.exit(1);
-  });
-}
+  return runInit({ repoRoot });
+});

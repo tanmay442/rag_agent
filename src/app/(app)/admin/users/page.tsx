@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { getComposition, unwrap, parsePageParam } from '@/composition';
 import { UserRowActions } from './user-row-actions';
+import { Pagination } from '@/components/admin/Pagination';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,35 +110,13 @@ export default async function UsersPage({
           </tbody>
         </table>
       </div>
-      <nav className="flex items-center justify-between text-sm" aria-label="Pagination">
-        <span>
-          Page {page} of {totalPages} ({result.total} total)
-        </span>
-        <div className="flex gap-2">
-          {page > 1 ? (
-            <Link
-              href={{
-                pathname: '/admin/users',
-                query: { search, page: page - 1 },
-              }}
-              className="rounded-xl border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-            >
-              Previous
-            </Link>
-          ) : null}
-          {page < totalPages ? (
-            <Link
-              href={{
-                pathname: '/admin/users',
-                query: { search, page: page + 1 },
-              }}
-              className="rounded-xl border border-[var(--border)] px-3 py-1 text-[var(--foreground-muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
-            >
-              Next
-            </Link>
-          ) : null}
-        </div>
-      </nav>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={result.total}
+        pathname="/admin/users"
+        query={{ search }}
+      />
     </section>
   );
 }

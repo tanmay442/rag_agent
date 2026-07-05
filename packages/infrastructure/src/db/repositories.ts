@@ -14,6 +14,12 @@ import type { TicketRow, UserRow } from '@app/domain';
 
 type Client = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+function whereAnd(parts: ReturnType<typeof eq>[]) {
+  if (parts.length === 0) return undefined;
+  if (parts.length === 1) return parts[0];
+  return and(...parts);
+}
+
 // ---- Documents / Chunks ----
 
 export async function findDocumentByName(name: string, client: Client = db): Promise<Document | null> {
@@ -131,11 +137,7 @@ export async function listDocuments(
   const whereParts = [] as ReturnType<typeof eq>[];
   if (!opts.includeDeleted) whereParts.push(isNull(documents.deletedAt));
   if (opts.search) whereParts.push(ilike(documents.fileName, `%${opts.search.replace(/[%_]/g, '\\$&')}%`));
-  const where = whereParts.length === 0
-    ? undefined
-    : whereParts.length === 1
-      ? whereParts[0]
-      : and(...whereParts);
+  const where = whereAnd(whereParts);
   const rows = await client
     .select({
       id: documents.id,
@@ -179,11 +181,7 @@ export const ticketRepo = {
       whereParts.push(eq(tickets.assignedTo, opts.assignee));
     }
     if (opts.search) whereParts.push(ilike(tickets.issue, `%${opts.search.replace(/[%_]/g, '\\$&')}%`));
-    const where = whereParts.length === 0
-      ? undefined
-      : whereParts.length === 1
-        ? whereParts[0]
-        : and(...whereParts);
+    const where = whereAnd(whereParts);
     const rows = await client
       .select({
         id: tickets.id,

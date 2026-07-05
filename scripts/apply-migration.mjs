@@ -43,6 +43,19 @@ function isBenignError(err) {
   return msg.includes('already exists') || msg.includes('does not exist');
 }
 
+async function safeQuery(pool, sql, logger) {
+  try {
+    await pool.query(sql);
+    logger.log('  ok');
+  } catch (err) {
+    if (isBenignError(err)) {
+      logger.log('  skip:', err.message.split('\n')[0]);
+    } else {
+      throw err;
+    }
+  }
+}
+
 /**
  * Structural shape of the pool the migrator needs. The real
  *  satisfies it; tests can pass a minimal fake.
@@ -78,29 +91,11 @@ export async function applyMigrations({
   try {
     // Enable pgvector extension before any schema operations.
     logger.log('-- enabling pgvector extension...');
-    try {
-      await pool.query(EXTENSION_SQL);
-      logger.log('  ok');
-    } catch (err) {
-      if (isBenignError(err)) {
-        logger.log('  skip:', err.message.split('\n')[0]);
-      } else {
-        throw err;
-      }
-    }
+    await safeQuery(pool, EXTENSION_SQL, logger);
 
     for (const sql of ADD_COLUMNS) {
       logger.log('-- add column:', sql);
-      try {
-        await pool.query(sql);
-        logger.log('  ok');
-      } catch (err) {
-        if (isBenignError(err)) {
-          logger.log('  skip:', err.message.split('\n')[0]);
-        } else {
-          throw err;
-        }
-      }
+      await safeQuery(pool, sql, logger);
     }
 
     for (const file of files) {

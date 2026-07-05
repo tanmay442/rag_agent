@@ -16,44 +16,23 @@ import {
   askYesNo,
 } from '../prompts/index';
 import {
-  promptOrg,
-  promptPersona,
-  promptOutOfScope,
-  promptCustomInstructions,
-  promptAdmin,
-  promptBranding,
-  promptSeed,
   writeOutputs,
+  runConfigPrompts,
+  validateConfig,
 } from './init';
 import {
-  appConfigSchema,
+  banner,
+  ok,
+  warn,
+  fail,
+  loadCurrentDefaults,
+} from './common';
+import {
   type AppConfig,
 } from '@app/domain';
 import { Llm } from '@app/infrastructure';
 
 const { Pool } = pg;
-
-const banner = (s: string) => console.log(`\n\x1b[1m${s}\x1b[0m`);
-const ok = (s: string) => console.log(`\x1b[32m  ✓\x1b[0m ${s}`);
-const fail = (s: string) => console.log(`\x1b[31m  ✗\x1b[0m ${s}`);
-const warn = (s: string) => console.log(`\x1b[33m  ⚠\x1b[0m ${s}`);
-
-// ── Helpers ─────────────────────────────────────────────────────
-
-async function loadCurrentDefaults(repoRoot: string, configPath: string): Promise<AppConfig> {
-  if (existsSync(configPath)) {
-    try {
-      const { default: existing } = (await import(
-        configPath as unknown as string
-      )) as { default: AppConfig };
-      return appConfigSchema.parse(existing);
-    } catch {
-      // Fall through to defaults.
-    }
-  }
-  void repoRoot;
-  return appConfigSchema.parse({});
-}
 
 function readEnvFile(envPath: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -345,13 +324,7 @@ export async function runSetup(repoRoot: string): Promise<void> {
   const defaults = await loadCurrentDefaults(repoRoot, CONFIG_PATH);
   let config: AppConfig = defaults;
 
-  await promptOrg(rl, config);
-  await promptPersona(rl, config);
-  await promptOutOfScope(rl, config);
-  await promptCustomInstructions(rl, config);
-  await promptAdmin(rl, config);
-  await promptBranding(rl, config);
-  let absSource = await promptSeed(rl, config, repoRoot);
+  let absSource = await runConfigPrompts(rl, config, repoRoot);
 
   const destDir = isAbsolute(config.seedDocsDir)
     ? config.seedDocsDir
@@ -364,16 +337,11 @@ export async function runSetup(repoRoot: string): Promise<void> {
   }
 
   // Validate config schema
-  const validated = appConfigSchema.safeParse(config);
-  if (!validated.success) {
-    console.error('\nInvalid configuration:');
-    for (const i of validated.error.issues) {
-      console.error(`  - ${i.path.join('.') || '(root)'}: ${i.message}`);
-    }
-    rl.close();
+  try {
+    config = validateConfig(rl, config);
+  } catch {
     process.exit(1);
   }
-  config = validated.data;
 
   // Step 7: Write config, admin emails, copy PDFs, run seed (closes rl)
   banner('Writing outputs');
@@ -415,12 +383,9 @@ export async function runSetup(repoRoot: string): Promise<void> {
 
 // ── CLI entry ───────────────────────────────────────────────────
 
-import { isMainModule } from '../is-main-module';
+import { cliMain } from './common';
 
-if (isMainModule()) {
+cliMain(() => {
   const repoRoot = process.cwd();
-  runSetup(repoRoot).catch((err) => {
-    console.error('setup failed:', err);
-    process.exit(1);
-  });
-}
+  return runSetup(repoRoot);
+});

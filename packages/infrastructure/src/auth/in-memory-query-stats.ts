@@ -79,7 +79,7 @@ export const inMemoryQueryStats: QueryStats = {
   },
 };
 
-export function __resetQueryStatsForTests(): void {
+function __resetQueryStatsForTests(): void {
   users.clear();
   globalCounts.clear();
   cachedTop = null;
