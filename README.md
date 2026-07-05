@@ -4,16 +4,19 @@ Serverless AI customer support agent built on Next.js 16, the Vercel AI SDK
 v6, and Drizzle ORM on Neon Serverless Postgres. Users sign in with
 **Clerk** (Vercel Marketplace), ask questions in a chat UI, and receive
 cited answers drawn from uploaded PDF documentation; when the agent
-cannot find a match, it offers to open a support ticket. A separate
+cannot find a match through documentation, it opens a support ticket so
+a human reviewer can follow up. A separate
 **admin console** lets staff upload, list, preview, replace, and
 delete documents, manage users, and triage tickets. Retrieval is
 tool-driven: the chat model calls a `searchDocumentation` tool when
-it needs context (and may ask a clarifying question first). On the
-first user turn the server also pre-fetches chunks server-side and
+it needs context (and may ask a clarifying question first). When
+`prefetchFirstTurn` is enabled in `config/app.config.ts`, on the
+first user turn the server pre-fetches chunks server-side and
 injects them into the system prompt, so the model has grounded
 context even when it does not call the tool itself; the LLM may
 still call `searchDocumentation` for reformulations. Tickets are
-opened only when the user explicitly asks for one.
+opened when the agent cannot resolve the issue through documentation
+or when the user explicitly asks for one.
 
 ## Stack
 
@@ -94,7 +97,7 @@ pnpm dev
 - **Action gating:** Every admin server action and API route calls
   `requireAdmin()` as its second line. Server actions return
   `{ error: 'Forbidden' }`; API routes return HTTP 403.
-- **Security headers:** `next.config.ts` sets `X-Frame-Options: DENY`,
+- **Security headers:** `next.config.ts` sets `X-Frame-Options: SAMEORIGIN`,
   `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
   `Strict-Transport-Security` (HSTS), `Permissions-Policy`, a
   `Content-Security-Policy` header, and disables the `X-Powered-By`
@@ -168,7 +171,7 @@ this for an Upstash hash; the call sites do not need to change.
 | `pnpm db:studio` | Drizzle Studio |
 | `pnpm cli` | Run the `rag-agent` CLI dispatcher (`--help` for usage) |
 | `pnpm cli init` | Interactive first-time setup: org name, agent persona, admin emails, seed PDFs. Writes `config/app.config.ts` and re-seeds. |
-| `pnpm cli seed` | Ingest every PDF in `scripts/fixtures/` |
+| `pnpm cli seed` | Ingest every PDF in `./documents/` (overridable via `SEED_DOCS_DIR` or `--dir`) |
 | `pnpm cli db-migrate` | Apply the Drizzle schema + enable pgvector + add-column migrations |
 | `pnpm arch` | Architecture boundary check via dependency-cruiser |
 
@@ -303,7 +306,7 @@ place where adapters are instantiated; routes import from
 | Layer            | May import                                | May NOT import                |
 |------------------|-------------------------------------------|-------------------------------|
 | `domain`         | zod                                       | application, infrastructure, cli, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
-| `application`    | domain                                    | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
+| `application`    | domain, config/constants                  | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
 | `infrastructure` | domain, drizzle, @ai-sdk, clerk, pdf-parse, pg | application, src/app, src/components, next |
 | `src/app`, `src/components` | application, domain, src/lib/http, src/lib/config | drizzle, @ai-sdk, pdf-parse, infrastructure |
 | `cli`            | application, infrastructure, dotenv       | src/app, src/components |
@@ -315,10 +318,19 @@ Run `pnpm arch` after any change that touches the import graph.
 Every route handler and server action parses its external input
 through a Zod schema before it reaches a use-case:
 
-- `src/env.ts` — `process.env` validated at server start
+- `src/lib/config/index.ts` — validates `config/app.config.ts` at server start
 - `src/app/api/chat/request-schema.ts` — POST `/api/chat` body
 - `src/app/api/admin/*/route.ts` — request bodies and URL params
 - Server actions in `src/app/(app)/admin/actions.ts` — form input
+
+Environment variables are validated at the point of use in each
+infrastructure adapter:
+
+- `packages/infrastructure/src/db/pool.ts` — validates `DATABASE_URL`
+- `packages/infrastructure/src/llm/google-embedding-service.ts` — validates `AI_STUDIO_KEY`
+- `packages/infrastructure/src/llm/openai-chat-service.ts` — validates `CUSTOM_LLM_API_KEY`, `CUSTOM_LLM_BASE_URL`
+- `packages/infrastructure/src/auth/session.ts` — parses `ADMIN_EMAILS`
+- `src/lib/logger.ts` — gates on `LOG_LEVEL`
 
 Use-cases return `Result<T, DomainError>`; `src/lib/http.ts` exports
 `respond(result)` which maps `DomainError` to the right HTTP status

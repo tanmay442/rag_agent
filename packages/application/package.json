@@ -7,7 +7,6 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./ports": "./src/ports/index.ts",
     "./rag": "./src/rag/index.ts",
     "./rag/ingest": "./src/rag/ingest.ts",
     "./rag/search": "./src/rag/search.ts",
@@ -20,9 +19,11 @@
     "./admin/documents": "./src/admin/documents.ts",
     "./admin/tickets": "./src/admin/tickets.ts",
     "./prompt": "./src/prompt/index.ts",
-    "./prompt/build-system-prompt": "./src/prompt/build-system-prompt.ts"
+    "./prompt/build-system-prompt": "./src/prompt/build-system-prompt.ts",
+    "./chat": "./src/chat/types.ts"
   },
   "dependencies": {
-    "@app/domain": "workspace:*"
+    "@app/domain": "workspace:*",
+    "ai": "^6.0.208"
   }
 }

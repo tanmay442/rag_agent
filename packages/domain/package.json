@@ -9,11 +9,9 @@
     ".": "./src/index.ts",
     "./result": "./src/result.ts",
     "./errors": "./src/errors.ts",
-    "./app-config": "./src/app-config.ts",
-    "./chat": "./src/chat/types.ts"
+    "./app-config": "./src/app-config.ts"
   },
   "dependencies": {
-    "ai": "^6.0.208",
     "zod": "^4.4.3"
   }
 }

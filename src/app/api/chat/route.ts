@@ -74,7 +74,7 @@ function buildChatTools(deps: {
     }),
     createSupportTicket: tool({
       description:
-        'Open a support ticket. ONLY call this tool when the user has explicitly asked to open one, file one, escalate, talk to a human, or submit a complaint. Do NOT call it just because the RAG context was empty. The `issue` argument should be a self-contained, structured summary an admin can read without the conversation transcript: Question / What was tried / Docs searched / User context.',
+        'Open a support ticket. Invoke this tool when the user\'s issue cannot be resolved via the available documentation content or the user has explicitly asked to open one, file one, escalate, talk to a human, or submit a complaint. When invoking, provide a structured `issue` summary with appropriate context so the reviewer can understand the full situation without reading the transcript: Product / Question / What was tried / Docs searched / User context.',
       inputSchema: z.object({
         name: z
           .string()

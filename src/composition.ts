@@ -14,7 +14,7 @@ import {
 import { Db, Llm, Auth, Pdf } from '@app/infrastructure';
 import { requireAdmin, requireSession, getAppSession } from '@app/infrastructure/auth';
 import { ForbiddenError, UnauthorizedError, unwrap, type Result } from '@app/domain';
-import { type MyUIMessage } from '@app/domain';
+import { type MyUIMessage } from '@app/application/chat';
 import type { DocumentRow } from '@app/domain';
 import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
