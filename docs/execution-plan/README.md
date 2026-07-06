@@ -41,7 +41,7 @@ Session 8 agent  ◄──gets session-08.md + after-session-07.md
 | 5 | `session-05-rate-limit-upstash.md` | Replace in-memory rate limiter + query stats with Upstash Redis. Correct behavior across N Vercel instances. | Session 1 |
 | 6 | `session-06-auth-decoupling.md` | Move Clerk behind `SessionStore` port. `proxy.ts` dispatches via `AUTH_PROVIDER`. No second adapter yet — just the seam. | Session 1 |
 | 7 | `session-07-env-validation.md` | Centralized env validation in `src/lib/env.ts` + `instrumentation.ts`. One actionable error listing all missing keys. | Sessions 1-6 |
-| 8 | `session-08-docker-readme-final.md` | Docker Compose (pgvector + Ollama), Dockerfile, `.env.example` defaults, README 3-step Quick Start, migrate-on-build. **Final agent informs the developer.** | Sessions 1-7 |
+| 8 | `session-08-docker-readme-final.md` | Docker Compose (pgvector + Ollama), Dockerfile, `.env.example` defaults, README 3-step Quick Start + "Getting your API keys" walkthrough, project rename to `rag-support-agent`, migrate-on-build. **Final agent informs the developer.** | Sessions 1-7 |
 
 ## Execution Order Rationale
 

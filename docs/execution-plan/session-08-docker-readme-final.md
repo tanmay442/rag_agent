@@ -6,7 +6,11 @@ Create the developer-experience layer on top of Sessions 1-7:
 - `docker-compose.yml` with Postgres+pgvector and optional Ollama
 - `Dockerfile` for non-Vercel serverless platforms
 - `.env.example` with sane defaults that boot against Docker
-- `README.md` with a dead-simple 3-step Quick Start at the top
+- `README.md` with a dead-simple 3-step Quick Start at the top, plus a
+  detailed "Getting your API keys" section with sign-up links, free-tier
+  notes, and dashboard walkthroughs for every service
+- Rename the project from `rag_agent` to `rag-support-agent` (kebab-case
+  for display, package name stays valid)
 - Migrate-on-build so `pnpm build` runs migrations automatically
 - `output: 'standalone'` in `next.config.ts` for the Docker image
 
@@ -350,10 +354,147 @@ pnpm install && pnpm dev
 
 1. Push to GitHub.
 2. Import the repo in Vercel.
-3. Add environment variables from `.env.example` (use your Neon URL for
-   `DATABASE_URL`, your R2 keys for blob storage, your Google/OpenAI
-   keys for production LLM).
+3. Add environment variables from `.env.example` — see the
+   "Getting your API keys" section below for where to get each one.
 4. Deploy. Migrations run automatically during `pnpm build`.
+
+### Getting your API keys
+
+Every service the app needs is listed below, with where to sign up,
+what to copy, and free-tier notes. For local-only development you can
+skip every service except **Clerk** — Docker provides Postgres and
+Ollama replaces the LLM providers.
+
+| Service | Required for | Where to sign up | Free tier |
+|---------|-------------|------------------|-----------|
+| Clerk | Auth (always) | https://dashboard.clerk.com | Yes — generous free tier |
+| Neon | Prod DB | https://neon.tech | Yes — 0.5 GB, auto-suspend |
+| Google AI Studio | Prod embeddings | https://aistudio.google.com/apikey | Yes — free embeddings |
+| OpenAI-compatible chat | Prod chat | Your provider (OpenAI, OpenRouter, Groq, etc.) | Varies |
+| Cloudflare R2 | Prod blob storage | https://dash.cloudflare.com → R2 | Yes — 10 GB, zero egress |
+| Upstash Redis | Prod rate limiting | https://console.upstash.com | Yes — 10k commands/day |
+| Upstash QStash | Async ingest (optional) | https://console.upstash.com → QStash | Yes — 500 msgs/day |
+
+#### Clerk (auth — always required, even locally)
+
+1. Go to https://dashboard.clerk.com → **Create application**.
+2. Name it (e.g. "RAG Support Agent"). Select your preferred sign-in
+   methods (Email + Google at minimum).
+3. From the application's **API Keys** page, copy:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — starts with `pk_test_`
+     (development) or `pk_live_` (production). The `NEXT_PUBLIC_`
+     prefix means it's safe to expose to the client.
+   - `CLERK_SECRET_KEY` — starts with `sk_test_` or `sk_live_`. **Never
+     commit this.**
+4. **Set up the JWT template (required for the role fast-path in
+   `proxy.ts`)**: Dashboard → **Sessions** → **Customize session token**
+   → set the template body to:
+   ```json
+   { "metadata": "{{user.public_metadata}}" }
+   ```
+   This projects `publicMetadata.role` into the session token's
+   `metadata.role` claim, which the middleware reads without calling
+   the Clerk Backend SDK on every request.
+5. **For Vercel Marketplace auto-provision** (optional but convenient):
+   In the Vercel dashboard → Storage → Marketplace → add Clerk. This
+   auto-sets both keys in your Vercel project env vars.
+
+#### Neon (prod database)
+
+1. Go to https://neon.tech → **Sign up** (GitHub/Google).
+2. **Create a project** → name it → select the region closest to your
+   Vercel deployment region (e.g. `us-east-1` if Vercel is `iad1`).
+3. Copy the **pooled connection string** (uses port `6543`, hostname
+   `-pooler`); this goes into `DATABASE_URL`. It should end with
+   `?sslmode=require`.
+4. **Enable pgvector**: open the Neon SQL editor and run:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+5. For preview deploys: copy `NEON_API_KEY` (Settings → API keys) and
+   `NEON_PROJECT_ID` (Settings → Project ID). When both are in Vercel
+   env vars, `pnpm test:ci` provisions a per-branch Neon database for
+   each Vercel preview deploy.
+
+#### Google AI Studio (prod embeddings)
+
+1. Go to https://aistudio.google.com/apikey → **Create API key**.
+2. Copy the key into `AI_STUDIO_KEY`.
+3. The default model `gemini-embedding-001` produces 768-dim vectors —
+   matches the pgvector column. Don't change `EMBEDDING_DIMENSION`
+   unless you switch to a different embedding model.
+
+#### OpenAI-compatible chat (prod chat)
+
+The app uses `@ai-sdk/openai`'s `createOpenAI`, so any
+OpenAI-compatible endpoint works (OpenAI, OpenRouter, Groq, Together,
+local LM Studio, etc.).
+
+1. Get an API key from your provider.
+2. Set `CUSTOM_LLM_API_KEY` = the key.
+3. Set `CUSTOM_LLM_BASE_URL` = the endpoint (e.g.
+   `https://api.openai.com/v1`, `https://openrouter.ai/api/v1`).
+4. Set `LLM_MODEL` = the model id (e.g. `gpt-4o-mini`,
+   `anthropic/claude-3.5-sonnet` for OpenRouter).
+
+#### Cloudflare R2 (prod blob storage)
+
+1. Go to https://dash.cloudflare.com → **R2 Object Storage** (sign up
+   if needed; requires a Cloudflare account + payment method on file
+   even for the free tier).
+2. **Create a bucket** — name it (e.g. `rag-agent-docs`). Note the
+   region (auto is fine).
+3. **Create an API token**: R2 → **Manage R2 API Tokens** → **Create
+   API Token** → permissions: **Object Read & Write** on your bucket.
+   Copy:
+   - `R2_ACCESS_KEY_ID` — the access key id
+   - `R2_SECRET_ACCESS_KEY` — the secret access key
+4. `R2_ACCOUNT_ID` = your Cloudflare account ID (visible in the
+   dashboard sidebar or URL).
+5. `R2_BUCKET` = the bucket name you created.
+6. **CORS** (needed if the PDF preview route redirects to a signed
+   R2 URL that the browser fetches): R2 → your bucket → **Settings** →
+   **CORS Policy** → add:
+   ```json
+   [{
+     "AllowedOrigins": ["https://your-app.vercel.app", "http://localhost:3000"],
+     "AllowedMethods": ["GET", "HEAD"],
+     "AllowedHeaders": ["*"],
+     "ExposeHeaders": ["Content-Length", "Content-Type"],
+     "MaxAgeSeconds": 3600
+   }]
+   ```
+7. If the CSP in `next.config.ts` blocks the R2 domain in `frame-src`
+   or `img-src`, add `https://*.r2.dev` (or your custom R2 domain) to
+   those directives.
+
+#### Upstash Redis (prod rate limiting + query stats)
+
+1. Go to https://console.upstash.com → **Create Database**.
+2. Name it, select the **same region** as your Vercel deployment
+   (latency matters — every `/api/chat` call hits Redis).
+3. Copy:
+   - `UPSTASH_REDIS_REST_URL` — the REST URL (ends with `.upstash.io`)
+   - `UPSTASH_REDIS_REST_TOKEN` — the REST token
+4. Without these, the app falls back to in-memory rate limiting — fine
+   for local dev, but on Vercel each instance gets its own limit (N×
+   the intended budget). Set these for any multi-instance deploy.
+
+#### Upstash QStash (async ingest — optional)
+
+1. Go to https://console.upstash.com → **QStash**.
+2. Copy:
+   - `QSTASH_TOKEN` — from the QStash dashboard
+   - `QSTASH_CURRENT_SIGNING_KEY` and `QSTASH_NEXT_SIGNING_KEY` —
+     from **Settings** → **API Keys**. These two are used for
+     signature rotation; the worker verifies with both so a key
+     rotation doesn't break in-flight messages.
+3. Set `QSTASH_INGEST_WORKER_URL` = the public URL of your deployment
+   (e.g. `https://your-app.vercel.app`). QStash calls back over the
+   public internet, so localhost won't work — use a Vercel preview or
+   production URL.
+4. Without `QSTASH_TOKEN`, all uploads go through the synchronous path
+   (≤4 MB, blocks until ingest completes). Fine for small docs.
 
 ## Stack
 
@@ -369,7 +510,11 @@ Quick Start, under a "Reference" heading ...]
 Key changes to README:
 - 3-step Quick Start at the very top (clone, docker, install+dev)
 - "Zero-key local" callout with Ollama
-- "Deploy to Vercel" section (4 steps)
+- "Deploy to Vercel" section (4 steps, references the API keys section)
+- **"Getting your API keys" section** — one table + one subsection per
+  service with where to sign up, what to copy, free-tier notes, and
+  dashboard walkthroughs (Clerk JWT template, Neon pgvector extension,
+  R2 CORS, Upstash region matching, QStash signing keys)
 - Move existing detailed content under a "Reference" heading
 - Remove the old "Quick start (recommended)" and "Manual setup" sections
   (replaced by the new Quick Start)
@@ -404,6 +549,44 @@ documents
 drizzle
 ```
 
+### 10. Rename the project
+
+Rename the project from `rag_agent` (snake_case) to
+**`rag-support-agent`** (kebab-case) for display consistency in the
+README, Docker image, and Vercel project name. npm package names must
+be lowercase, so kebab-case is the convention.
+
+**What to change:**
+
+1. **`package.json`** line 2: `"name": "rag_agent"` →
+   `"name": "rag-support-agent"`. The `name` field must be lowercase
+   and kebab-case per npm rules.
+2. **`README.md`** H1 heading: `# RAG Support Agent` (already correct
+   in the rewrite above — just confirm it).
+3. **`docker-compose.yml`** — the `container_name` is not set, so
+   Compose derives it from the project directory name. No change
+   needed unless you want to explicitly set `container_name:
+   rag-support-agent-db`.
+4. **`Dockerfile`** — no `name` field needed; the image is named at
+   build time via `docker build -t rag-support-agent .`.
+5. **`vercel.json`** — no change needed; Vercel uses the repo name for
+   the project name, and the repo rename happens on GitHub (the
+   developer does this, not the agent).
+
+**What NOT to change:**
+- The `packages/` workspace package names (`@app/domain`,
+  `@app/application`, etc.) — these are internal, not published, and
+  renaming them would touch every import in the codebase for no
+  benefit.
+- The `src/` directory structure.
+- Any import paths.
+
+**Repo rename (developer action, not agent action):**
+The agent should add a note in the handoff file reminding the
+developer to rename the GitHub repo from `rag_agent` to
+`rag-support-agent` (Settings → Repository name → Rename). GitHub
+auto-redirects old URLs, so no links break.
+
 ---
 
 ## Env Vars
@@ -430,9 +613,11 @@ New files:
 Modified:
 - `next.config.ts` — `output: 'standalone'`
 - `package.json` — new/updated scripts (`build`, `db:migrate`, `dev:db`,
-  `dev:ollama`)
+  `dev:ollama`), project name → `rag-support-agent`
 - `.env.example` — rewritten with sane defaults
-- `README.md` — rewritten top section with 3-step Quick Start
+- `README.md` — rewritten: 3-step Quick Start, "Getting your API keys"
+  section with per-service walkthroughs, existing details moved under
+  "Reference"
 
 ---
 
@@ -477,9 +662,21 @@ Modified:
    setup wizard. It's still useful for interactive first-time setup.
    Just don't make it the primary path in the README.
 
-9. **`.env.example` is committed**: It's already in `.gitignore`? Check
-   that `.env.example` is NOT in `.gitignore` (it should be committed).
-   `.env.local` should be in `.gitignore` (it is).
+9. **`.env.example` is committed**: Check that `.env.example` is NOT
+   in `.gitignore` (it should be committed). `.env.local` should be in
+   `.gitignore` (it is).
+
+10. **Project rename + repo rename**: The `package.json` `name` field
+    changes from `rag_agent` to `rag-support-agent`. The GitHub repo
+    rename is a **developer action** (Settings → Repository name →
+    Rename). GitHub auto-redirects old URLs, so no links break. The
+    agent should NOT attempt to rename the GitHub repo — only change
+    `package.json`. Note this in the handoff file.
+
+11. **"Getting your API keys" section length**: This section is long
+    (one subsection per service) but it's the single most useful
+    section for a new developer. Keep it. It goes in the README between
+    "Deploy to Vercel" and "Stack".
 
 ---
 
@@ -576,7 +773,8 @@ This is the **final session**. When complete:
    - Session 5: Rate limiter + query stats moved to Upstash Redis
    - Session 6: Auth decoupled behind SessionStore port
    - Session 7: Centralized env validation + instrumentation.ts
-   - Session 8: Docker Compose, Dockerfile, README Quick Start, migrate-on-build
+   - Session 8: Docker Compose, Dockerfile, README Quick Start + API
+     keys guide, project rename, migrate-on-build
 
    The app is now:
    - Fully serverless (no servers to manage)
@@ -584,20 +782,28 @@ This is the **final session**. When complete:
    - Provider-swappable via env vars (DB, LLM, blobs, auth, rate limit)
    - Zero-key local dev via Docker + Ollama
    - Deployable with `git clone && docker compose up -d db && pnpm install && pnpm dev`
+   - README includes a "Getting your API keys" section with sign-up
+     links, free-tier notes, and dashboard walkthroughs for every
+     service (Clerk, Neon, Google AI Studio, OpenAI, R2, Upstash
+     Redis, Upstash QStash)
 
    Next steps for you (the developer):
    1. Review all changes and commit
-   2. Run the backfill script (scripts/backfill-blobs.ts) if you have
+   2. Rename the GitHub repo: Settings → Repository name →
+      `rag-support-agent` (GitHub auto-redirects old URLs)
+   3. Run the backfill script (scripts/backfill-blobs.ts) if you have
       existing PDFs in the database
-   3. Set up Cloudflare R2 (or S3) for production blob storage
-   4. Set up Upstash Redis for production rate limiting
-   5. Set up QStash for async ingest (optional, for large PDFs)
-   6. Deploy to Vercel with the production env vars
+   4. Set up Cloudflare R2 (or S3) for production blob storage
+   5. Set up Upstash Redis for production rate limiting
+   6. Set up QStash for async ingest (optional, for large PDFs)
+   7. Deploy to Vercel with the production env vars
    ```
 
 3. Include in the handoff file:
    - The final state of `.env.example` (all defaults)
    - The Quick Start steps from the README
+   - The "Getting your API keys" section from the README
    - The `docker-compose.yml` contents
    - Any issues encountered during end-to-end validation
    - The backfill script reminder for the developer
+   - The GitHub repo rename reminder for the developer
