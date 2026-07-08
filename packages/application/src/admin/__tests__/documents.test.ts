@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import {
   Documents,
@@ -16,7 +16,7 @@ import {
 } from '@app/domain';
 import { restoreDocument, softDeleteDocument } from '../documents';
 import { RESTORE_WINDOW_MS } from '../../../../../config/constants';
-import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
+import { expectFailure } from '../../__tests__/effect-test-utils';
 
 function docRow(over: Partial<DocumentRow> = {}): DocumentRow {
   return {
@@ -89,75 +89,87 @@ beforeEach(() => {
 });
 
 describe('restoreDocument', () => {
-  it('returns NotFoundError for missing document', async () => {
-    const layer = makeLayers();
-    const exit = await runExit(restoreDocument(999, 'user_1'), layer);
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(NotFoundError);
-  });
+  it.effect('returns NotFoundError for missing document', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers();
+      const exit = yield* restoreDocument(999, 'user_1').pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(NotFoundError);
+    }),
+  );
 
-  it('returns ValidationError for non-deleted document', async () => {
-    const layer = makeLayers({
-      documents: { findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null }))) },
-    });
-    const exit = await runExit(restoreDocument(1, 'user_1'), layer);
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(ValidationError);
-  });
+  it.effect('returns ValidationError for non-deleted document', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        documents: { findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null }))) },
+      });
+      const exit = yield* restoreDocument(1, 'user_1').pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(ValidationError);
+    }),
+  );
 
-  it('returns GoneError when restore window expired', async () => {
-    const deletedAt = new Date(Date.now() - RESTORE_WINDOW_MS - 1000);
-    const layer = makeLayers({
-      documents: { findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt }))) },
-      clock: { now: vi.fn().mockReturnValue(Effect.succeed(new Date())) },
-    });
-    const exit = await runExit(restoreDocument(1, 'user_1'), layer);
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(GoneError);
-  });
+  it.effect('returns GoneError when restore window expired', () =>
+    Effect.gen(function* () {
+      const deletedAt = new Date(Date.now() - RESTORE_WINDOW_MS - 1000);
+      const layer = makeLayers({
+        documents: { findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt }))) },
+        clock: { now: vi.fn().mockReturnValue(Effect.succeed(new Date())) },
+      });
+      const exit = yield* restoreDocument(1, 'user_1').pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(GoneError);
+    }),
+  );
 
-  it('restores within window', async () => {
-    const deletedAt = new Date(Date.now() - 1000);
-    const restore = vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null })));
-    const layer = makeLayers({
-      documents: {
-        findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt }))),
-        restore,
-      },
-      clock: { now: vi.fn().mockReturnValue(Effect.succeed(new Date())) },
-    });
-    await runWith(restoreDocument(1, 'user_1'), layer);
-    expect(restore).toHaveBeenCalledWith(1);
-  });
+  it.effect('restores within window', () =>
+    Effect.gen(function* () {
+      const deletedAt = new Date(Date.now() - 1000);
+      const restore = vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null })));
+      const layer = makeLayers({
+        documents: {
+          findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt }))),
+          restore,
+        },
+        clock: { now: vi.fn().mockReturnValue(Effect.succeed(new Date())) },
+      });
+      yield* restoreDocument(1, 'user_1').pipe(Effect.provide(layer));
+      expect(restore).toHaveBeenCalledWith(1);
+    }),
+  );
 });
 
 describe('softDeleteDocument', () => {
-  it('returns NotFoundError for missing document', async () => {
-    const layer = makeLayers();
-    const exit = await runExit(
-      softDeleteDocument({ documentId: 999, actorId: 'user_1' }),
-      layer,
-    );
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(NotFoundError);
-  });
+  it.effect('returns NotFoundError for missing document', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers();
+      const exit = yield* softDeleteDocument({ documentId: 999, actorId: 'user_1' }).pipe(
+        Effect.provide(layer),
+        Effect.exit,
+      );
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(NotFoundError);
+    }),
+  );
 
-  it('soft-deletes existing document', async () => {
-    const softDelete = vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: new Date() })));
-    const logDocumentEvent = vi.fn().mockReturnValue(Effect.void);
-    const layer = makeLayers({
-      documents: {
-        findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null }))),
-        softDelete,
-      },
-      audit: { logDocumentEvent },
-    });
-    await runWith(softDeleteDocument({ documentId: 1, actorId: 'user_1' }), layer);
-    expect(softDelete).toHaveBeenCalledOnce();
-    expect(logDocumentEvent).toHaveBeenCalledWith({
-      action: 'delete',
-      documentId: 1,
-      actorId: 'user_1',
-    });
-  });
+  it.effect('soft-deletes existing document', () =>
+    Effect.gen(function* () {
+      const softDelete = vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: new Date() })));
+      const logDocumentEvent = vi.fn().mockReturnValue(Effect.void);
+      const layer = makeLayers({
+        documents: {
+          findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null }))),
+          softDelete,
+        },
+        audit: { logDocumentEvent },
+      });
+      yield* softDeleteDocument({ documentId: 1, actorId: 'user_1' }).pipe(Effect.provide(layer));
+      expect(softDelete).toHaveBeenCalledOnce();
+      expect(logDocumentEvent).toHaveBeenCalledWith({
+        action: 'delete',
+        documentId: 1,
+        actorId: 'user_1',
+      });
+    }),
+  );
 });

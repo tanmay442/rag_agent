@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { searchChunks } from '../search';
 import { Chunks, Embeddings, ExternalServiceError } from '@app/domain';
-import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
+import { expectFailure } from '../../__tests__/effect-test-utils';
 
 function makeLayers(overrides?: {
   chunks?: Partial<Chunks.Service>;
@@ -31,22 +31,26 @@ function makeLayers(overrides?: {
 }
 
 describe('searchChunks', () => {
-  it('propagates DB errors as ExternalServiceError', async () => {
-    const layer = makeLayers({
-      chunks: {
-        searchByVector: vi
-          .fn()
-          .mockReturnValue(Effect.fail(new ExternalServiceError('connection refused'))),
-      },
-    });
-    const exit = await runExit(searchChunks('test', {}), layer);
-    const err = expectFailure(exit);
-    expect(err.message).toMatch(/connection refused/);
-  });
+  it.effect('propagates DB errors as ExternalServiceError', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        chunks: {
+          searchByVector: vi
+            .fn()
+            .mockReturnValue(Effect.fail(new ExternalServiceError('connection refused'))),
+        },
+      });
+      const exit = yield* searchChunks('test', {}).pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err.message).toMatch(/connection refused/);
+    }),
+  );
 
-  it('returns results on success', async () => {
-    const layer = makeLayers();
-    const result = await runWith(searchChunks('test', {}), layer);
-    expect(result).toEqual([{ content: 'test', similarity: 0.9 }]);
-  });
+  it.effect('returns results on success', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers();
+      const result = yield* searchChunks('test', {}).pipe(Effect.provide(layer));
+      expect(result).toEqual([{ content: 'test', similarity: 0.9 }]);
+    }),
+  );
 });

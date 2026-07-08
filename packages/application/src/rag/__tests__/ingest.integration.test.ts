@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { ingestFile } from '../ingest';
 import {
@@ -12,7 +12,7 @@ import {
   ExternalServiceError,
   type DocumentRow,
 } from '@app/domain';
-import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
+import { expectFailure } from '../../__tests__/effect-test-utils';
 
 function docRow(over: Partial<DocumentRow> = {}): DocumentRow {
   return {
@@ -89,94 +89,106 @@ function makeLayers(overrides?: {
 }
 
 describe('ingestFile', () => {
-  it('inserts chunks when embedding succeeds', async () => {
-    const layer = makeLayers();
-    const result = await runWith(
-      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' }),
-      layer,
-    );
-    expect(result.status).toBe('inserted');
-    expect(result.chunks).toBe(1);
-  });
+  it.effect('inserts chunks when embedding succeeds', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers();
+      const result = yield* ingestFile({
+        fileName: 'test.pdf',
+        buffer: Buffer.from('%PDF-1.4...'),
+        uploadedBy: 'user',
+      }).pipe(Effect.provide(layer));
+      expect(result.status).toBe('inserted');
+      expect(result.chunks).toBe(1);
+    }),
+  );
 
-  it('deletes old document only after new insert succeeds', async () => {
-    const deleteById = vi.fn().mockReturnValue(Effect.void);
-    const insert = vi
-      .fn()
-      .mockReturnValue(Effect.succeed(docRow({ id: 2, fileHash: 'newhash' })));
-    const layer = makeLayers({
-      documents: {
-        findByName: vi.fn().mockReturnValue(
-          Effect.succeed(docRow({ id: 1, fileHash: 'oldhash' })),
-        ),
-        insert,
-        deleteById,
-      },
-    });
-    const result = await runWith(
-      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' }),
-      layer,
-    );
-    expect(result.status).toBe('updated');
-    expect(deleteById).toHaveBeenCalled();
-    expect(insert).toHaveBeenCalled();
-    expect(deleteById.mock.invocationCallOrder[0]).toBeLessThan(insert.mock.invocationCallOrder[0]);
-  });
+  it.effect('deletes old document only after new insert succeeds', () =>
+    Effect.gen(function* () {
+      const deleteById = vi.fn().mockReturnValue(Effect.void);
+      const insert = vi.fn().mockReturnValue(Effect.succeed(docRow({ id: 2, fileHash: 'newhash' })));
+      const layer = makeLayers({
+        documents: {
+          findByName: vi.fn().mockReturnValue(Effect.succeed(docRow({ id: 1, fileHash: 'oldhash' }))),
+          insert,
+          deleteById,
+        },
+      });
+      const result = yield* ingestFile({
+        fileName: 'test.pdf',
+        buffer: Buffer.from('%PDF-1.4...'),
+        uploadedBy: 'user',
+      }).pipe(Effect.provide(layer));
+      expect(result.status).toBe('updated');
+      expect(deleteById).toHaveBeenCalled();
+      expect(insert).toHaveBeenCalled();
+      expect(deleteById.mock.invocationCallOrder[0]).toBeLessThan(insert.mock.invocationCallOrder[0]);
+    }),
+  );
 
-  it('returns unchanged when hash matches', async () => {
-    const layer = makeLayers({
-      documents: {
-        findByName: vi.fn().mockReturnValue(
-          Effect.succeed(docRow({ id: 1, fileHash: 'abc123' })),
-        ),
-      },
-    });
-    const result = await runWith(
-      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' }),
-      layer,
-    );
-    expect(result.status).toBe('unchanged');
-  });
+  it.effect('returns unchanged when hash matches', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        documents: {
+          findByName: vi.fn().mockReturnValue(Effect.succeed(docRow({ id: 1, fileHash: 'abc123' }))),
+        },
+      });
+      const result = yield* ingestFile({
+        fileName: 'test.pdf',
+        buffer: Buffer.from('data'),
+        uploadedBy: 'user',
+      }).pipe(Effect.provide(layer));
+      expect(result.status).toBe('unchanged');
+    }),
+  );
 
-  it('returns ValidationError when PDF has no extractable text', async () => {
-    const layer = makeLayers({
-      textSplitter: { splitText: vi.fn().mockReturnValue(Effect.succeed([])) },
-    });
-    const exit = await runExit(
-      ingestFile({ fileName: 'empty.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' }),
-      layer,
-    );
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(ValidationError);
-    expect(err.message).toMatch(/No extractable text/);
-  });
+  it.effect('returns ValidationError when PDF has no extractable text', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        textSplitter: { splitText: vi.fn().mockReturnValue(Effect.succeed([])) },
+      });
+      const exit = yield* ingestFile({
+        fileName: 'empty.pdf',
+        buffer: Buffer.from('data'),
+        uploadedBy: 'user',
+      }).pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(ValidationError);
+      expect(err.message).toMatch(/No extractable text/);
+    }),
+  );
 
-  it('returns ExternalServiceError when PDF parsing fails', async () => {
-    const layer = makeLayers({
-      pdfParser: {
-        extractText: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('corrupt file'))),
-      },
-    });
-    const exit = await runExit(
-      ingestFile({ fileName: 'bad.pdf', buffer: Buffer.from('trash'), uploadedBy: 'user' }),
-      layer,
-    );
-    const err = expectFailure(exit);
-    expect(err.message).toMatch(/corrupt file/);
-  });
+  it.effect('returns ExternalServiceError when PDF parsing fails', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        pdfParser: {
+          extractText: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('corrupt file'))),
+        },
+      });
+      const exit = yield* ingestFile({
+        fileName: 'bad.pdf',
+        buffer: Buffer.from('trash'),
+        uploadedBy: 'user',
+      }).pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err.message).toMatch(/corrupt file/);
+    }),
+  );
 
-  it('returns ExternalServiceError when embedding fails', async () => {
-    const layer = makeLayers({
-      embeddings: {
-        embed: vi.fn().mockReturnValue(Effect.succeed([0.1])),
-        embedBatch: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('API down'))),
-      },
-    });
-    const exit = await runExit(
-      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' }),
-      layer,
-    );
-    const err = expectFailure(exit);
-    expect(err.message).toMatch(/API down/);
-  });
+  it.effect('returns ExternalServiceError when embedding fails', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        embeddings: {
+          embed: vi.fn().mockReturnValue(Effect.succeed([0.1])),
+          embedBatch: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('API down'))),
+        },
+      });
+      const exit = yield* ingestFile({
+        fileName: 'test.pdf',
+        buffer: Buffer.from('data'),
+        uploadedBy: 'user',
+      }).pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err.message).toMatch(/API down/);
+    }),
+  );
 });

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { Users, Audit, ValidationError, NotFoundError, type UserRow } from '@app/domain';
 import { setUserRole } from '../users';
-import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
+import { expectFailure } from '../../__tests__/effect-test-utils';
 
 function user(over: Partial<UserRow> = {}): UserRow {
   return {
@@ -42,41 +42,48 @@ function makeLayers(overrides?: {
 }
 
 describe('setUserRole', () => {
-  it('logs a role_change ticket audit event', async () => {
-    const logTicketEvent = vi.fn().mockReturnValue(Effect.void);
-    const layer = makeLayers({ audit: { logTicketEvent } });
-    await runWith(
-      setUserRole({ clerkUserId: 'user_1', role: 'admin', actorId: 'actor_1' }),
-      layer,
-    );
-    expect(logTicketEvent).toHaveBeenCalledWith({
-      action: 'role_change',
-      ticketId: 'user:user_1',
-      actorId: 'actor_1',
-    });
-  });
+  it.effect('logs a role_change ticket audit event', () =>
+    Effect.gen(function* () {
+      const logTicketEvent = vi.fn().mockReturnValue(Effect.void);
+      const layer = makeLayers({ audit: { logTicketEvent } });
+      yield* setUserRole({ clerkUserId: 'user_1', role: 'admin', actorId: 'actor_1' }).pipe(
+        Effect.provide(layer),
+      );
+      expect(logTicketEvent).toHaveBeenCalledWith({
+        action: 'role_change',
+        ticketId: 'user:user_1',
+        actorId: 'actor_1',
+      });
+    }),
+  );
 
-  it('returns ValidationError for invalid role', async () => {
-    const layer = makeLayers();
-    const exit = await runExit(
-      setUserRole({ clerkUserId: 'user_1', role: 'superadmin' as 'admin', actorId: 'actor_1' }),
-      layer,
-    );
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(ValidationError);
-    expect(err.message).toMatch(/Invalid role/);
-  });
+  it.effect('returns ValidationError for invalid role', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers();
+      const exit = yield* setUserRole({
+        clerkUserId: 'user_1',
+        role: 'superadmin' as 'admin',
+        actorId: 'actor_1',
+      }).pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(ValidationError);
+      expect(err.message).toMatch(/Invalid role/);
+    }),
+  );
 
-  it('returns NotFoundError when user does not exist', async () => {
-    const layer = makeLayers({
-      users: { setRole: vi.fn().mockReturnValue(Effect.succeed(null)) },
-    });
-    const exit = await runExit(
-      setUserRole({ clerkUserId: 'nonexistent', role: 'admin', actorId: 'actor_1' }),
-      layer,
-    );
-    const err = expectFailure(exit);
-    expect(err).toBeInstanceOf(NotFoundError);
-    expect(err.message).toMatch(/User not found/);
-  });
+  it.effect('returns NotFoundError when user does not exist', () =>
+    Effect.gen(function* () {
+      const layer = makeLayers({
+        users: { setRole: vi.fn().mockReturnValue(Effect.succeed(null)) },
+      });
+      const exit = yield* setUserRole({
+        clerkUserId: 'nonexistent',
+        role: 'admin',
+        actorId: 'actor_1',
+      }).pipe(Effect.provide(layer), Effect.exit);
+      const err = expectFailure(exit);
+      expect(err).toBeInstanceOf(NotFoundError);
+      expect(err.message).toMatch(/User not found/);
+    }),
+  );
 });
