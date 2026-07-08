@@ -5,8 +5,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { EmbeddingModelV3 } from '@ai-sdk/provider';
 
-export function getEmbeddingModel(): EmbeddingModelV3 {
-  const apiKey = process.env.AI_STUDIO_KEY;
+export function getEmbeddingModel(apiKey: string | null = process.env.AI_STUDIO_KEY ?? null): EmbeddingModelV3 {
   if (!apiKey) {
     throw new Error('AI_STUDIO_KEY is not set.');
   }

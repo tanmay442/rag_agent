@@ -4,22 +4,30 @@
 import { Redis } from '@upstash/redis';
 import type { RateLimiterAdapter } from '../adapter-ports';
 
-export function createUpstashRateLimiter(): RateLimiterAdapter {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) {
-    throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set.');
-  }
-  const redis = new Redis({ url, token });
+export function createRedisClient(url: string, token: string): Redis {
+  return new Redis({ url, token });
+}
+
+export function createUpstashRateLimiter(redis?: Redis): RateLimiterAdapter {
+  const client =
+    redis ??
+    (() => {
+      const url = process.env.UPSTASH_REDIS_REST_URL;
+      const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+      if (!url || !token) {
+        throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set.');
+      }
+      return createRedisClient(url, token);
+    })();
 
   return {
     async check(key, opts) {
       const now = Date.now();
       const windowId = Math.floor(now / opts.windowMs);
       const redisKey = `ratelimit:${key}:${windowId}`;
-      const count = await redis.incr(redisKey);
+      const count = await client.incr(redisKey);
       if (count === 1) {
-        await redis.expire(redisKey, Math.ceil(opts.windowMs / 1000) + 1);
+        await client.expire(redisKey, Math.ceil(opts.windowMs / 1000) + 1);
       }
       const resetMs = (windowId + 1) * opts.windowMs - now;
       if (count > opts.limit) {

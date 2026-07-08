@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { BlobStorageAdapter } from '../adapter-ports';
+import type { EnvConfig } from '@app/domain';
 
 interface S3CompatibleConfig {
   region: string;
@@ -50,17 +51,24 @@ function createS3CompatibleBlobStorage(config: S3CompatibleConfig): BlobStorageA
 
 // Standard AWS S3 adapter. Doubles as a MinIO adapter via the
 // S3_ENDPOINT env var (points the client at a self-hosted endpoint).
-export function createS3BlobStorage(): BlobStorageAdapter {
-  const region = process.env.S3_REGION;
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-  const bucket = process.env.S3_BUCKET;
+export function createS3BlobStorage(
+  cfg: Partial<
+    Pick<
+      EnvConfig.Service,
+      's3Region' | 's3AccessKeyId' | 's3SecretAccessKey' | 's3Bucket' | 's3Endpoint'
+    >
+  > = {},
+): BlobStorageAdapter {
+  const region = cfg.s3Region ?? process.env.S3_REGION;
+  const accessKeyId = cfg.s3AccessKeyId ?? process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = cfg.s3SecretAccessKey ?? process.env.S3_SECRET_ACCESS_KEY;
+  const bucket = cfg.s3Bucket ?? process.env.S3_BUCKET;
   if (!region || !accessKeyId || !secretAccessKey || !bucket) {
     throw new Error('S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET must be set.');
   }
   return createS3CompatibleBlobStorage({
     region,
-    endpoint: process.env.S3_ENDPOINT,
+    endpoint: cfg.s3Endpoint ?? process.env.S3_ENDPOINT,
     accessKeyId,
     secretAccessKey,
     bucket,

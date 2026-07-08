@@ -345,6 +345,56 @@ export namespace TransactionRunner {
   }
 }
 
+// ---- Env-derived config & shared clients ----
+
+/** Single source of truth for all env-derived infrastructure config.
+ *  Loaded once via Effect `Config` (see infra `EnvConfigLive`). Every
+ *  infrastructure layer that needs env values depends on this service
+ *  rather than reading `process.env` or `Config.*` directly, so tests
+ *  can supply a hardcoded layer. */
+export class EnvConfig extends Context.Tag('@app/EnvConfig')<EnvConfig, EnvConfig.Service>() {}
+export namespace EnvConfig {
+  export interface Service {
+    readonly embeddingProvider: string;
+    readonly chatProvider: string;
+    readonly aiStudioKey: string | null;
+    readonly openaiEmbeddingApiKey: string | null;
+    readonly openaiEmbeddingBaseUrl: string | null;
+    readonly openaiEmbeddingModel: string;
+    readonly customLlmApiKey: string | null;
+    readonly customLlmBaseUrl: string | null;
+    readonly llmModel: string;
+    readonly embeddingDimension: number;
+    readonly ollamaBaseUrl: string;
+    readonly ollamaEmbeddingModel: string;
+    readonly ollamaChatModel: string;
+    readonly upstashRedisUrl: string | null;
+    readonly upstashRedisToken: string | null;
+    readonly authProvider: string;
+    readonly adminEmails: readonly string[];
+    readonly blobStorageProvider: string;
+    readonly blobFsDir: string;
+    readonly r2AccountId: string | null;
+    readonly r2AccessKeyId: string | null;
+    readonly r2SecretAccessKey: string | null;
+    readonly r2Bucket: string | null;
+    readonly s3Region: string | null;
+    readonly s3AccessKeyId: string | null;
+    readonly s3SecretAccessKey: string | null;
+    readonly s3Bucket: string | null;
+    readonly s3Endpoint: string | null;
+    readonly qstashToken: string | null;
+    readonly qstashIngestWorkerUrl: string | null;
+  }
+}
+
+export class RedisClient extends Context.Tag('@app/RedisClient')<RedisClient, RedisClient.Service>() {}
+export namespace RedisClient {
+  export interface Service {
+    readonly redis: unknown;
+  }
+}
+
 // ---- Misc: Clock, Hasher, SessionStore ----
 
 export class Clock extends Context.Tag('@app/Clock')<Clock, Clock.Service>() {}

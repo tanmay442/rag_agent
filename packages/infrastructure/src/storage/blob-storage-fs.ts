@@ -3,8 +3,7 @@ import { join, dirname } from 'node:path';
 import { Readable } from 'node:stream';
 import type { BlobStorageAdapter } from '../adapter-ports';
 
-export function createFilesystemBlobStorage(): BlobStorageAdapter {
-  const baseDir = process.env.BLOB_FS_DIR ?? './.blobs';
+export function createFilesystemBlobStorage(baseDir: string = process.env.BLOB_FS_DIR ?? './.blobs'): BlobStorageAdapter {
   return {
     async put(key, body) {
       const path = join(baseDir, key);

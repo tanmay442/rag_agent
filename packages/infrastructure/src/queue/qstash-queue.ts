@@ -6,11 +6,12 @@ import type { IngestQueueAdapter } from '../adapter-ports';
  *  retries on non-2xx responses (up to `retries`). Requires
  *  `QSTASH_TOKEN` and `QSTASH_INGEST_WORKER_URL` (the public
  *  deployment URL — QStash cannot reach `localhost`). */
-export function createQstashQueue(): IngestQueueAdapter {
-  const token = process.env.QSTASH_TOKEN;
+export function createQstashQueue(
+  token: string | null = process.env.QSTASH_TOKEN ?? null,
+  baseUrl: string | null = process.env.QSTASH_INGEST_WORKER_URL ?? null,
+): IngestQueueAdapter {
   if (!token) throw new Error('QSTASH_TOKEN is not set.');
   const client = new Client({ token });
-  const baseUrl = process.env.QSTASH_INGEST_WORKER_URL ?? '';
   return {
     async enqueue({ documentId }) {
       if (!baseUrl) throw new Error('QSTASH_INGEST_WORKER_URL is not set.');
