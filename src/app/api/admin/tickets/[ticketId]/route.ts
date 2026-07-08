@@ -1,11 +1,13 @@
-import { z } from 'zod';
+import { Schema } from 'effect';
 import { requireAdminRoute, TICKET_STATUSES, respond } from '@/composition';
 import { ValidationError } from '@app/domain';
 
-const PatchSchema = z.object({
-  status: z.enum(TICKET_STATUSES).optional(),
-  assignedTo: z.string().nullable().optional(),
-  note: z.string().min(1).max(10_000).optional(),
+const PatchSchema = Schema.Struct({
+  status: Schema.optional(Schema.Literal(...TICKET_STATUSES)),
+  assignedTo: Schema.optional(Schema.NullOr(Schema.String)),
+  note: Schema.optional(
+    Schema.String.pipe(Schema.minLength(1), Schema.maxLength(10_000)),
+  ),
 });
 
 export async function PATCH(
@@ -17,15 +19,21 @@ export async function PATCH(
   const { session, comp } = auth;
   const { ticketId } = await context.params;
   const body = await req.json().catch(() => ({}));
-  const parsed = PatchSchema.safeParse(body);
-  if (!parsed.success) {
-    return respond(new ValidationError('Invalid payload', { issues: parsed.error.issues }));
+  let parsed: Schema.Schema.Type<typeof PatchSchema>;
+  try {
+    parsed = Schema.decodeUnknownSync(PatchSchema)(body);
+  } catch (e) {
+    return respond(
+      new ValidationError('Invalid payload', {
+        issues: e instanceof Error ? e.message : String(e),
+      }),
+    );
   }
   const result = await comp.updateTicket({
     ticketId,
-    status: parsed.data.status,
-    assignedTo: parsed.data.assignedTo,
-    note: parsed.data.note,
+    status: parsed.status,
+    assignedTo: parsed.assignedTo,
+    note: parsed.note,
     actorId: session.user.id,
   });
   if (!result.ok) return respond(result.error);

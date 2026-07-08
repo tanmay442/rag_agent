@@ -1,7 +1,7 @@
 import {
-  DomainError,
   ValidationError,
   RateLimitedError,
+  type DomainError,
   type Result,
 } from '@app/domain';
 
@@ -22,6 +22,15 @@ export type SafeErrorBody = {
   details?: Record<string, unknown>;
 };
 
+function isDomainError(err: unknown): err is DomainError {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    '_tag' in err &&
+    typeof (err as { _tag: unknown })._tag === 'string'
+  );
+}
+
 /** Build a client-safe error body from a DomainError.
  *  Never leaks raw internal messages — falls back to a generic
  *  string for codes not in the safe-allowlist. */
@@ -37,7 +46,7 @@ function toErrorBody(err: DomainError): SafeErrorBody {
 }
 
 export function toSafeError(err: unknown): SafeErrorBody {
-  if (err instanceof DomainError) return toErrorBody(err);
+  if (isDomainError(err)) return toErrorBody(err);
   return { error: 'An unexpected error occurred', code: 'internal_error' };
 }
 
@@ -68,8 +77,8 @@ export function isActionError<T>(
  *  - generic Error → 500 with generic body.
  *  - Response → passthrough.
  *  - anything else (thrown string/null/object) → 500, never 200. */
-export function respond(err: Error | DomainError | Response | unknown): Response {
-  if (err instanceof DomainError) {
+export function respond(err: unknown): Response {
+  if (isDomainError(err)) {
     const headers: Record<string, string> = {};
     if (err instanceof RateLimitedError) {
       headers['Retry-After'] = String(Math.ceil(err.retryAfterMs / 1000));

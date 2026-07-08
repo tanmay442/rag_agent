@@ -202,9 +202,6 @@ importers:
       effect:
         specifier: ^3.21.4
         version: 3.21.4
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
 
   packages/infrastructure:
     dependencies:

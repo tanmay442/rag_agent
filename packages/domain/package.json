@@ -12,7 +12,6 @@
     "./app-config": "./src/app-config.ts"
   },
   "dependencies": {
-    "effect": "^3.21.4",
-    "zod": "^4.4.3"
+    "effect": "^3.21.4"
   }
 }

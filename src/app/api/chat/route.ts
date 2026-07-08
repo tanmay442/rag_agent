@@ -5,7 +5,7 @@ import { getComposition, appConfig, type MyUIMessage, type Composition } from '@
 import type { RetrievedChunk } from '@app/application/rag/search';
 import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
-import { ChatRequestSchema } from './request-schema';
+import { safeParse as parseChatRequest } from './request-schema';
 import { sanitizeText } from '@/lib/sanitize';
 import { logger } from '@/lib/logger';
 import { CITATION_SNIPPET_MAX, TOOL_CONTENT_CAP, CHAT_RATE_LIMIT } from '../../../../config/constants';
@@ -150,7 +150,7 @@ async function streamChatResponse(req: Request): Promise<Response> {
     logger.debug('JSON parse failed', { error: String(e) });
     return null;
   });
-  const parsed = ChatRequestSchema.safeParse(raw);
+  const parsed = parseChatRequest(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request', issues: parsed.error.issues }, { status: 400 });
   }
