@@ -21,7 +21,7 @@ module.exports = {
       from: { path: '^packages/domain' },
       to: {
         dependencyTypes: ['npm'],
-        path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-parse|pdf-lib|pg|@neondatabase|drizzle-kit|ai/)',
+        path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-parse|pdf-lib|pg|@neondatabase|drizzle-kit|ai|zod/)',
       },
     },
     {
@@ -50,7 +50,7 @@ module.exports = {
       from: { path: '^packages/application' },
       to: {
         dependencyTypes: ['npm'],
-        path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-parse|pdf-lib|pg|@neondatabase|drizzle-kit/)',
+        path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-parse|pdf-lib|pg|@neondatabase|drizzle-kit|zod/)',
       },
     },
     {
