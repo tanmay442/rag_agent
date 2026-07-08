@@ -63,8 +63,8 @@ proposedplans.md
 proposedplan.md
 OUTSTANDING_ISSUES.md
 
-# Execution plan (transient agent planning artifacts — never commit)
-docs/execution-plan/
+# Effect migration plan (transient agent planning artifacts — never commit)
 AGENTS.md
-issue.md
 .vscode/settings.json
+
+docs/effect-migration
