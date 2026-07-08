@@ -2,7 +2,7 @@
 import { Effect } from 'effect';
 import { Audit } from '@app/domain';
 
-export const logDocumentEvent = Effect.fn('Auth.logDocumentEvent')(
+export const logDocumentEvent = Effect.fn('Audit.logDocumentEvent')(
   function* (input: {
     action: 'upload' | 'replace' | 'delete' | 'restore';
     documentId: number;
@@ -13,7 +13,7 @@ export const logDocumentEvent = Effect.fn('Auth.logDocumentEvent')(
   },
 );
 
-export const logTicketEvent = Effect.fn('Auth.logTicketEvent')(
+export const logTicketEvent = Effect.fn('Audit.logTicketEvent')(
   function* (input: {
     action: 'create' | 'assign' | 'status_change' | 'note' | 'role_change';
     ticketId: string;

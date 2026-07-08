@@ -2,14 +2,14 @@
 import { Effect } from 'effect';
 import { QueryStats } from '@app/domain';
 
-export const recordQuery = Effect.fn('Auth.recordQuery')(
+export const recordQuery = Effect.fn('QueryStats.recordQuery')(
   function* (userId: string, query: string) {
     const stats = yield* QueryStats;
     yield* stats.record(userId, query);
   },
 );
 
-export const getTopQueries = Effect.fn('Auth.getTopQueries')(
+export const getTopQueries = Effect.fn('QueryStats.getTopQueries')(
   function* (limit: number) {
     const stats = yield* QueryStats;
     return yield* stats.top(limit);

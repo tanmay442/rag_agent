@@ -34,7 +34,7 @@ interface ListDocumentsInput {
   offset?: number;
 }
 
-export const listDocuments = Effect.fn('Admin.listDocuments')(
+export const listDocuments = Effect.fn('Documents.listDocuments')(
   function* (input: ListDocumentsInput) {
     const documents = yield* Documents;
     const chunks = yield* Chunks;
@@ -72,7 +72,7 @@ function asyncIngestEnabled(): boolean {
   return Boolean(process.env.QSTASH_TOKEN);
 }
 
-export const uploadPdf = Effect.fn('Admin.uploadPdf')(
+export const uploadPdf = Effect.fn('Documents.uploadPdf')(
   function* (input: { fileName: string; buffer: Buffer; actorId: string }) {
     if (input.buffer.length >= ASYNC_INGEST_THRESHOLD && asyncIngestEnabled()) {
       return yield* queuePdfForIngest(input, (newId) => ({ action: 'upload', documentId: newId }));
@@ -177,7 +177,7 @@ function queuePdfForIngest(
   });
 }
 
-export const softDeleteDocument = Effect.fn('Admin.softDeleteDocument')(
+export const softDeleteDocument = Effect.fn('Documents.softDeleteDocument')(
   function* (input: { documentId: number; actorId: string }) {
     const documents = yield* Documents;
     const runner = yield* TransactionRunner;
@@ -196,7 +196,7 @@ export const softDeleteDocument = Effect.fn('Admin.softDeleteDocument')(
   },
 );
 
-export const restoreDocument = Effect.fn('Admin.restoreDocument')(
+export const restoreDocument = Effect.fn('Documents.restoreDocument')(
   function* (documentId: number, actorId: string) {
     const documents = yield* Documents;
     const clock = yield* Clock;
@@ -217,7 +217,7 @@ export const restoreDocument = Effect.fn('Admin.restoreDocument')(
   },
 );
 
-export const getDocumentById = Effect.fn('Admin.getDocumentById')(
+export const getDocumentById = Effect.fn('Documents.getDocumentById')(
   function* (documentId: number) {
     const documents = yield* Documents;
     const doc = yield* documents.findById(documentId);
@@ -225,7 +225,7 @@ export const getDocumentById = Effect.fn('Admin.getDocumentById')(
   },
 );
 
-export const hardDeleteDocument = Effect.fn('Admin.hardDeleteDocument')(
+export const hardDeleteDocument = Effect.fn('Documents.hardDeleteDocument')(
   function* (input: { documentId: number; actorId: string }) {
     const documents = yield* Documents;
     const runner = yield* TransactionRunner;
@@ -250,7 +250,7 @@ export const hardDeleteDocument = Effect.fn('Admin.hardDeleteDocument')(
   },
 );
 
-export const replacePdf = Effect.fn('Admin.replacePdf')(
+export const replacePdf = Effect.fn('Documents.replacePdf')(
   function* (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) {
     const documents = yield* Documents;
     const existing = yield* documents.findById(input.documentId);
@@ -289,7 +289,7 @@ export const replacePdf = Effect.fn('Admin.replacePdf')(
   },
 );
 
-export const recountChunksForDocument = Effect.fn('Admin.recountChunksForDocument')(
+export const recountChunksForDocument = Effect.fn('Documents.recountChunksForDocument')(
   function* (documentId: number) {
     const chunks = yield* Chunks;
     const count = yield* chunks.countForDocument(documentId);
@@ -297,7 +297,7 @@ export const recountChunksForDocument = Effect.fn('Admin.recountChunksForDocumen
   },
 );
 
-export const recountChunksForAllDocuments = Effect.fn('Admin.recountChunksForAllDocuments')(
+export const recountChunksForAllDocuments = Effect.fn('Documents.recountChunksForAllDocuments')(
   function* () {
     const chunks = yield* Chunks;
     return yield* chunks.recountAll();

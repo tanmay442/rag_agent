@@ -8,7 +8,7 @@ interface RateLimitInput {
   windowMs: number;
 }
 
-export const enforceRateLimit = Effect.fn('Auth.enforceRateLimit')(
+export const enforceRateLimit = Effect.fn('RateLimit.enforceRateLimit')(
   function* (input: RateLimitInput) {
     const limiter = yield* RateLimiter;
     return yield* limiter.check(input.key, { limit: input.limit, windowMs: input.windowMs });

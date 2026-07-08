@@ -3,7 +3,7 @@ import { Audit } from '@app/domain';
 import { MAX_AUDIT_LIMIT } from '../../../../config/constants';
 import { sanitizePagination } from '../pagination';
 
-export const listAudit = Effect.fn('Admin.listAudit')(
+export const listAudit = Effect.fn('Audit.listAudit')(
   function* (input: {
     documentId?: number;
     ticketId?: string;

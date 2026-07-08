@@ -23,7 +23,7 @@ export const VALID_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = 
   closed: [],
 };
 
-export const listTickets = Effect.fn('Admin.listTickets')(
+export const listTickets = Effect.fn('Tickets.listTickets')(
   function* (input: {
     status?: TicketStatus;
     assignee?: string | null;
@@ -52,7 +52,7 @@ export interface UpdateTicketInput {
   actorId: string;
 }
 
-export const updateTicket = Effect.fn('Admin.updateTicket')(
+export const updateTicket = Effect.fn('Tickets.updateTicket')(
   function* (input: UpdateTicketInput) {
     const tickets = yield* Tickets;
     const audit = yield* Audit;
@@ -96,7 +96,7 @@ export interface CreateTicketInput {
   issue: string;
 }
 
-export const createTicket = Effect.fn('Admin.createTicket')(
+export const createTicket = Effect.fn('Tickets.createTicket')(
   function* (input: CreateTicketInput) {
     const tickets = yield* Tickets;
     const audit = yield* Audit;

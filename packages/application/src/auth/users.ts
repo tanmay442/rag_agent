@@ -3,7 +3,7 @@ import { Users, Audit, NotFoundError, ValidationError } from '@app/domain';
 import { MAX_LIST_LIMIT } from '../../../../config/constants';
 import { sanitizePagination } from '../pagination';
 
-export const listUsers = Effect.fn('Auth.listUsers')(
+export const listUsers = Effect.fn('Users.listUsers')(
   function* (input: { search?: string; limit?: number; offset?: number }) {
     const users = yield* Users;
     const { limit, offset } = sanitizePagination(input.limit, input.offset, MAX_LIST_LIMIT);
@@ -12,7 +12,7 @@ export const listUsers = Effect.fn('Auth.listUsers')(
   },
 );
 
-export const setUserRole = Effect.fn('Auth.setUserRole')(
+export const setUserRole = Effect.fn('Users.setUserRole')(
   function* (input: { clerkUserId: string; role: 'admin' | 'user'; actorId: string }) {
     if (input.role !== 'admin' && input.role !== 'user') {
       return yield* new ValidationError(`Invalid role: ${input.role}`);
@@ -36,7 +36,7 @@ export const setUserRole = Effect.fn('Auth.setUserRole')(
   },
 );
 
-export const getUserByClerkId = Effect.fn('Auth.getUserByClerkId')(
+export const getUserByClerkId = Effect.fn('Users.getUserByClerkId')(
   function* (clerkUserId: string) {
     const users = yield* Users;
     const u = yield* users.findByClerkId(clerkUserId);
@@ -48,7 +48,7 @@ export const getUserByClerkId = Effect.fn('Auth.getUserByClerkId')(
   },
 );
 
-export const touchLastSeen = Effect.fn('Auth.touchLastSeen')(
+export const touchLastSeen = Effect.fn('Users.touchLastSeen')(
   function* (clerkUserId: string) {
     const users = yield* Users;
     yield* users.touchLastSeen(clerkUserId);
