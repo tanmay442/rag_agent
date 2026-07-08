@@ -287,11 +287,11 @@ inside `packages/`:
 
 ```
 packages/
-├── domain/         # @app/domain — pure types, Zod schemas,
-│                   #   Result<T,E>, DomainError hierarchy,
+├── domain/         # @app/domain — pure types, Effect Schema,
+│                   #   DomainError hierarchy,
 │                   #   port interfaces (repositories, services)
 ├── application/    # @app/application — use-cases that return
-│                   #   Result<T, DomainError>. Imports only domain.
+│                   #   Effect<A, DomainError>. Imports only domain.
 ├── infrastructure/ # @app/infrastructure — Drizzle repos, AI SDK
 │                   #   adapters, Clerk session, pdf-parse, bytea.
 │                   #   Imports domain only (not application).
@@ -307,7 +307,7 @@ place where adapters are instantiated; routes import from
 
 | Layer            | May import                                | May NOT import                |
 |------------------|-------------------------------------------|-------------------------------|
-| `domain`         | zod                                       | application, infrastructure, cli, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
+| `domain`         | effect                                     | application, infrastructure, cli, src/, drizzle, @ai-sdk, pdf-parse, next, node: built-ins |
 | `application`    | domain, config/constants                  | infrastructure, src/app, src/components, drizzle, @ai-sdk, pdf-parse, next |
 | `infrastructure` | domain, drizzle, @ai-sdk, clerk, pdf-parse, pg | application, src/app, src/components, next |
 | `src/app`, `src/components` | application, domain, src/lib/http, src/lib/config | drizzle, @ai-sdk, pdf-parse, infrastructure |
@@ -318,7 +318,7 @@ Run `pnpm arch` after any change that touches the import graph.
 #### Boundary validation
 
 Every route handler and server action parses its external input
-through a Zod schema before it reaches a use-case:
+through an Effect Schema before it reaches a use-case:
 
 - `src/lib/config/index.ts` — validates `config/app.config.ts` at server start
 - `src/app/api/chat/request-schema.ts` — POST `/api/chat` body
@@ -332,9 +332,10 @@ infrastructure adapter:
 - `packages/infrastructure/src/llm/google-embedding-service.ts` — validates `AI_STUDIO_KEY`
 - `packages/infrastructure/src/llm/openai-chat-service.ts` — validates `CUSTOM_LLM_API_KEY`, `CUSTOM_LLM_BASE_URL`
 - `packages/infrastructure/src/auth/session.ts` — parses `ADMIN_EMAILS`
-- `src/lib/logger.ts` — gates on `LOG_LEVEL`
+- `src/lib/env.ts` — validates required env vars via Effect `Config`
+  (through the `EnvConfig` service / `EnvConfigLive` layer) at server start
 
-Use-cases return `Result<T, DomainError>`; `src/lib/http.ts` exports
+Use-cases return `Effect<A, DomainError>`; `src/lib/http.ts` exports
 `respond(result)` which maps `DomainError` to the right HTTP status
 (ValidationError → 400, UnauthorizedError → 401, ForbiddenError → 403,
 NotFoundError → 404, ConflictError → 409, GoneError → 410,

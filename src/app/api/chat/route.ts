@@ -1,5 +1,4 @@
-import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageStreamResponse, type InferUIMessageChunk } from 'ai';
-import { z } from 'zod';
+import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageStreamResponse, jsonSchema, type InferUIMessageChunk } from 'ai';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { getComposition, appConfig, type MyUIMessage, type Composition } from '@/composition';
 import { RateLimitedError } from '@app/domain';
@@ -35,23 +34,26 @@ function buildChatTools(deps: {
     searchDocumentation: tool({
       description:
         "Search the org documentation for chunks relevant to the user's question. Returns an array of { content, similarity } objects, ordered by similarity (highest first). Call this tool whenever you need to ground an answer in the official docs. You may call it more than once with a reformulated query if the first call returns nothing useful. Each `content` is capped at 800 characters; the full chunk is still available, but only the top 3 results are returned by default. Do NOT call this for non-documentation questions (medical, legal, personal).",
-      inputSchema: z.object({
-        query: z
-          .string()
-          .min(1)
-          .max(2000)
-          .describe(
-            'A focused, specific search query. Reformulate vague user wording into a tight phrase (e.g. "school cell phone policy" instead of "phones").',
-          ),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(10)
-          .optional()
-          .describe(
-            'Maximum number of chunks to return. Defaults to 3. Use a larger value only if the first call returned nothing useful.',
-          ),
+      inputSchema: jsonSchema<{ query: string; limit?: number }>({
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 2000,
+            description:
+              'A focused, specific search query. Reformulate vague user wording into a tight phrase (e.g. "school cell phone policy" instead of "phones").',
+          },
+          limit: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 10,
+            description:
+              'Maximum number of chunks to return. Defaults to 3. Use a larger value only if the first call returned nothing useful.',
+          },
+        },
+        required: ['query'],
+        additionalProperties: false,
       }),
       execute: async ({ query, limit }) => {
         try {
@@ -76,24 +78,29 @@ function buildChatTools(deps: {
     createSupportTicket: tool({
       description:
         'Open a support ticket. Invoke this tool when the user\'s issue cannot be resolved via the available documentation content or the user has explicitly asked to open one, file one, escalate, talk to a human, or submit a complaint. When invoking, provide a structured `issue` summary with appropriate context so the reviewer can understand the full situation without reading the transcript: Product / Question / What was tried / Docs searched / User context.',
-      inputSchema: z.object({
-        name: z
-          .string()
-          .describe(
-            "Ignored by the server \u2014 the signed-in user's name is used instead.",
-          ),
-        email: z
-          .string()
-          .email()
-          .describe(
-            "Ignored by the server \u2014 the signed-in user's email is used instead.",
-          ),
-        issue: z
-          .string()
-          .max(10_000)
-          .describe(
-            'Structured ticket summary in the form: Question: ...\nWhat was tried: ...\nDocs searched: ...\nUser context: ...',
-          ),
+      inputSchema: jsonSchema<{ name: string; email: string; issue: string }>({
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description:
+              "Ignored by the server — the signed-in user's name is used instead.",
+          },
+          email: {
+            type: 'string',
+            format: 'email',
+            description:
+              "Ignored by the server — the signed-in user's email is used instead.",
+          },
+          issue: {
+            type: 'string',
+            maxLength: 10_000,
+            description:
+              'Structured ticket summary in the form: Question: ...\nWhat was tried: ...\nDocs searched: ...\nUser context: ...',
+          },
+        },
+        required: ['name', 'email', 'issue'],
+        additionalProperties: false,
       }),
       execute: async ({ issue }) => {
         const clerkUser = await currentUser();

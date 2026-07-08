@@ -1,63 +1,84 @@
-// Lightweight structured logger. Uses console under the hood but
-// outputs JSON for easy parsing by log aggregators.
-// Replace with pino or similar if richer features are needed.
+import { Effect, Logger, LogLevel } from "effect";
 
-type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+/**
+ * App-wide structured logger built on Effect's `Logger`.
+ *
+ * The previous custom logger (console + manual JSON.stringify) is replaced
+ * by Effect's `Logger`. `AppLogger` is a `Layer` that overrides the default
+ * logger with a JSON formatter. Non-Effect runtime contexts (Next.js route
+ * handlers, server actions) log through the `logger` facade below, which runs
+ * the underlying Effect log inside a minimal runtime scoped to `AppLogger`.
+ */
 
-const LEVEL_PRIORITY: Record<LogLevel, number> = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  debug: 3,
-};
-
-const configuredLevel: LogLevel =
-  (process.env.LOG_LEVEL as LogLevel | undefined) ?? 'info';
-
-/** Serialise Error objects so JSON.stringify captures their
- *  properties (Error props are non-enumerable by default). */
-function serializeMeta(meta: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(meta)) {
-    if (value instanceof Error) {
-      const errObj: Record<string, unknown> = {
-        message: value.message,
-        ...(value.stack ? { stack: value.stack } : {}),
-      };
-      const code = (value as { code?: unknown }).code;
-      if (code !== undefined) errObj.code = code;
-      const cause = (value as { cause?: unknown }).cause;
-      if (cause !== undefined) {
-        errObj.cause = cause instanceof Error
-          ? serializeMeta({ cause })
-          : { cause: String(cause) };
-      }
-      out[key] = errObj;
-    } else {
-      out[key] = value;
-    }
+function safeStringify(value: unknown): string {
+  if (value instanceof Error) {
+    const out: Record<string, unknown> = { message: value.message };
+    if (value.stack) out.stack = value.stack;
+    const code = (value as { code?: unknown }).code;
+    if (code !== undefined) out.code = code;
+    return JSON.stringify(out);
   }
-  return out;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
-function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
-  if (LEVEL_PRIORITY[level] > LEVEL_PRIORITY[configuredLevel]) return;
-  const entry = {
-    level,
-    time: new Date().toISOString(),
-    msg: message,
-    ...(meta ? serializeMeta(meta) : {}),
-  };
-  const line = JSON.stringify(entry);
-  if (level === 'error') console.error(line);
-  else if (level === 'warn') console.warn(line);
-  else if (level === 'debug') console.debug(line);
-  else console.log(line);
+function formatMessage(message: unknown): string {
+  if (Array.isArray(message)) {
+    return message
+      .map((m) => (typeof m === "string" ? m : safeStringify(m)))
+      .join(" ");
+  }
+  return typeof message === "string" ? message : safeStringify(message);
 }
 
+/** Structured JSON logger layer. */
+export const AppLogger = Logger.replace(
+  Logger.defaultLogger,
+  Logger.make((options) => {
+    const entry: Record<string, unknown> = {
+      level: options.logLevel.label,
+      time: options.date.toISOString(),
+      msg: formatMessage(options.message),
+    };
+    if (options.cause._tag !== "Empty") {
+      entry.cause = safeStringify(options.cause);
+    }
+    const line = JSON.stringify(entry);
+    if (options.logLevel === LogLevel.Error) console.error(line);
+    else if (options.logLevel === LogLevel.Warning) console.warn(line);
+    else console.log(line);
+  }),
+);
+
+type Meta = Record<string, unknown> | undefined;
+
+function runLog(
+  level: "info" | "warn" | "error" | "debug",
+  message: string,
+  meta?: Meta,
+): void {
+  const args: Array<unknown> = [message];
+  if (meta && Object.keys(meta).length > 0) args.push(meta);
+
+  const effect: Effect.Effect<void> =
+    level === "error"
+      ? Effect.logError(...args)
+      : level === "warn"
+        ? Effect.logWarning(...args)
+        : level === "debug"
+          ? Effect.logDebug(...args)
+          : Effect.logInfo(...args);
+
+  Effect.runSync(Effect.provide(effect, AppLogger));
+}
+
+/** Logging facade for non-Effect (synchronous/runtime) contexts. */
 export const logger = {
-  info: (msg: string, meta?: Record<string, unknown>) => log('info', msg, meta),
-  warn: (msg: string, meta?: Record<string, unknown>) => log('warn', msg, meta),
-  error: (msg: string, meta?: Record<string, unknown>) => log('error', msg, meta),
-  debug: (msg: string, meta?: Record<string, unknown>) => log('debug', msg, meta),
+  info: (msg: string, meta?: Meta) => runLog("info", msg, meta),
+  warn: (msg: string, meta?: Meta) => runLog("warn", msg, meta),
+  error: (msg: string, meta?: Meta) => runLog("error", msg, meta),
+  debug: (msg: string, meta?: Meta) => runLog("debug", msg, meta),
 };
