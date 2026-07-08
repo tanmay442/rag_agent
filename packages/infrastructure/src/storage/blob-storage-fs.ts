@@ -22,5 +22,8 @@ export function createFilesystemBlobStorage(): BlobStorage {
     async delete(key) {
       await fs.unlink(join(baseDir, key)).catch(() => {});
     },
+    // signedUrl is intentionally omitted — filesystem storage
+    // doesn't support time-limited URLs. Callers should check
+    // for its existence before using it (see blob/route.ts).
   };
 }

@@ -5,9 +5,11 @@ import { z } from 'zod';
 
 const MAX_TEXT_LENGTH = 50_000;
 
+const ACCEPTED_PART_TYPES = ['text', 'tool-invocation', 'step-start', 'step-finish', 'source'] as const;
+
 const MessagePartSchema = z.union([
   z.object({ type: z.literal('text'), text: z.string().max(MAX_TEXT_LENGTH) }),
-  z.object({ type: z.string(), text: z.string().max(MAX_TEXT_LENGTH).optional() }).strip(),
+  z.object({ type: z.enum(ACCEPTED_PART_TYPES), text: z.string().max(MAX_TEXT_LENGTH).optional() }).strip(),
 ]);
 
 export const ChatRequestSchema = z.object({

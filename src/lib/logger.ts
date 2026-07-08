@@ -27,7 +27,11 @@ function serializeMeta(meta: Record<string, unknown>): Record<string, unknown> {
       const code = (value as { code?: unknown }).code;
       if (code !== undefined) errObj.code = code;
       const cause = (value as { cause?: unknown }).cause;
-      if (cause !== undefined) errObj.cause = String(cause);
+      if (cause !== undefined) {
+        errObj.cause = cause instanceof Error
+          ? serializeMeta({ cause })
+          : { cause: String(cause) };
+      }
       out[key] = errObj;
     } else {
       out[key] = value;

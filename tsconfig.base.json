@@ -4,8 +4,8 @@
     "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "declaration": true,
@@ -13,6 +13,10 @@
     "sourceMap": true,
     "composite": false,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "rewriteRelativeImportExtensions": true,
+    "noUnusedLocals": true,
+    "noImplicitOverride": true
   }
 }

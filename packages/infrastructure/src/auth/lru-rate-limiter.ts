@@ -52,7 +52,7 @@ export const lruRateLimiter: RateLimiter = {
   },
 };
 
-function __resetRateLimitForTests(): void {
+export function __resetRateLimitForTests(): void {
   buckets.clear();
   evictionCounter = 0;
 }

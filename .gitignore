@@ -65,3 +65,6 @@ OUTSTANDING_ISSUES.md
 
 # Execution plan (transient agent planning artifacts — never commit)
 docs/execution-plan/
+AGENTS.md
+issue.md
+.vscode/settings.json

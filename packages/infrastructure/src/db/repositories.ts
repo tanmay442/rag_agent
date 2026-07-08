@@ -296,18 +296,24 @@ export const userRepo = {
           ilike(users.name, `%${search.replace(/[%_]/g, '\\$&')}%`),
         )
       : undefined;
-    const rows = (await client
-      .select()
+    const rows = await client
+      .select({
+        clerkUserId: users.clerkUserId,
+        email: users.email,
+        name: users.name,
+        imageUrl: users.imageUrl,
+        role: users.role,
+        lastSeenAt: users.lastSeenAt,
+        createdAt: users.createdAt,
+        total: sql<number>`count(*) over()`.as('total'),
+      })
       .from(users)
       .where(where)
       .orderBy(users.createdAt)
       .limit(opts.limit)
-      .offset(opts.offset)) as UserRow[];
-    const [totalRow] = await client
-      .select({ count: sql<number>`count(*)::int` })
-      .from(users)
-      .where(where);
-    return { rows, total: totalRow?.count ?? 0 };
+      .offset(opts.offset);
+    const total = rows[0]?.total ?? 0;
+    return { rows: rows as unknown as UserRow[], total };
   },
   async countAll(client: Client = db): Promise<number> {
     const [row] = await client.select({ count: sql<number>`count(*)::int` }).from(users);

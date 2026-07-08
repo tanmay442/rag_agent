@@ -18,13 +18,13 @@ const authAdapter = Auth.createAuthAdapter();
 const requireAdmin = authAdapter.requireAdmin;
 const requireSession = authAdapter.requireSession;
 const getAppSession = authAdapter.getAppSession;
-import { ForbiddenError, UnauthorizedError, unwrap, err, ok, NotFoundError, ExternalServiceError, type Result, type BlobStorage, type IngestQueue, type RateLimiter, type QueryStats } from '@app/domain';
+import { ForbiddenError, UnauthorizedError, GoneError, ValidationError, unwrap, err, ok, NotFoundError, ExternalServiceError, type Result, type BlobStorage, type IngestQueue, type RateLimiter, type QueryStats } from '@app/domain';
 import { type MyUIMessage } from '@app/application/chat';
 import type { DocumentRow } from '@app/domain';
 import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
 import { logger } from './lib/logger';
-import { respond, respondResult, toActionResult, isActionError } from './lib/http';
+import { respond, respondResult } from './lib/http';
 import { MAX_LIST_LIMIT } from '../config/constants';
 
 const systemClock = { now: () => new Date() };
@@ -59,6 +59,12 @@ const ingestDeps: IngestDeps = {
   pdfParser: Pdf.pdfParseParser, textSplitter: Pdf.langchainSplitter,
 };
 const searchDeps: SearchDeps = { chunks: chunkRepo, embeddings: embeddingService };
+
+// Cache rate limiter and query stats instances to avoid creating
+// new Upstash Redis clients on every request (fixes connection leak).
+const rateLimiter: RateLimiter = createRateLimiter();
+const queryStats: QueryStats = createQueryStats();
+
 function createRateLimiter(): RateLimiter {
   if (process.env.UPSTASH_REDIS_REST_URL) return Auth.createUpstashRateLimiter();
   return Auth.lruRateLimiter;
@@ -69,7 +75,7 @@ function createQueryStats(): QueryStats {
   return Auth.inMemoryQueryStats;
 }
 
-const rateLimitDeps: RateLimitDeps = { limiter: createRateLimiter() };
+const rateLimitDeps: RateLimitDeps = { limiter: rateLimiter };
 
 function createComposition() {
   const auditDeps = { audit: Db.auditRepo };
@@ -85,8 +91,8 @@ function createComposition() {
     getUserByClerkId: (id: string) => bind(getUserByClerkId, id, userDeps),
     logDocumentEvent: (input: Parameters<typeof logDocumentEvent>[0]) => bind(logDocumentEvent, input, auditDeps),
     logTicketEvent: (input: Parameters<typeof logTicketEvent>[0]) => bind(logTicketEvent, input, auditDeps),
-    recordQuery: (userId: string, query: string) => recordQuery(userId, query, { stats: createQueryStats() }),
-    getTopQueries: (limit: number) => getTopQueries(limit, { stats: createQueryStats() }),
+    recordQuery: (userId: string, query: string) => recordQuery(userId, query, { stats: queryStats }),
+    getTopQueries: (limit: number) => getTopQueries(limit, { stats: queryStats }),
     enforceRateLimit: (input: Parameters<typeof enforceRateLimit>[0]) => bind(enforceRateLimit, input, rateLimitDeps),
     listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
       bind(listDocuments, input, { documents: documentRepo, chunks: chunkRepo, ...userDeps }),
@@ -151,7 +157,7 @@ function createComposition() {
     recountChunksForDocument: (id: number) => bind(recountChunksForDocument, id, { chunks: chunkRepo }),
     recountChunksForAllDocuments: () => bind(recountChunksForAllDocuments, { chunks: chunkRepo }),
     getAnalyticsSummary: () =>
-      bind(getAnalyticsSummary, { documents: documentRepo, chunks: chunkRepo, tickets: Db.ticketRepo, ...userDeps, stats: createQueryStats() }),
+      bind(getAnalyticsSummary, { documents: documentRepo, chunks: chunkRepo, tickets: Db.ticketRepo, ...userDeps, stats: queryStats }),
     listAudit: (input: Parameters<typeof listAudit>[0]) => bind(listAudit, input, auditDeps),
     db: Db.db,
     schema: Db.schema,
@@ -160,7 +166,7 @@ function createComposition() {
     getChatModel: Llm.getChatModel,
     session: Auth.clerkSessionStore,
     rateLimit: async (key: string, opts: { limit: number; windowMs: number }) =>
-      createRateLimiter().check(key, opts),
+      rateLimiter.check(key, opts),
   };
 }
 
@@ -177,10 +183,6 @@ export function getComposition(): Composition {
   return _composition;
 }
 
-function resetComposition() {
-  _composition = null;
-}
-
 export async function requireAdminRoute(): Promise<
   | { ok: true; session: Awaited<ReturnType<typeof requireAdmin>>; comp: Composition }
   | { ok: false; response: Response }
@@ -188,11 +190,11 @@ export async function requireAdminRoute(): Promise<
   try {
     const session = await requireAdmin();
     return { ok: true, session, comp: getComposition() };
-  } catch (err) {
-    if (err instanceof UnauthorizedError) return { ok: false, response: new Response('Unauthorized', { status: 401 }) };
-    if (err instanceof ForbiddenError) return { ok: false, response: new Response('Forbidden', { status: 403 }) };
-    logger.error('requireAdminRoute failed', { error: err });
-    return { ok: false, response: new Response('Service Unavailable', { status: 503 }) };
+  } catch (e) {
+    if (e instanceof UnauthorizedError) return { ok: false, response: respond(new UnauthorizedError()) };
+    if (e instanceof ForbiddenError) return { ok: false, response: respond(new ForbiddenError()) };
+    logger.error('requireAdminRoute failed', { error: e });
+    return { ok: false, response: respond(new ExternalServiceError('Service unavailable', e)) };
   }
 }
 
@@ -242,12 +244,12 @@ export async function requireAdminDocument(
   if (!auth.ok) return auth;
   const { id } = await context.params;
   const docId = Number(id);
-  if (!Number.isInteger(docId)) return { ok: false, response: new Response('Invalid id', { status: 400 }) };
+  if (!Number.isInteger(docId)) return { ok: false, response: respond(new ValidationError('Invalid id')) };
   const r = await auth.comp.getDocumentById(docId);
   if (!r.ok) return { ok: false, response: respond(r.error) };
   const doc = r.value.document;
-  if (!doc) return { ok: false, response: new Response('Not found', { status: 404 }) };
-  if (!opts.allowDeleted && doc.deletedAt) return { ok: false, response: new Response('Gone', { status: 410 }) };
-  if (!doc.storageKey) return { ok: false, response: new Response('File unavailable', { status: 404 }) };
+  if (!doc) return { ok: false, response: respond(new NotFoundError('Document not found')) };
+  if (!opts.allowDeleted && doc.deletedAt) return { ok: false, response: respond(new GoneError('Document was deleted')) };
+  if (!doc.storageKey) return { ok: false, response: respond(new NotFoundError('File unavailable')) };
   return { ok: true, session: auth.session, comp: auth.comp, document: doc };
 }

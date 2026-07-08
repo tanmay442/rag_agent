@@ -220,6 +220,8 @@ async function streamChatResponse(req: Request): Promise<Response> {
           logger.error('Chat stream error', { error: err });
           controller.error(err);
           return;
+        } finally {
+          reader.releaseLock();
         }
         controller.close();
       })();

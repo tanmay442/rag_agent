@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   const { limit, offset } = parseQueryPagination(url);
   const result = await comp.listTickets({
     status: status && isTicketStatus(status) ? status : undefined,
-    assignee: assignee === null ? undefined : assignee,
+    assignee: assignee || undefined,
     search,
     limit,
     offset,

@@ -1,4 +1,5 @@
 import type { DomainError } from './errors';
+import { ExternalServiceError } from './errors';
 
 export type Result<T, E = DomainError> =
   | { ok: true; value: T }
@@ -36,4 +37,14 @@ export function unwrap<T, E>(r: Result<T, E>): T {
 
 export function unwrapOr<T, E>(r: Result<T, E>, fallback: T): T {
   return r.ok ? r.value : fallback;
+}
+
+/** Wrap a Promise into a Result. Rejects are converted to
+ *  ExternalServiceError; resolves are wrapped in ok(). */
+export async function fromPromise<T>(promise: Promise<T>, message?: string): Promise<Result<T>> {
+  try {
+    return ok(await promise);
+  } catch (e) {
+    return err(new ExternalServiceError(message ?? 'Operation failed', e));
+  }
 }

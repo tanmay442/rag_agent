@@ -201,6 +201,8 @@ export interface BlobStorage {
   get(key: string): Promise<Buffer>;
   stream(key: string): Promise<ReadableStream<Uint8Array>>;
   delete(key: string): Promise<void>;
+  /** Generate a time-limited signed URL for direct access.
+   *  Optional — filesystem adapters may not support this. */
   signedUrl?(key: string, ttlSec: number): Promise<string>;
 }
 

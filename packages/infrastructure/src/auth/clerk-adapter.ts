@@ -94,7 +94,10 @@ export async function getAppSession(): Promise<AppSessionFull | null> {
     const client = await clerkClient();
     client.users.updateUserMetadata(userId, { publicMetadata: { role: 'admin' } }).catch(() => {});
   }
-  void touchLastSeen(userId).catch(() => {});
+  void touchLastSeen(userId).catch((e) => {
+    // Log but don't fail the request — lastSeen is best-effort.
+    console.error('touchLastSeen failed', e);
+  });
   return {
     user: {
       id: userId,
@@ -158,13 +161,15 @@ async function resolveRole(
     }
   }
   // Fallback: read role from Clerk Backend SDK (Edge-compatible).
+  // This only runs when the JWT template doesn't include the role claim
+  // (should be rare after first login when syncClerkRole runs).
   try {
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
     const role = (user.publicMetadata as { role?: unknown } | null)?.role;
     if (role === 'admin' || role === 'user') return role;
   } catch (err) {
-    console.error('proxy: failed to read user from Clerk', err);
+    console.error('proxy: failed to read user role from Clerk API fallback', err);
   }
   return 'user';
 }

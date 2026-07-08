@@ -7,6 +7,47 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { BlobStorage } from '@app/domain';
 
+interface S3CompatibleConfig {
+  region: string;
+  endpoint?: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+}
+
+function createS3CompatibleBlobStorage(config: S3CompatibleConfig): BlobStorage {
+  const client = new S3Client({
+    region: config.region,
+    ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+  });
+  return {
+    async put(key, body, contentType) {
+      await client.send(
+        new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: body, ContentType: contentType }),
+      );
+    },
+    async get(key) {
+      const resp = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+      if (!resp.Body) throw new Error('Empty response body from object storage');
+      return Buffer.from(await resp.Body.transformToByteArray());
+    },
+    async stream(key) {
+      const resp = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+      if (!resp.Body) throw new Error('Empty response body from object storage');
+      return resp.Body.transformToWebStream() as ReadableStream<Uint8Array>;
+    },
+    async delete(key) {
+      await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
+    },
+    async signedUrl(key, ttlSec) {
+      return getSignedUrl(client, new GetObjectCommand({ Bucket: config.bucket, Key: key }), {
+        expiresIn: ttlSec,
+      });
+    },
+  };
+}
+
 // Standard AWS S3 adapter. Doubles as a MinIO adapter via the
 // S3_ENDPOINT env var (points the client at a self-hosted endpoint).
 export function createS3BlobStorage(): BlobStorage {
@@ -17,32 +58,11 @@ export function createS3BlobStorage(): BlobStorage {
   if (!region || !accessKeyId || !secretAccessKey || !bucket) {
     throw new Error('S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET must be set.');
   }
-  const client = new S3Client({
+  return createS3CompatibleBlobStorage({
     region,
-    ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true } : {}),
-    credentials: { accessKeyId, secretAccessKey },
+    endpoint: process.env.S3_ENDPOINT,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
   });
-  return {
-    async put(key, body, contentType) {
-      await client.send(
-        new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }),
-      );
-    },
-    async get(key) {
-      const resp = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-      return Buffer.from(await resp.Body!.transformToByteArray());
-    },
-    async stream(key) {
-      const resp = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-      return resp.Body!.transformToWebStream() as ReadableStream<Uint8Array>;
-    },
-    async delete(key) {
-      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-    },
-    async signedUrl(key, ttlSec) {
-      return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), {
-        expiresIn: ttlSec,
-      });
-    },
-  };
 }

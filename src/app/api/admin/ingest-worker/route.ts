@@ -3,6 +3,15 @@ import { Receiver } from '@upstash/qstash';
 import { getComposition } from '@/composition';
 import { NotFoundError } from '@app/domain';
 
+/** Lazily create a Receiver from env vars. Reads env on each call
+ *  so tests can set vars after module import. */
+function getReceiver(): Receiver | null {
+  const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
+  const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
+  if (!currentSigningKey || !nextSigningKey) return null;
+  return new Receiver({ currentSigningKey, nextSigningKey });
+}
+
 /** QStash callback endpoint for async PDF ingest. QStash POSTs here
  *  with `{ documentId }` after the upload use-case enqueues a message.
  *  The signature is verified against `QSTASH_CURRENT_SIGNING_KEY` /
@@ -16,16 +25,14 @@ import { NotFoundError } from '@app/domain';
  *  flip happen in one transaction, so a retry that arrives after a
  *  committed ingest is a no-op. */
 export async function POST(req: Request) {
-  const currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
-  const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
-  if (!currentSigningKey || !nextSigningKey) {
+  const receiver = getReceiver();
+  if (!receiver) {
     return NextResponse.json({ error: 'QStash signing keys not configured' }, { status: 401 });
   }
   // Read the body as text first — `Receiver.verify` needs the raw
   // string and `req.json()` would consume the stream.
   const body = await req.text();
   const signature = req.headers.get('upstash-signature') ?? '';
-  const receiver = new Receiver({ currentSigningKey, nextSigningKey });
   let isValid: boolean;
   try {
     isValid = await receiver.verify({ body, signature });

@@ -9,6 +9,7 @@ import {
 import type { TicketRepository, AuditLog, TicketRow } from '@app/domain';
 import { randomUUID } from 'node:crypto';
 import { MAX_TICKET_NOTES_LENGTH, MAX_LIST_LIMIT } from '../../../../config/constants';
+import { sanitizePagination } from '../service-result';
 
 export const TICKET_STATUSES = ['created', 'in_progress', 'closed'] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
@@ -34,8 +35,7 @@ export async function listTickets(
   deps: { tickets: TicketRepository },
 ): Promise<Result<{ tickets: TicketRow[]; total: number }>> {
   try {
-    const limit = Math.min(Math.max(Math.floor(input.limit ?? 25), 1), MAX_LIST_LIMIT);
-    const offset = Math.max(Math.floor(input.offset ?? 0), 0);
+    const { limit, offset } = sanitizePagination(input.limit, input.offset, MAX_LIST_LIMIT);
     const r = await deps.tickets.list({
       status: input.status,
       assignee: input.assignee,

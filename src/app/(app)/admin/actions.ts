@@ -138,9 +138,6 @@ export async function setRoleAction(
 ): Promise<SetRoleResult> {
   const session = await requireAdminOrError();
   if ('error' in session) return session;
-  if (role !== 'admin' && role !== 'user') {
-    return { error: 'Invalid role' };
-  }
   try {
     const result = await getComposition().setUserRole({ clerkUserId, role, actorId: session.user.id });
     if (!result.ok) return toSafeError(result.error);

@@ -194,9 +194,11 @@ describe('admin actions', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'Admin', role: 'admin' },
     });
+    const { ValidationError } = await import('@app/domain');
+    setUserRoleMock.mockResolvedValue(err(new ValidationError('Invalid role: superuser')));
     const result = await setRoleAction('user_1', 'superuser' as 'admin');
-    expect(result.error).toMatch(/Invalid role/);
-    expect(setUserRoleMock).not.toHaveBeenCalled();
+    expect(result.error).toBe('Invalid input provided');
+    expect(setUserRoleMock).toHaveBeenCalled();
   });
 
   it('setRoleAction forwards valid roles to setUserRole', async () => {

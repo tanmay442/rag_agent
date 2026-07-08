@@ -37,19 +37,28 @@ function trimBucket(bucket: UserBucket) {
 
 function evictIfNeeded() {
   if (users.size <= MAX_USERS) return;
-  let oldestKey: string | null = null;
-  let oldestTouched = Number.POSITIVE_INFINITY;
-  for (const [k, b] of users) {
-    if (b.lastTouched < oldestTouched) {
-      oldestTouched = b.lastTouched;
-      oldestKey = k;
+  // Evict a batch of oldest users to avoid O(n) scan on every record().
+  const EVICT_BATCH = 50;
+  let evicted = 0;
+  while (evicted < EVICT_BATCH && users.size > MAX_USERS) {
+    let oldestKey: string | null = null;
+    let oldestTouched = Number.POSITIVE_INFINITY;
+    for (const [k, b] of users) {
+      if (b.lastTouched < oldestTouched) {
+        oldestTouched = b.lastTouched;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey) {
+      const bucket = users.get(oldestKey)!;
+      for (const [q, c] of bucket.queries) decrementGlobal(q, c);
+      users.delete(oldestKey);
+      evicted++;
+    } else {
+      break;
     }
   }
-  if (oldestKey) {
-    const bucket = users.get(oldestKey)!;
-    for (const [q, c] of bucket.queries) decrementGlobal(q, c);
-    users.delete(oldestKey);
-  }
+  cachedTop = null;
 }
 
 export const inMemoryQueryStats: QueryStats = {
@@ -78,8 +87,7 @@ export const inMemoryQueryStats: QueryStats = {
     return cachedTop;
   },
 };
-
-function __resetQueryStatsForTests(): void {
+export function __resetQueryStatsForTests(): void {
   users.clear();
   globalCounts.clear();
   cachedTop = null;

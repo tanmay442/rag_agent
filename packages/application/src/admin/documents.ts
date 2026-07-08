@@ -5,11 +5,11 @@ import {
   ok,
   type Result,
   NotFoundError,
-  ConflictError,
   ValidationError,
   GoneError,
   ExternalServiceError,
 } from '@app/domain';
+void ExternalServiceError; // used in catch blocks below
 import type {
   DocumentRepository,
   ChunkRepository,
@@ -253,7 +253,7 @@ export async function restoreDocument(
     if (e instanceof NotFoundError || e instanceof ValidationError || e instanceof GoneError) {
       return err(e);
     }
-    return err(new ConflictError('Document restore transaction failed'));
+    return err(new ExternalServiceError('Document restore failed', e));
   }
 }
 
