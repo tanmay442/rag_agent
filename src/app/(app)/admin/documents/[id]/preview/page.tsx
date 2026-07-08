@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getComposition, unwrap } from '@/composition';
+import { getComposition } from '@/composition';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,7 @@ export default async function PreviewPage({
   const { id } = await params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) notFound();
-  const r = unwrap(await getComposition().getDocumentById(docId));
+  const r = await getComposition().getDocumentById(docId);
   const doc = r.document;
   if (!doc) notFound();
   if (doc.deletedAt) {

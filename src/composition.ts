@@ -1,179 +1,288 @@
-// Composition root: wires port interfaces to infrastructure adapters.
+// Composition root: assembles Effect service layers into a memoized
+// runtime and exposes a facade whose methods run the Effect use-cases
+// via that runtime. Domain errors propagate as rejected promises
+// (tagged errors); routes catch them and hand them to `respond`.
+import { Effect, Layer, Runtime } from 'effect';
 import {
-  ingestFile, searchChunks, listUsers, setUserRole, touchLastSeen,
-  getUserByClerkId, logDocumentEvent, logTicketEvent, recordQuery,
-  getTopQueries, enforceRateLimit, listDocuments, uploadPdf,
-  softDeleteDocument, restoreDocument, listTickets, updateTicket,
+  Documents,
+  Chunks,
+  Tickets,
+  Users,
+  Audit,
+  RateLimiter,
+  QueryStats,
+  Embeddings,
+  BlobStorage,
+  IngestQueue,
+  PdfParser,
+  TextSplitter,
+  TransactionRunner,
+  Clock,
+  Hasher,
+  SessionStore,
+  NotFoundError,
+  ValidationError,
+  GoneError,
+  ExternalServiceError,
+  type DocumentRow,
+  type SessionUser,
+} from '@app/domain';
+import {
+  DbServicesLayer,
+  InfraServicesLayer,
+  Llm,
+  Storage,
+  Auth,
+} from '@app/infrastructure';
+import {
+  ingestFile,
+  searchChunks,
+  listUsers,
+  setUserRole,
+  touchLastSeen,
+  getUserByClerkId,
+  logDocumentEvent,
+  logTicketEvent,
+  recordQuery,
+  getTopQueries,
+  enforceRateLimit,
+  listDocuments,
+  uploadPdf,
+  softDeleteDocument,
+  restoreDocument,
+  listTickets,
+  updateTicket,
   createTicket,
-  isTicketStatus, TICKET_STATUSES,
-  getDocumentById, hardDeleteDocument, replacePdf,
-  recountChunksForDocument, recountChunksForAllDocuments,
-  getAnalyticsSummary, listAudit,
+  getDocumentById,
+  hardDeleteDocument,
+  replacePdf,
+  recountChunksForDocument,
+  recountChunksForAllDocuments,
+  getAnalyticsSummary,
+  listAudit,
   prepareIngest,
-  type IngestDeps, type SearchDeps, type RateLimitDeps,
 } from '@app/application';
-import { Db, Llm, Auth, Pdf, Storage, Queue } from '@app/infrastructure';
-const authAdapter = Auth.createAuthAdapter();
-
-const requireAdmin = authAdapter.requireAdmin;
-const requireSession = authAdapter.requireSession;
-const getAppSession = authAdapter.getAppSession;
-import { ForbiddenError, UnauthorizedError, GoneError, ValidationError, unwrap, err, ok, NotFoundError, ExternalServiceError, type Result, type BlobStorage, type IngestQueue, type RateLimiter, type QueryStats } from '@app/domain';
 import { type MyUIMessage } from '@app/application/chat';
-import type { DocumentRow } from '@app/domain';
-import { createHash } from 'node:crypto';
+import { ForbiddenError, UnauthorizedError } from '@app/domain';
 import { appConfig } from './lib/config';
 import { logger } from './lib/logger';
-import { respond, respondResult } from './lib/http';
+import { respond } from './lib/http';
 import { MAX_LIST_LIMIT } from '../config/constants';
 
-const systemClock = { now: () => new Date() };
-const systemHasher = { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') };
+// Layer assembly: DB-backed + infrastructure services in one layer.
+const appLayer = Layer.mergeAll(DbServicesLayer, InfraServicesLayer);
 
-/** Wrap a Result-returning use-case with partially-applied deps.
- *  Returns the Result directly — the caller inspects `.ok`. */
-const bind = <Args extends unknown[], T>(
-  fn: (...args: Args) => Promise<Result<T>>,
-  ...bound: Args
-): Promise<Result<T>> => fn(...bound);
+type AppServices =
+  | Documents
+  | Chunks
+  | Tickets
+  | Users
+  | Audit
+  | RateLimiter
+  | QueryStats
+  | Embeddings
+  | BlobStorage
+  | IngestQueue
+  | PdfParser
+  | TextSplitter
+  | TransactionRunner
+  | Clock
+  | Hasher
+  | SessionStore;
 
-// Reuse the factory functions from repositories.ts instead of
-// defining duplicate adapter wrappers here.
-const documentRepo = Db.createDocumentRepo(Db.db);
-const chunkRepo = Db.createChunkRepo(Db.db);
-
-const embeddingService = Llm.getEmbeddingService();
-
-// Object storage for PDF binaries. Provider is env-swappable via
-// BLOB_STORAGE_PROVIDER (filesystem | r2 | s3). Default: filesystem.
-const blobStorage: BlobStorage = Storage.createBlobStorage();
-
-// Async ingest queue. QStash-backed when QSTASH_TOKEN is set; a no-op
-// (sync mode) otherwise. The upload use-cases enqueue large PDFs here
-// and the /api/admin/ingest-worker route drains them.
-const ingestQueue: IngestQueue = Queue.createIngestQueue();
-
-const ingestDeps: IngestDeps = {
-  documents: documentRepo, chunks: chunkRepo,
-  embeddings: embeddingService, hasher: systemHasher,
-  pdfParser: Pdf.pdfParseParser, textSplitter: Pdf.langchainSplitter,
-};
-const searchDeps: SearchDeps = { chunks: chunkRepo, embeddings: embeddingService };
-
-// Cache rate limiter and query stats instances to avoid creating
-// new Upstash Redis clients on every request (fixes connection leak).
-const rateLimiter: RateLimiter = createRateLimiter();
-const queryStats: QueryStats = createQueryStats();
-
-function createRateLimiter(): RateLimiter {
-  if (process.env.UPSTASH_REDIS_REST_URL) return Auth.createUpstashRateLimiter();
-  return Auth.lruRateLimiter;
+let _runtime: Runtime.Runtime<AppServices> | null = null;
+const runtimePromise: Promise<Runtime.Runtime<AppServices>> = Effect.runPromise(
+  Layer.toRuntime(appLayer).pipe(Effect.scoped),
+);
+async function runtime(): Promise<Runtime.Runtime<AppServices>> {
+  if (!_runtime) _runtime = await runtimePromise;
+  return _runtime;
 }
 
-function createQueryStats(): QueryStats {
-  if (process.env.UPSTASH_REDIS_REST_URL) return Auth.createUpstashQueryStats();
-  return Auth.inMemoryQueryStats;
+/** Run an Effect use-case against the app runtime, returning its
+ *  success value. Domain errors reject the promise (tagged errors). */
+export async function runWithLayer<A, E, R extends AppServices>(
+  effect: Effect.Effect<A, E, R>,
+): Promise<A> {
+  const rt = await runtime();
+  return Runtime.runPromise(rt)(effect as Effect.Effect<A, E, AppServices>);
 }
 
-const rateLimitDeps: RateLimitDeps = { limiter: rateLimiter };
+/** Run a facade Promise and map the result into an HTTP Response:
+ *  success → 200 JSON value, failure → `respond(error)`. */
+export async function runComp<T>(p: Promise<T>): Promise<Response> {
+  try {
+    const value = await p;
+    return Response.json(value);
+  } catch (e) {
+    return respond(e);
+  }
+}
+
+/** Run a facade Promise that resolves to void: success → 200 `{ ok: true }`,
+ *  failure → `respond(error)`. */
+export async function runCompVoid(p: Promise<void>): Promise<Response> {
+  try {
+    await p;
+    return Response.json({ ok: true });
+  } catch (e) {
+    return respond(e);
+  }
+}
+
+/** Run an Effect use-case and map the result into an HTTP Response:
+ *  success → 200 JSON, failure → `respond(error)` with the correct
+ *  status. This is the primary helper for API route handlers. */
+export async function runRoute<A, E, R extends AppServices>(
+  effect: Effect.Effect<A, E, R>,
+): Promise<Response> {
+  try {
+    const value = await runWithLayer(effect);
+    return Response.json(value);
+  } catch (e) {
+    return respond(e);
+  }
+}
+
+// ingested-queue drain is an Effect workflow assembled here (not in
+// the application package) because it orchestrates blob storage,
+// embeddings, pdf parsing, and a transactional chunk insert.
+const ingestQueuedDocumentEffect = Effect.fn('Admin.ingestQueuedDocument')(
+  function* (documentId: number) {
+    const documents = yield* Documents;
+    const blobStorage = yield* BlobStorage;
+    const runner = yield* TransactionRunner;
+
+    const doc = yield* documents.findById(documentId);
+    if (!doc) return yield* new NotFoundError(`Document not found: ${documentId}`);
+    if (doc.ingestStatus === 'done') return { status: 'already-done' as const, chunks: 0 };
+    if (doc.ingestStatus === 'ingesting') return { status: 'busy' as const, chunks: 0 };
+    if (!doc.storageKey) return yield* new NotFoundError(`Document ${documentId} has no stored blob`);
+    yield* documents.updateIngestStatus(documentId, 'ingesting');
+    const buffer = yield* blobStorage.get(doc.storageKey).pipe(
+      Effect.catchAll((e) =>
+        documents
+          .updateIngestStatus(documentId, 'failed')
+          .pipe(Effect.catchAll(() => Effect.void), Effect.zipRight(Effect.fail(e))),
+      ),
+    );
+    const prepared = yield* prepareIngest({
+      documentId,
+      fileName: doc.fileName,
+      buffer,
+    }).pipe(
+      Effect.catchAll((e) =>
+        documents
+          .updateIngestStatus(documentId, 'failed')
+          .pipe(Effect.catchAll(() => Effect.void), Effect.zipRight(Effect.fail(e))),
+      ),
+    );
+    yield* runner
+      .run((ctx) =>
+        Effect.gen(function* () {
+          yield* ctx.chunks.insertMany(prepared.rows);
+          yield* ctx.documents.updateIngestStatus(documentId, 'done');
+        }),
+      )
+      .pipe(
+        Effect.catchAll((e) =>
+          documents
+            .updateIngestStatus(documentId, 'failed')
+            .pipe(Effect.catchAll(() => Effect.void), Effect.zipRight(Effect.fail(e))),
+        ),
+      );
+    return { status: 'done' as const, chunks: prepared.chunks };
+  },
+);
 
 function createComposition() {
-  const auditDeps = { audit: Db.auditRepo };
-  const userDeps = { users: Db.userRepo };
-  const txRunner = Db.transactionRunner;
-
   return {
-    ingestFile: (input: Parameters<typeof ingestFile>[0]) => bind(ingestFile, input, ingestDeps),
-    searchChunks: (q: string, o: Parameters<typeof searchChunks>[1]) => bind(searchChunks, q, o, searchDeps),
-    listUsers: (input: Parameters<typeof listUsers>[0]) => bind(listUsers, input, userDeps),
-    setUserRole: (input: Parameters<typeof setUserRole>[0]) => bind(setUserRole, input, { ...userDeps, ...auditDeps }),
-    touchLastSeen: (id: string) => bind(touchLastSeen, id, userDeps),
-    getUserByClerkId: (id: string) => bind(getUserByClerkId, id, userDeps),
-    logDocumentEvent: (input: Parameters<typeof logDocumentEvent>[0]) => bind(logDocumentEvent, input, auditDeps),
-    logTicketEvent: (input: Parameters<typeof logTicketEvent>[0]) => bind(logTicketEvent, input, auditDeps),
-    recordQuery: (userId: string, query: string) => recordQuery(userId, query, { stats: queryStats }),
-    getTopQueries: (limit: number) => getTopQueries(limit, { stats: queryStats }),
-    enforceRateLimit: (input: Parameters<typeof enforceRateLimit>[0]) => bind(enforceRateLimit, input, rateLimitDeps),
-    listDocuments: (input: Parameters<typeof listDocuments>[0]) =>
-      bind(listDocuments, input, { documents: documentRepo, chunks: chunkRepo, ...userDeps }),
-    uploadPdf: (input: Parameters<typeof uploadPdf>[0]) =>
-      bind(uploadPdf, input, { ...ingestDeps, ...auditDeps, runner: txRunner, blobStorage, ingestQueue }),
-    softDeleteDocument: (input: Parameters<typeof softDeleteDocument>[0]) =>
-      bind(softDeleteDocument, input, { documents: documentRepo, ...auditDeps, runner: txRunner }),
-    restoreDocument: (id: number, actorId: string) =>
-      bind(restoreDocument, id, actorId, { documents: documentRepo, ...auditDeps, clock: systemClock, runner: txRunner }),
-    listTickets: (input: Parameters<typeof listTickets>[0]) => bind(listTickets, input, { tickets: Db.ticketRepo }),
-    updateTicket: (input: Parameters<typeof updateTicket>[0]) =>
-      bind(updateTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
-    createTicket: (input: Parameters<typeof createTicket>[0]) =>
-      bind(createTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
-    getDocumentById: (id: number) => getDocumentById(id, { documents: documentRepo }),
+    ingestFile: (input: { fileName: string; buffer: Buffer; uploadedBy: string }) =>
+      runWithLayer(ingestFile(input)),
+    searchChunks: (q: string, o: { threshold?: number; limit?: number }) =>
+      runWithLayer(searchChunks(q, o)),
+    listUsers: (input: { search?: string; limit?: number; offset?: number }) =>
+      runWithLayer(listUsers(input)),
+    setUserRole: (input: { clerkUserId: string; role: 'admin' | 'user'; actorId: string }) =>
+      runWithLayer(setUserRole(input)),
+    touchLastSeen: (id: string) => runWithLayer(touchLastSeen(id)),
+    getUserByClerkId: (id: string) => runWithLayer(getUserByClerkId(id)),
+    logDocumentEvent: (input: {
+      action: 'upload' | 'replace' | 'delete' | 'restore';
+      documentId: number;
+      actorId: string;
+    }) => runWithLayer(logDocumentEvent(input)),
+    logTicketEvent: (input: {
+      action: 'create' | 'assign' | 'status_change' | 'note' | 'role_change';
+      ticketId: string;
+      actorId: string;
+    }) => runWithLayer(logTicketEvent(input)),
+    recordQuery: (userId: string, query: string) => runWithLayer(recordQuery(userId, query)),
+    getTopQueries: (limit: number) => runWithLayer(getTopQueries(limit)),
+    enforceRateLimit: (input: { key: string; limit: number; windowMs: number }) =>
+      runWithLayer(enforceRateLimit(input)),
+    listDocuments: (input: {
+      search?: string;
+      includeDeleted?: boolean;
+      limit?: number;
+      offset?: number;
+    }) => runWithLayer(listDocuments(input)),
+    uploadPdf: (input: { fileName: string; buffer: Buffer; actorId: string }) =>
+      runWithLayer(uploadPdf(input)),
+    softDeleteDocument: (input: { documentId: number; actorId: string }) =>
+      runWithLayer(softDeleteDocument(input)),
+    restoreDocument: (id: number, actorId: string) => runWithLayer(restoreDocument(id, actorId)),
+    listTickets: (input: {
+      status?: 'created' | 'in_progress' | 'closed';
+      assignee?: string | null;
+      search?: string;
+      limit?: number;
+      offset?: number;
+    }) => runWithLayer(listTickets(input)),
+    updateTicket: (input: {
+      ticketId: string;
+      status?: 'created' | 'in_progress' | 'closed';
+      assignedTo?: string | null;
+      note?: string;
+      actorId: string;
+    }) => runWithLayer(updateTicket(input)),
+    createTicket: (input: {
+      userId: string;
+      name: string;
+      email: string;
+      issue: string;
+    }) => runWithLayer(createTicket(input)),
+    getDocumentById: (id: number) => runWithLayer(getDocumentById(id)),
     hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
-      bind(hardDeleteDocument, input, { documents: documentRepo, ...auditDeps, runner: txRunner, blobStorage }),
-    replacePdf: (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) =>
-      bind(replacePdf, input, { ...ingestDeps, ...auditDeps, runner: txRunner, blobStorage, ingestQueue }),
-    /** Drain a queued ingest: called by the /api/admin/ingest-worker
-     *  route on a QStash callback. Loads the doc, marks `ingesting`,
-     *  reads the PDF from the blob store, parses+embeds it, and
-     *  inserts chunks + flips to `done` in one transaction (so a
-     *  retry that sees `done` is a no-op). Idempotent: a `done` doc
-     *  returns `already-done`; an `ingesting` doc returns `busy`
-     *  (the route maps that to 409 so QStash retries later). */
-    ingestQueuedDocument: async (documentId: number): Promise<Result<{ status: 'done' | 'already-done' | 'busy'; chunks: number }>> => {
-      const doc = await documentRepo.findById(documentId);
-      if (!doc) return err(new NotFoundError(`Document not found: ${documentId}`));
-      if (doc.ingestStatus === 'done') return ok({ status: 'already-done', chunks: 0 });
-      if (doc.ingestStatus === 'ingesting') return ok({ status: 'busy', chunks: 0 });
-      if (!doc.storageKey) {
-        return err(new NotFoundError(`Document ${documentId} has no stored blob`));
-      }
-      await documentRepo.updateIngestStatus(documentId, 'ingesting');
-      let buffer: Buffer;
-      try {
-        buffer = await blobStorage.get(doc.storageKey);
-      } catch (e) {
-        await documentRepo.updateIngestStatus(documentId, 'failed').catch(() => {});
-        return err(new ExternalServiceError('Blob read failed', e));
-      }
-      const prepared = await prepareIngest(
-        { documentId, fileName: doc.fileName, buffer },
-        { embeddings: embeddingService, pdfParser: Pdf.pdfParseParser, textSplitter: Pdf.langchainSplitter },
-      );
-      if (!prepared.ok) {
-        await documentRepo.updateIngestStatus(documentId, 'failed').catch(() => {});
-        return prepared;
-      }
-      try {
-        await Db.transactionRunner.run(async (tx) => {
-          await tx.chunks.insertMany(prepared.value.rows);
-          await tx.documents.updateIngestStatus(documentId, 'done');
-        });
-      } catch (e) {
-        await documentRepo.updateIngestStatus(documentId, 'failed').catch(() => {});
-        return err(new ExternalServiceError('Chunk insert failed', e));
-      }
-      return ok({ status: 'done', chunks: prepared.value.chunks });
-    },
-    recountChunksForDocument: (id: number) => bind(recountChunksForDocument, id, { chunks: chunkRepo }),
-    recountChunksForAllDocuments: () => bind(recountChunksForAllDocuments, { chunks: chunkRepo }),
-    getAnalyticsSummary: () =>
-      bind(getAnalyticsSummary, { documents: documentRepo, chunks: chunkRepo, tickets: Db.ticketRepo, ...userDeps, stats: queryStats }),
-    listAudit: (input: Parameters<typeof listAudit>[0]) => bind(listAudit, input, auditDeps),
-    db: Db.db,
-    schema: Db.schema,
-    blobStorage,
-    getEmbeddingModel: Llm.getEmbeddingModel,
+      runWithLayer(hardDeleteDocument(input)),
+    replacePdf: (input: {
+      documentId: number;
+      fileName: string;
+      buffer: Buffer;
+      actorId: string;
+    }) => runWithLayer(replacePdf(input)),
+    recountChunksForDocument: (id: number) => runWithLayer(recountChunksForDocument(id)),
+    recountChunksForAllDocuments: () => runWithLayer(recountChunksForAllDocuments()),
+    getAnalyticsSummary: () => runWithLayer(getAnalyticsSummary()),
+    listAudit: (input: {
+      documentId?: number;
+      ticketId?: string;
+      limit?: number;
+      offset?: number;
+    }) => runWithLayer(listAudit(input)),
+    ingestQueuedDocument: (documentId: number) =>
+      runWithLayer(ingestQueuedDocumentEffect(documentId)),
+    // Raw adapters exposed for routes that stream/redirect blobs directly.
+    blobStorage: Storage.createBlobStorage(),
     getChatModel: Llm.getChatModel,
-    session: Auth.clerkSessionStore,
     rateLimit: async (key: string, opts: { limit: number; windowMs: number }) =>
-      rateLimiter.check(key, opts),
+      runWithLayer(enforceRateLimit({ key, ...opts })),
   };
 }
 
-export { appConfig, isTicketStatus, TICKET_STATUSES, type MyUIMessage };
-export { requireAdmin, requireSession, getAppSession, ForbiddenError, unwrap };
-export { respond, respondResult };
-
+export { appConfig, type MyUIMessage };
+export { TICKET_STATUSES, isTicketStatus } from '@app/application';
+export { respond, ForbiddenError, UnauthorizedError };
 
 export type Composition = ReturnType<typeof createComposition>;
 
@@ -183,8 +292,16 @@ export function getComposition(): Composition {
   return _composition;
 }
 
+// ---- Auth-boundary helpers (unchanged shape) ----
+
+const authAdapter = Auth.createAuthAdapter();
+const requireAdmin = authAdapter.requireAdmin;
+const requireSession = authAdapter.requireSession;
+const getAppSession = authAdapter.getAppSession;
+export { requireAdmin, requireSession, getAppSession };
+
 export async function requireAdminRoute(): Promise<
-  | { ok: true; session: Awaited<ReturnType<typeof requireAdmin>>; comp: Composition }
+  | { ok: true; session: { user: SessionUser }; comp: Composition }
   | { ok: false; response: Response }
 > {
   try {
@@ -205,7 +322,10 @@ export function parseQueryPagination(
   const rawLimit = Number(url.searchParams.get('limit') ?? defaults.limit ?? 25);
   const rawOffset = Number(url.searchParams.get('offset') ?? defaults.offset ?? 0);
   return {
-    limit: Math.min(Math.max(Math.floor(Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25)), 1), MAX_LIST_LIMIT),
+    limit: Math.min(
+      Math.max(Math.floor(Number.isFinite(rawLimit) ? rawLimit : (defaults.limit ?? 25)), 1),
+      MAX_LIST_LIMIT,
+    ),
     offset: Math.max(Math.floor(Number.isFinite(rawOffset) ? rawOffset : (defaults.offset ?? 0)), 0),
   };
 }
@@ -234,7 +354,7 @@ export async function requireAdminDocument(
 ): Promise<
   | {
       ok: true;
-      session: Awaited<ReturnType<typeof requireAdmin>>;
+      session: { user: SessionUser };
       comp: Composition;
       document: DocumentRow;
     }
@@ -245,11 +365,15 @@ export async function requireAdminDocument(
   const { id } = await context.params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) return { ok: false, response: respond(new ValidationError('Invalid id')) };
-  const r = await auth.comp.getDocumentById(docId);
-  if (!r.ok) return { ok: false, response: respond(r.error) };
-  const doc = r.value.document;
-  if (!doc) return { ok: false, response: respond(new NotFoundError('Document not found')) };
-  if (!opts.allowDeleted && doc.deletedAt) return { ok: false, response: respond(new GoneError('Document was deleted')) };
-  if (!doc.storageKey) return { ok: false, response: respond(new NotFoundError('File unavailable')) };
-  return { ok: true, session: auth.session, comp: auth.comp, document: doc };
+  try {
+    const r = await auth.comp.getDocumentById(docId);
+    const doc = r.document;
+    if (!doc) return { ok: false, response: respond(new NotFoundError('Document not found')) };
+    if (!opts.allowDeleted && doc.deletedAt)
+      return { ok: false, response: respond(new GoneError('Document was deleted')) };
+    if (!doc.storageKey) return { ok: false, response: respond(new NotFoundError('File unavailable')) };
+    return { ok: true, session: auth.session, comp: auth.comp, document: doc };
+  } catch (e) {
+    return { ok: false, response: respond(e) };
+  }
 }

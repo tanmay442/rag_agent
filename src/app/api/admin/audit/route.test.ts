@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ok, err, ExternalServiceError } from '@app/domain';
+import { ExternalServiceError } from '@app/domain';
 
 const { requireAdminMock, listAuditMock, requireAdminRouteMock, requireAdminGetMock } = vi.hoisted(() => {
   const requireAdminMock = vi.fn();
@@ -26,7 +26,7 @@ const { requireAdminMock, listAuditMock, requireAdminRouteMock, requireAdminGetM
 vi.mock('@/composition', async () => {
   const actual = await vi.importActual<typeof import('@/composition')>('@/composition');
   const { ForbiddenError } = await import('@app/domain');
-  const { respond, respondResult } = await import('@/lib/http');
+  const { respond } = await import('@/lib/http');
   return {
     ...actual,
     requireAdmin: requireAdminMock,
@@ -36,7 +36,6 @@ vi.mock('@/composition', async () => {
     getAppSession: vi.fn(),
     ForbiddenError,
     respond,
-    respondResult,
     getComposition: () => ({ listAudit: listAuditMock }),
   };
 });
@@ -68,7 +67,7 @@ describe('GET /api/admin/audit', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' },
     });
-    listAuditMock.mockResolvedValue(ok({
+    listAuditMock.mockResolvedValue({
       events: [
         {
           id: 1,
@@ -82,7 +81,7 @@ describe('GET /api/admin/audit', () => {
         },
       ],
       total: 1,
-    }) as never);
+    });
 
     const res = await route.GET(makeReq());
 
@@ -96,7 +95,7 @@ describe('GET /api/admin/audit', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' },
     });
-    listAuditMock.mockResolvedValue(ok({ events: [], total: 0 }) as never);
+    listAuditMock.mockResolvedValue({ events: [], total: 0 });
 
     const res = await route.GET(makeReq());
     const body = await res.json();
@@ -111,7 +110,7 @@ describe('GET /api/admin/audit', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' },
     });
-    listAuditMock.mockResolvedValue(ok({ events: [], total: 0 }) as never);
+    listAuditMock.mockResolvedValue({ events: [], total: 0 });
 
     await route.GET(makeReq({ documentId: '5', ticketId: 'TKT-1001', limit: '25', offset: '10' }));
 
@@ -127,7 +126,7 @@ describe('GET /api/admin/audit', () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' },
     });
-    listAuditMock.mockResolvedValue(ok({ events: [], total: 0 }) as never);
+    listAuditMock.mockResolvedValue({ events: [], total: 0 });
 
     const res = await route.GET(makeReq());
     const body = await res.json();
@@ -136,11 +135,11 @@ describe('GET /api/admin/audit', () => {
     expect(body.total).toBe(0);
   });
 
-  it('maps listAudit Result errors to 502', async () => {
+  it('maps listAudit errors to 502', async () => {
     requireAdminMock.mockResolvedValue({
       user: { id: 'admin_1', email: 'a@x.com', name: 'A', role: 'admin' },
     });
-    listAuditMock.mockResolvedValue(err(new ExternalServiceError('db down')) as never);
+    listAuditMock.mockRejectedValue(new ExternalServiceError('db down'));
 
     const res = await route.GET(makeReq());
     expect(res.status).toBe(502);

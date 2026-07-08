@@ -9,6 +9,7 @@
 //   pnpm tsx scripts/backfill-blobs.ts
 import 'dotenv/config';
 import { and, isNull, isNotNull } from 'drizzle-orm';
+import { Effect } from 'effect';
 import { Db, Storage } from '@app/infrastructure';
 
 function safeName(name: string): string {
@@ -42,7 +43,7 @@ async function main() {
     const key = `docs/${row.id}/${safeName(row.fileName)}`;
     try {
       await blobStorage.put(key, buffer, 'application/pdf');
-      await setDocumentStorageKey(row.id, key);
+      await Effect.runPromise(setDocumentStorageKey(row.id, key));
       console.log(`  ok doc ${row.id} -> ${key} (${buffer.length} bytes)`);
       migrated++;
     } catch (err) {

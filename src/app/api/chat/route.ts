@@ -2,6 +2,7 @@ import { tool, convertToModelMessages, streamText, stepCountIs, createUIMessageS
 import { z } from 'zod';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { getComposition, appConfig, type MyUIMessage, type Composition } from '@/composition';
+import { RateLimitedError } from '@app/domain';
 import type { RetrievedChunk } from '@app/application/rag/search';
 import { buildSystemPrompt } from '@app/application/prompt/build-system-prompt';
 import { NextResponse } from 'next/server';
@@ -53,23 +54,23 @@ function buildChatTools(deps: {
           ),
       }),
       execute: async ({ query, limit }) => {
-        const r = await searchFn(query, { limit });
-        if (!r.ok) {
-          logger.error('RAG retrieval failed', { error: r.error });
+        try {
+          const matches = await searchFn(query, { limit });
+          const capped = matches.map((m) => ({
+            content:
+              m.content.length > TOOL_CONTENT_CAP
+                ? m.content.slice(0, TOOL_CONTENT_CAP) + '\u2026'
+                : m.content,
+            similarity: m.similarity,
+          }));
+          for (const citation of emitCitations(matches)) {
+            citationTarget.push(citation);
+          }
+          return capped;
+        } catch (err) {
+          logger.error('RAG retrieval failed', { error: err });
           return [];
         }
-        const matches = r.value;
-        const capped = matches.map((m) => ({
-          content:
-            m.content.length > TOOL_CONTENT_CAP
-              ? m.content.slice(0, TOOL_CONTENT_CAP) + '\u2026'
-              : m.content,
-          similarity: m.similarity,
-        }));
-        for (const citation of emitCitations(matches)) {
-          citationTarget.push(citation);
-        }
-        return capped;
       },
     }),
     createSupportTicket: tool({
@@ -110,17 +111,18 @@ function buildChatTools(deps: {
           realName = 'Unknown';
           realEmail = '';
         }
-        const result = await createTicketFn({
-          userId: uid,
-          name: realName,
-          email: realEmail,
-          issue: sanitizeText(issue),
-        });
-        if (!result.ok) {
-          logger.error('createSupportTicket: createTicket failed', { error: result.error });
+        try {
+          const value = await createTicketFn({
+            userId: uid,
+            name: realName,
+            email: realEmail,
+            issue: sanitizeText(issue),
+          });
+          return value;
+        } catch (err) {
+          logger.error('createSupportTicket: createTicket failed', { error: err });
           return { ticketId: null, status: 'error' };
         }
-        return result.value;
       },
     }),
   };
@@ -138,12 +140,17 @@ async function streamChatResponse(req: Request): Promise<Response> {
   // Body size is enforced by next.config.ts experimental.bodySizeLimit
   // at the framework level (not via a spoofable Content-Length header).
   const comp = getComposition();
-  const limit = await comp.rateLimit(`chat:${userId}`, CHAT_RATE_LIMIT);
-  if (!limit.ok) {
-    return new Response('Too Many Requests', {
-      status: 429,
-      headers: { 'Retry-After': String(Math.ceil(limit.retryAfterMs / 1000)) },
-    });
+  try {
+    await comp.rateLimit(`chat:${userId}`, CHAT_RATE_LIMIT);
+  } catch (e) {
+    if (e instanceof RateLimitedError) {
+      return new Response('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': String(Math.ceil(e.retryAfterMs / 1000)) },
+      });
+    }
+    logger.error('Rate limit check failed', { error: e });
+    return new Response('Service unavailable', { status: 502 });
   }
 
   const raw = await req.json().catch((e) => {
@@ -172,15 +179,14 @@ async function streamChatResponse(req: Request): Promise<Response> {
   const isFirstTurn = messages.length <= 1;
   let prefetch: RetrievedChunk[] | null = null;
   if (appConfig.prefetchFirstTurn && isFirstTurn && lastUserText.trim() !== '') {
-    const prefetchResult = await comp.searchChunks(lastUserText, {});
-    if (!prefetchResult.ok) {
-      logger.error('First-turn pre-fetch failed', { error: prefetchResult.error });
-      prefetch = null;
-    } else {
-      prefetch = prefetchResult.value;
+    try {
+      prefetch = await comp.searchChunks(lastUserText, {});
       for (const citation of emitCitations(prefetch)) {
         capturedCitations.push(citation);
       }
+    } catch (err) {
+      logger.error('First-turn pre-fetch failed', { error: err });
+      prefetch = null;
     }
   }
 

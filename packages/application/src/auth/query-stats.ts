@@ -1,20 +1,17 @@
 // Use-case: record chat queries and read the top list.
-// Source: src/lib/auth/query-stats.ts.
-import { ok, type Result } from '@app/domain';
-import type { QueryStats } from '@app/domain';
+import { Effect } from 'effect';
+import { QueryStats } from '@app/domain';
 
-export async function recordQuery(
-  userId: string,
-  query: string,
-  deps: { stats: QueryStats },
-): Promise<Result<void>> {
-  await deps.stats.record(userId, query);
-  return ok(undefined);
-}
+export const recordQuery = Effect.fn('Auth.recordQuery')(
+  function* (userId: string, query: string) {
+    const stats = yield* QueryStats;
+    yield* stats.record(userId, query);
+  },
+);
 
-export async function getTopQueries(
-  limit: number,
-  deps: { stats: QueryStats },
-): Promise<Result<Array<{ q: string; count: number }>>> {
-  return ok(await deps.stats.top(limit));
-}
+export const getTopQueries = Effect.fn('Auth.getTopQueries')(
+  function* (limit: number) {
+    const stats = yield* QueryStats;
+    return yield* stats.top(limit);
+  },
+);

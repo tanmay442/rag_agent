@@ -5,7 +5,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import type { EmbeddingModelV3 } from '@ai-sdk/provider';
 import { embed } from 'ai';
-import type { EmbeddingService } from '@app/domain';
+import type { EmbeddingService } from '../adapter-ports';
 import { embedBatchWithModel } from './embedding-batch-helper';
 
 export function getOpenAIEmbeddingModel(): EmbeddingModelV3 {

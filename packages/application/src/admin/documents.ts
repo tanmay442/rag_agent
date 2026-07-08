@@ -1,30 +1,22 @@
 // Admin document use-cases: list, upload, replace, soft-delete,
 // restore, hard-delete, recount.
+import { Effect } from 'effect';
 import {
-  err,
-  ok,
-  type Result,
-  NotFoundError,
-  ValidationError,
-  GoneError,
-  ExternalServiceError,
-} from '@app/domain';
-void ExternalServiceError; // used in catch blocks below
-import type {
-  DocumentRepository,
-  ChunkRepository,
-  AuditLog,
-  Clock,
-  UserRepository,
+  Documents,
+  Chunks,
+  Users,
   TransactionRunner,
   BlobStorage,
   IngestQueue,
-  IngestStatus,
+  Clock,
+  Hasher,
+  NotFoundError,
+  ValidationError,
+  GoneError,
 } from '@app/domain';
 import { ingestFile } from '../rag/ingest';
-import type { IngestDeps, IngestResult } from '../rag/ingest';
+import { sanitizePagination } from '../pagination';
 import { RESTORE_WINDOW_MS, MAX_LIST_LIMIT } from '../../../../config/constants';
-import { wrapServiceCall, serviceResult, sanitizePagination } from '../service-result';
 
 /** Build the object-storage key for a document's PDF binary. The key
  *  is namespaced under `docs/` and prefixed by the document id so that
@@ -35,15 +27,6 @@ function blobKey(documentId: number, fileName: string): string {
   return `docs/${documentId}/${safe}`;
 }
 
-async function ensureDocument(
-  documentId: number,
-  dep: DocumentRepository,
-): Promise<Result<{ documentId: number }>> {
-  const existing = await dep.findById(documentId);
-  if (!existing) return err(new NotFoundError(`Document not found: ${documentId}`));
-  return ok({ documentId });
-}
-
 interface ListDocumentsInput {
   search?: string;
   includeDeleted?: boolean;
@@ -51,301 +34,272 @@ interface ListDocumentsInput {
   offset?: number;
 }
 
-export async function listDocuments(
-  input: ListDocumentsInput,
-  deps: {
-    documents: DocumentRepository;
-    chunks: ChunkRepository;
-    users: UserRepository;
-  },
-): Promise<
-  Result<{
-    documents: Array<{
-      id: number;
-      fileName: string;
-      fileHash: string;
-      uploadedBy: string;
-      uploadedAt: Date;
-      storageKey: string | null;
-      ingestStatus: IngestStatus;
-      deletedAt: Date | null;
-      uploaderName: string | null;
-      chunkCount: number;
-      hasBlob: boolean;
-    }>;
-    total: number;
-  }>
-> {
-  return wrapServiceCall(async () => {
+export const listDocuments = Effect.fn('Admin.listDocuments')(
+  function* (input: ListDocumentsInput) {
+    const documents = yield* Documents;
+    const chunks = yield* Chunks;
+    const users = yield* Users;
     const { limit, offset } = sanitizePagination(input.limit, input.offset, MAX_LIST_LIMIT);
-    const { documents, total } = await deps.documents.list({
+    const { documents: docs, total } = yield* documents.list({
       search: input.search,
       includeDeleted: input.includeDeleted,
       limit,
       offset,
     });
-    const ids = documents.map((d) => d.id);
+    const ids = docs.map((d) => d.id);
     const chunkCounts =
-      ids.length > 0
-        ? await deps.chunks.countForDocuments(ids)
-        : new Map<number, number>();
-    const uploaderIds = [...new Set(documents.map((d) => d.uploadedBy))];
-    const uploaders =
-      uploaderIds.length > 0 ? await deps.users.findByIds(uploaderIds) : [];
+      ids.length > 0 ? yield* chunks.countForDocuments(ids) : new Map<number, number>();
+    const uploaderIds = [...new Set(docs.map((d) => d.uploadedBy))];
+    const uploaders = uploaderIds.length > 0 ? yield* users.findByIds(uploaderIds) : [];
     const uploaderMap = new Map<string, string | null>();
-    for (const u of uploaders) {
-      uploaderMap.set(u.clerkUserId, u.name ?? null);
-    }
-    const result = documents.map((d) => ({
+    for (const u of uploaders) uploaderMap.set(u.clerkUserId, u.name ?? null);
+    const result = docs.map((d) => ({
       ...d,
       hasBlob: Boolean(d.hasBlob),
       uploaderName: uploaderMap.get(d.uploadedBy) ?? null,
       chunkCount: chunkCounts.get(d.id) ?? 0,
     }));
-    return ok({ documents: result, total });
-  }, 'Failed to list documents');
-}
+    return { documents: result, total };
+  },
+);
 
 /** Files at or above this size go through the async QStash ingest path
  *  (when `QSTASH_TOKEN` is set). Smaller files ingest synchronously.
  *  4 MB matches Vercel's server-action request body limit. */
 const ASYNC_INGEST_THRESHOLD = 4 * 1024 * 1024;
 
-/** Whether the async ingest path is enabled: only when a QStash token
- *  is configured. Without it, the queue is a no-op and every upload
- *  ingests synchronously regardless of size. */
 function asyncIngestEnabled(): boolean {
   return Boolean(process.env.QSTASH_TOKEN);
 }
 
-export async function uploadPdf(
-  input: { fileName: string; buffer: Buffer; actorId: string },
-  deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner; blobStorage: BlobStorage; ingestQueue: IngestQueue },
-): Promise<Result<IngestResult>> {
-  return wrapServiceCall(async () => {
+export const uploadPdf = Effect.fn('Admin.uploadPdf')(
+  function* (input: { fileName: string; buffer: Buffer; actorId: string }) {
     if (input.buffer.length >= ASYNC_INGEST_THRESHOLD && asyncIngestEnabled()) {
-      return queuePdfForIngest(input, deps, (newId) => ({ action: 'upload', documentId: newId }));
+      return yield* queuePdfForIngest(input, (newId) => ({ action: 'upload', documentId: newId }));
     }
-    return uploadPdfSync(input, deps);
-  }, 'Failed to upload PDF');
-}
+    return yield* uploadPdfSync(input);
+  },
+);
 
 /** Synchronous ingest: parse, embed, insert chunks, put blob, set
  *  storage key — all in a transaction. Used for small PDFs (<4 MB)
- *  or always when `QSTASH_TOKEN` is unset. Sets `ingest_status='done'`
- *  (the column default, applied at insert). */
-async function uploadPdfSync(
-  input: { fileName: string; buffer: Buffer; actorId: string },
-  deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner; blobStorage: BlobStorage },
-): Promise<Result<IngestResult>> {
-  return await deps.runner.run(async (tx) => {
-    const r = await ingestFile(
-      { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
-      { ...deps, documents: tx.documents, chunks: tx.chunks },
+ *  or always when `QSTASH_TOKEN` is unset. */
+function uploadPdfSync(input: {
+  fileName: string;
+  buffer: Buffer;
+  actorId: string;
+}) {
+  return Effect.gen(function* () {
+    const runner = yield* TransactionRunner;
+    const blobStorage = yield* BlobStorage;
+    return yield* runner.run((ctx) =>
+      Effect.gen(function* () {
+        const r = yield* ingestFile({
+          fileName: input.fileName,
+          buffer: input.buffer,
+          uploadedBy: input.actorId,
+        }).pipe(
+          Effect.provideService(Documents, ctx.documents),
+          Effect.provideService(Chunks, ctx.chunks),
+        );
+        const key = blobKey(r.documentId, input.fileName);
+        yield* blobStorage.put(key, input.buffer, 'application/pdf');
+        yield* ctx.documents.setStorageKey(r.documentId, key);
+        yield* ctx.audit.logDocumentEvent({
+          action: r.status === 'inserted' ? 'upload' : 'replace',
+          documentId: r.documentId,
+          actorId: input.actorId,
+        });
+        return r;
+      }),
     );
-    if (!r.ok) return r;
-    const key = blobKey(r.value.documentId, input.fileName);
-    await deps.blobStorage.put(key, input.buffer, 'application/pdf');
-    await tx.documents.setStorageKey(r.value.documentId, key);
-    await tx.audit.logDocumentEvent({
-      action: r.value.status === 'inserted' ? 'upload' : 'replace',
-      documentId: r.value.documentId,
-      actorId: input.actorId,
-    });
-    return r;
   });
 }
 
 /** Asynchronous ingest core: store the blob, insert a `documents` row
  *  with `ingest_status='queued'`, and enqueue a QStash message. No
  *  parsing/embedding happens here — the worker does that on callback.
- *  Handles name dedup the same way `ingestFile` does (same hash →
- *  unchanged; different hash → delete the old row and its blob first)
- *  because `documents.file_name` is unique. `auditFor` receives the
- *  new row's id so the caller can choose the audit action/documentId
- *  (upload logs the new id; replace logs the original documentId). */
-async function queuePdfForIngest(
+ *  `auditFor` receives the new row's id so the caller can choose the
+ *  audit action/documentId (upload logs the new id; replace logs the
+ *  original documentId). */
+function queuePdfForIngest(
   input: { fileName: string; buffer: Buffer; actorId: string },
-  deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner; blobStorage: BlobStorage; ingestQueue: IngestQueue },
   auditFor: (newDocumentId: number) => { action: 'upload' | 'replace'; documentId: number },
-): Promise<Result<IngestResult>> {
-  const fileHash = deps.hasher.sha256(input.buffer);
-  const existing = await deps.documents.findByName(input.fileName);
-  if (existing && existing.fileHash === fileHash) {
-    return ok({ documentId: existing.id, chunks: 0, status: 'unchanged' });
-  }
-  if (existing && existing.storageKey) {
-    await deps.blobStorage.delete(existing.storageKey).catch(() => {
-      // Best-effort: an orphaned blob is preferable to blocking the
-      // re-upload. The old row is deleted below regardless.
-    });
-  }
-  const inserted = await deps.runner.run(async (tx) => {
-    if (existing && existing.fileHash !== fileHash) {
-      await tx.documents.deleteById(existing.id);
+) {
+  return Effect.gen(function* () {
+    const documents = yield* Documents;
+    const hasher = yield* Hasher;
+    const blobStorage = yield* BlobStorage;
+    const runner = yield* TransactionRunner;
+    const ingestQueue = yield* IngestQueue;
+    const fileHash = yield* hasher.sha256(input.buffer);
+    const existing = yield* documents.findByName(input.fileName);
+    if (existing && existing.fileHash === fileHash) {
+      return { documentId: existing.id, chunks: 0, status: 'unchanged' as const };
     }
-    const row = await tx.documents.insert({
-      fileName: input.fileName,
-      fileHash,
-      uploadedBy: input.actorId,
-    });
-    const key = blobKey(row.id, input.fileName);
-    await deps.blobStorage.put(key, input.buffer, 'application/pdf');
-    await tx.documents.setStorageKey(row.id, key);
-    await tx.documents.updateIngestStatus(row.id, 'queued');
-    const a = auditFor(row.id);
-    await tx.audit.logDocumentEvent({
-      action: a.action,
-      documentId: a.documentId,
-      actorId: input.actorId,
-    });
-    return row;
+    if (existing && existing.storageKey) {
+      // Best-effort: an orphaned blob is preferable to blocking the re-upload.
+      yield* blobStorage.delete(existing.storageKey).pipe(Effect.catchAll(() => Effect.void));
+    }
+    const inserted = yield* runner.run((ctx) =>
+      Effect.gen(function* () {
+        if (existing && existing.fileHash !== fileHash) {
+          yield* ctx.documents.deleteById(existing.id);
+        }
+        const row = yield* ctx.documents.insert({
+          fileName: input.fileName,
+          fileHash,
+          uploadedBy: input.actorId,
+        });
+        const key = blobKey(row.id, input.fileName);
+        yield* blobStorage.put(key, input.buffer, 'application/pdf');
+        yield* ctx.documents.setStorageKey(row.id, key);
+        yield* ctx.documents.updateIngestStatus(row.id, 'queued');
+        const a = auditFor(row.id);
+        yield* ctx.audit.logDocumentEvent({
+          action: a.action,
+          documentId: a.documentId,
+          actorId: input.actorId,
+        });
+        return row;
+      }),
+    );
+    // If QStash publish fails, mark `failed` so the UI doesn't show a
+    // forever-`queued` doc; a future re-drive can re-enqueue.
+    yield* ingestQueue.enqueue({ documentId: inserted.id }).pipe(
+      Effect.catchAll((e) =>
+        documents
+          .updateIngestStatus(inserted.id, 'failed')
+          .pipe(Effect.catchAll(() => Effect.void), Effect.zipRight(Effect.fail(e))),
+      ),
+    );
+    return { documentId: inserted.id, chunks: 0, status: 'queued' as const };
   });
-  try {
-    await deps.ingestQueue.enqueue({ documentId: inserted.id });
-  } catch (e) {
-    // The blob + row are committed but the QStash publish failed.
-    // Mark `failed` so the UI doesn't show a forever-`queued` doc.
-    // A future re-drive can re-enqueue once QStash is reachable.
-    await deps.documents.updateIngestStatus(inserted.id, 'failed').catch(() => {});
-    throw e;
-  }
-  return ok({ documentId: inserted.id, chunks: 0, status: 'queued' });
 }
 
-export async function softDeleteDocument(
-  input: { documentId: number; actorId: string },
-  deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner },
-): Promise<Result<void>> {
-  return wrapServiceCall(async () => {
-    const check = await ensureDocument(input.documentId, deps.documents);
-    if (!check.ok) return check;
-    await deps.runner.run(async (tx) => {
-      await tx.documents.softDelete(input.documentId, new Date());
-      await tx.audit.logDocumentEvent({
-        action: 'delete',
-        documentId: input.documentId,
-        actorId: input.actorId,
-      });
-    });
-    return ok(undefined);
-  }, 'Failed to soft-delete document');
-}
-
-export async function restoreDocument(
-  documentId: number,
-  actorId: string,
-  deps: { documents: DocumentRepository; audit: AuditLog; clock: Clock; runner: TransactionRunner },
-): Promise<Result<void>> {
-  try {
-    const doc = await deps.documents.findById(documentId);
-    if (!doc) return err(new NotFoundError('Document not found'));
-    if (!doc.deletedAt) return err(new ValidationError('Document is not deleted'));
-    if (deps.clock.now().getTime() - doc.deletedAt.getTime() > RESTORE_WINDOW_MS) {
-      return err(new GoneError('Restore window expired'));
-    }
-    await deps.runner.run(async (tx) => {
-      await tx.documents.restore(documentId);
-      await tx.audit.logDocumentEvent({ action: 'restore', documentId, actorId });
-    });
-    return ok(undefined);
-  } catch (e) {
-    if (e instanceof NotFoundError || e instanceof ValidationError || e instanceof GoneError) {
-      return err(e);
-    }
-    return err(new ExternalServiceError('Document restore failed', e));
-  }
-}
-
-export async function getDocumentById(
-  documentId: number,
-  deps: { documents: DocumentRepository },
-): Promise<Result<{ document: import('@app/domain').DocumentRow | null }>> {
-  return serviceResult(
-    () => deps.documents.findById(documentId).then((doc) => ({ document: doc })),
-    'Failed to get document',
-  );
-}
-
-export async function hardDeleteDocument(
-  input: { documentId: number; actorId: string },
-  deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner; blobStorage: BlobStorage },
-): Promise<Result<void>> {
-  return wrapServiceCall(async () => {
-    const existing = await deps.documents.findById(input.documentId);
-    if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
-    // Clean up the stored blob before the DB row disappears — once the
-    // row is gone we no longer know which key to delete.
-    const storageKey = existing.storageKey;
-    await deps.runner.run(async (tx) => {
-      await tx.audit.logDocumentEvent({
-        action: 'delete',
-        documentId: input.documentId,
-        actorId: input.actorId,
-      });
-      await tx.documents.deleteById(input.documentId);
-    });
-    if (storageKey) {
-      await deps.blobStorage.delete(storageKey).catch(() => {
-        // Best-effort: an orphaned blob is preferable to failing the
-        // hard-delete. Logged by the caller if needed.
-      });
-    }
-    return ok(undefined);
-  }, 'Failed to hard-delete document');
-}
-
-export async function replacePdf(
-  input: { documentId: number; fileName: string; buffer: Buffer; actorId: string },
-  deps: IngestDeps & { audit: AuditLog; runner: TransactionRunner; blobStorage: BlobStorage; ingestQueue: IngestQueue },
-): Promise<Result<IngestResult>> {
-  return wrapServiceCall(async () => {
-    const check = await ensureDocument(input.documentId, deps.documents);
-    if (!check.ok) return check;
-
-    if (input.buffer.length >= ASYNC_INGEST_THRESHOLD && asyncIngestEnabled()) {
-      // Replace via the async queue: audit `replace` against the
-      // original documentId (mirrors the sync path's convention).
-      return queuePdfForIngest(
-        input,
-        deps,
-        () => ({ action: 'replace', documentId: input.documentId }),
-      );
-    }
-
-    return await deps.runner.run(async (tx) => {
-      const r = await ingestFile(
-        { fileName: input.fileName, buffer: input.buffer, uploadedBy: input.actorId },
-        { ...deps, documents: tx.documents, chunks: tx.chunks },
-      );
-      if (!r.ok) return r;
-      const key = blobKey(r.value.documentId, input.fileName);
-      await deps.blobStorage.put(key, input.buffer, 'application/pdf');
-      await tx.documents.setStorageKey(r.value.documentId, key);
-      if (r.value.status !== 'unchanged') {
-        await tx.audit.logDocumentEvent({
-          action: 'replace',
+export const softDeleteDocument = Effect.fn('Admin.softDeleteDocument')(
+  function* (input: { documentId: number; actorId: string }) {
+    const documents = yield* Documents;
+    const runner = yield* TransactionRunner;
+    const existing = yield* documents.findById(input.documentId);
+    if (!existing) return yield* new NotFoundError(`Document not found: ${input.documentId}`);
+    yield* runner.run((ctx) =>
+      Effect.gen(function* () {
+        yield* ctx.documents.softDelete(input.documentId, new Date());
+        yield* ctx.audit.logDocumentEvent({
+          action: 'delete',
           documentId: input.documentId,
           actorId: input.actorId,
         });
-      }
-      return r;
-    });
-  }, 'Failed to replace PDF');
-}
+      }),
+    );
+  },
+);
 
-export async function recountChunksForDocument(
-  documentId: number,
-  deps: { chunks: ChunkRepository },
-): Promise<Result<{ documentId: number; count: number }>> {
-  return serviceResult(
-    () => deps.chunks.countForDocument(documentId).then((count) => ({ documentId, count })),
-    'Failed to recount chunks',
-  );
-}
+export const restoreDocument = Effect.fn('Admin.restoreDocument')(
+  function* (documentId: number, actorId: string) {
+    const documents = yield* Documents;
+    const clock = yield* Clock;
+    const runner = yield* TransactionRunner;
+    const doc = yield* documents.findById(documentId);
+    if (!doc) return yield* new NotFoundError('Document not found');
+    if (!doc.deletedAt) return yield* new ValidationError('Document is not deleted');
+    const now = yield* clock.now();
+    if (now.getTime() - doc.deletedAt.getTime() > RESTORE_WINDOW_MS) {
+      return yield* new GoneError('Restore window expired');
+    }
+    yield* runner.run((ctx) =>
+      Effect.gen(function* () {
+        yield* ctx.documents.restore(documentId);
+        yield* ctx.audit.logDocumentEvent({ action: 'restore', documentId, actorId });
+      }),
+    );
+  },
+);
 
-export async function recountChunksForAllDocuments(
-  deps: { chunks: ChunkRepository },
-): Promise<Result<Array<{ documentId: number; count: number }>>> {
-  return serviceResult(() => deps.chunks.recountAll(), 'Failed to recount chunks for all documents');
-}
+export const getDocumentById = Effect.fn('Admin.getDocumentById')(
+  function* (documentId: number) {
+    const documents = yield* Documents;
+    const doc = yield* documents.findById(documentId);
+    return { document: doc };
+  },
+);
+
+export const hardDeleteDocument = Effect.fn('Admin.hardDeleteDocument')(
+  function* (input: { documentId: number; actorId: string }) {
+    const documents = yield* Documents;
+    const runner = yield* TransactionRunner;
+    const blobStorage = yield* BlobStorage;
+    const existing = yield* documents.findById(input.documentId);
+    if (!existing) return yield* new NotFoundError(`Document not found: ${input.documentId}`);
+    const storageKey = existing.storageKey;
+    yield* runner.run((ctx) =>
+      Effect.gen(function* () {
+        yield* ctx.audit.logDocumentEvent({
+          action: 'delete',
+          documentId: input.documentId,
+          actorId: input.actorId,
+        });
+        yield* ctx.documents.deleteById(input.documentId);
+      }),
+    );
+    if (storageKey) {
+      // Best-effort: an orphaned blob is preferable to failing the hard-delete.
+      yield* blobStorage.delete(storageKey).pipe(Effect.catchAll(() => Effect.void));
+    }
+  },
+);
+
+export const replacePdf = Effect.fn('Admin.replacePdf')(
+  function* (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) {
+    const documents = yield* Documents;
+    const existing = yield* documents.findById(input.documentId);
+    if (!existing) return yield* new NotFoundError(`Document not found: ${input.documentId}`);
+    if (input.buffer.length >= ASYNC_INGEST_THRESHOLD && asyncIngestEnabled()) {
+      return yield* queuePdfForIngest(
+        input,
+        () => ({ action: 'replace', documentId: input.documentId }),
+      );
+    }
+    const runner = yield* TransactionRunner;
+    const blobStorage = yield* BlobStorage;
+    return yield* runner.run((ctx) =>
+      Effect.gen(function* () {
+        const r = yield* ingestFile({
+          fileName: input.fileName,
+          buffer: input.buffer,
+          uploadedBy: input.actorId,
+        }).pipe(
+          Effect.provideService(Documents, ctx.documents),
+          Effect.provideService(Chunks, ctx.chunks),
+        );
+        const key = blobKey(r.documentId, input.fileName);
+        yield* blobStorage.put(key, input.buffer, 'application/pdf');
+        yield* ctx.documents.setStorageKey(r.documentId, key);
+        if (r.status !== 'unchanged') {
+          yield* ctx.audit.logDocumentEvent({
+            action: 'replace',
+            documentId: input.documentId,
+            actorId: input.actorId,
+          });
+        }
+        return r;
+      }),
+    );
+  },
+);
+
+export const recountChunksForDocument = Effect.fn('Admin.recountChunksForDocument')(
+  function* (documentId: number) {
+    const chunks = yield* Chunks;
+    const count = yield* chunks.countForDocument(documentId);
+    return { documentId, count };
+  },
+);
+
+export const recountChunksForAllDocuments = Effect.fn('Admin.recountChunksForAllDocuments')(
+  function* () {
+    const chunks = yield* Chunks;
+    return yield* chunks.recountAll();
+  },
+);

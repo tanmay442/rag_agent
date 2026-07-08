@@ -1,68 +1,56 @@
-import { err, ok, type Result, NotFoundError, ValidationError, ExternalServiceError } from '@app/domain';
-import type { UserRepository } from '@app/domain';
-import type { AuditLog } from '@app/domain';
+import { Effect } from 'effect';
+import { Users, Audit, NotFoundError, ValidationError } from '@app/domain';
 import { MAX_LIST_LIMIT } from '../../../../config/constants';
-import { sanitizePagination } from '../service-result';
+import { sanitizePagination } from '../pagination';
 
-export async function listUsers(
-  input: { search?: string; limit?: number; offset?: number },
-  deps: { users: UserRepository },
-): Promise<Result<{ users: Array<{ clerkUserId: string; email: string; name: string | null; role: string; lastSeenAt: Date | null; createdAt: Date }>; total: number }>> {
-  try {
+export const listUsers = Effect.fn('Auth.listUsers')(
+  function* (input: { search?: string; limit?: number; offset?: number }) {
+    const users = yield* Users;
     const { limit, offset } = sanitizePagination(input.limit, input.offset, MAX_LIST_LIMIT);
-    const r = await deps.users.list({ search: input.search, limit, offset });
-    return ok({ users: r.rows, total: r.total });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to list users', e));
-  }
-}
+    const r = yield* users.list({ search: input.search, limit, offset });
+    return { users: r.rows, total: r.total };
+  },
+);
 
-export async function setUserRole(
-  input: { clerkUserId: string; role: 'admin' | 'user'; actorId: string },
-  deps: { users: UserRepository; audit: AuditLog },
-): Promise<Result<{ user: { clerkUserId: string; role: string } }>> {
-  if (input.role !== 'admin' && input.role !== 'user') {
-    return err(new ValidationError(`Invalid role: ${input.role}`));
-  }
-  try {
-    const row = await deps.users.setRole(input.clerkUserId, input.role);
-    if (!row) return err(new NotFoundError(`User not found: ${input.clerkUserId}`));
-    void deps.users.syncClerkRole(input.clerkUserId, input.role).catch((err) => {
-      console.error(`Failed to sync Clerk role for ${input.clerkUserId}:`, err);
-    });
-    void deps.audit.logTicketEvent({
-      action: 'role_change',
-      ticketId: `user:${input.clerkUserId}`,
-      actorId: input.actorId,
-    }).catch((err) => {
-      console.error(`Failed to log role change audit for ${input.clerkUserId}:`, err);
-    });
-    return ok({ user: { clerkUserId: row.clerkUserId, role: row.role } });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to set user role', e));
-  }
-}
+export const setUserRole = Effect.fn('Auth.setUserRole')(
+  function* (input: { clerkUserId: string; role: 'admin' | 'user'; actorId: string }) {
+    if (input.role !== 'admin' && input.role !== 'user') {
+      return yield* new ValidationError(`Invalid role: ${input.role}`);
+    }
+    const users = yield* Users;
+    const audit = yield* Audit;
+    const row = yield* users.setRole(input.clerkUserId, input.role);
+    if (!row) return yield* new NotFoundError(`User not found: ${input.clerkUserId}`);
+    // Clerk role sync is best-effort.
+    yield* users
+      .syncClerkRole(input.clerkUserId, input.role)
+      .pipe(Effect.catchAll((e) => Effect.sync(() => console.error(`Failed to sync Clerk role for ${input.clerkUserId}:`, e))));
+    yield* audit
+      .logTicketEvent({
+        action: 'role_change',
+        ticketId: `user:${input.clerkUserId}`,
+        actorId: input.actorId,
+      })
+      .pipe(Effect.catchAll((e) => Effect.sync(() => console.error(`Failed to log role change audit for ${input.clerkUserId}:`, e))));
+    return { user: { clerkUserId: row.clerkUserId, role: row.role } };
+  },
+);
 
-export async function getUserByClerkId(
-  clerkUserId: string,
-  deps: { users: UserRepository },
-): Promise<Result<{ user: { clerkUserId: string; email: string; name: string | null; role: string } | null }>> {
-  try {
-    const u = await deps.users.findByClerkId(clerkUserId);
-    return ok({ user: u ? { clerkUserId: u.clerkUserId, email: u.email, name: u.name, role: u.role } : null });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to get user', e));
-  }
-}
+export const getUserByClerkId = Effect.fn('Auth.getUserByClerkId')(
+  function* (clerkUserId: string) {
+    const users = yield* Users;
+    const u = yield* users.findByClerkId(clerkUserId);
+    return {
+      user: u
+        ? { clerkUserId: u.clerkUserId, email: u.email, name: u.name, role: u.role }
+        : null,
+    };
+  },
+);
 
-export async function touchLastSeen(
-  clerkUserId: string,
-  deps: { users: UserRepository },
-): Promise<Result<void>> {
-  try {
-    await deps.users.touchLastSeen(clerkUserId);
-    return ok(undefined);
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to update last seen', e));
-  }
-}
+export const touchLastSeen = Effect.fn('Auth.touchLastSeen')(
+  function* (clerkUserId: string) {
+    const users = yield* Users;
+    yield* users.touchLastSeen(clerkUserId);
+  },
+);

@@ -2,9 +2,9 @@
 // Falls back to the in-memory adapter when UPSTASH_REDIS_REST_URL is
 // unset (see the factory in src/composition.ts).
 import { Redis } from '@upstash/redis';
-import type { RateLimiter } from '@app/domain';
+import type { RateLimiterAdapter } from '../adapter-ports';
 
-export function createUpstashRateLimiter(): RateLimiter {
+export function createUpstashRateLimiter(): RateLimiterAdapter {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {

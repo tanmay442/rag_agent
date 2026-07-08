@@ -1,9 +1,9 @@
 import { promises as fs, createReadStream } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { Readable } from 'node:stream';
-import type { BlobStorage } from '@app/domain';
+import type { BlobStorageAdapter } from '../adapter-ports';
 
-export function createFilesystemBlobStorage(): BlobStorage {
+export function createFilesystemBlobStorage(): BlobStorageAdapter {
   const baseDir = process.env.BLOB_FS_DIR ?? './.blobs';
   return {
     async put(key, body) {

@@ -1,44 +1,87 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotFoundError, ValidationError, GoneError } from '@app/domain';
-import type { DocumentRepository, AuditLog, Clock, TransactionRunner, TransactionContext } from '@app/domain';
+import { Effect, Layer } from 'effect';
+import {
+  Documents,
+  Audit,
+  Chunks,
+  Tickets,
+  Users,
+  TransactionRunner,
+  Clock,
+  NotFoundError,
+  ValidationError,
+  GoneError,
+  type DocumentRow,
+  type TransactionContext,
+} from '@app/domain';
 import { restoreDocument, softDeleteDocument } from '../documents';
 import { RESTORE_WINDOW_MS } from '../../../../../config/constants';
+import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
 
-function makeMockDeps(overrides: {
-  documents?: Partial<DocumentRepository>;
-  audit?: Partial<AuditLog>;
-  clock?: Partial<Clock>;
-  runner?: Partial<TransactionRunner>;
+function docRow(over: Partial<DocumentRow> = {}): DocumentRow {
+  return {
+    id: 1,
+    fileName: 'a.pdf',
+    fileHash: 'h',
+    uploadedBy: 'u',
+    uploadedAt: new Date(),
+    storageKey: 'docs/1/a.pdf',
+    ingestStatus: 'done',
+    deletedAt: null,
+    ...over,
+  };
+}
+
+function makeLayers(overrides: {
+  documents?: Partial<Documents.Service>;
+  audit?: Partial<Audit.Service>;
+  clock?: Partial<Clock.Service>;
+  runner?: Partial<TransactionRunner.Service>;
 } = {}) {
-  const documents = {
-    findById: vi.fn().mockResolvedValue(null),
-    softDelete: vi.fn().mockResolvedValue(undefined),
-    restore: vi.fn().mockResolvedValue(undefined),
-    list: vi.fn().mockResolvedValue({ documents: [], total: 0 }),
-    findByName: vi.fn().mockResolvedValue(null),
-    setStorageKey: vi.fn().mockResolvedValue(undefined),
-    insert: vi.fn().mockResolvedValue({} as never),
-    deleteById: vi.fn().mockResolvedValue(undefined),
-    countChunksForDocuments: vi.fn().mockResolvedValue(new Map()),
-    countChunksForAll: vi.fn().mockResolvedValue(0),
+  const documents: Documents.Service = {
+    findById: vi.fn().mockReturnValue(Effect.succeed(null)),
+    softDelete: vi.fn().mockReturnValue(Effect.succeed(null)),
+    restore: vi.fn().mockReturnValue(Effect.succeed(null)),
+    list: vi.fn().mockReturnValue(Effect.succeed({ documents: [], total: 0 })),
+    findByName: vi.fn().mockReturnValue(Effect.succeed(null)),
+    setStorageKey: vi.fn().mockReturnValue(Effect.void),
+    insert: vi.fn().mockReturnValue(Effect.succeed(docRow())),
+    deleteById: vi.fn().mockReturnValue(Effect.void),
+    updateIngestStatus: vi.fn().mockReturnValue(Effect.void),
+    countChunksForDocuments: vi.fn().mockReturnValue(Effect.succeed(new Map())),
+    countChunksForAll: vi.fn().mockReturnValue(Effect.succeed(0)),
     ...overrides.documents,
-  } as DocumentRepository;
-  const audit = {
-    logDocumentEvent: vi.fn().mockResolvedValue(undefined),
-    logTicketEvent: vi.fn().mockResolvedValue(undefined),
+  };
+  const audit: Audit.Service = {
+    logDocumentEvent: vi.fn().mockReturnValue(Effect.void),
+    logTicketEvent: vi.fn().mockReturnValue(Effect.void),
+    list: vi.fn().mockReturnValue(Effect.succeed({ events: [], total: 0 })),
     ...overrides.audit,
-  } as AuditLog;
-  const clock = {
-    now: vi.fn(() => new Date()),
+  };
+  const clock: Clock.Service = {
+    now: vi.fn().mockReturnValue(Effect.succeed(new Date())),
     ...overrides.clock,
-  } as Clock;
-  const runner = {
-    run: vi.fn(async (fn: (ctx: TransactionContext) => Promise<unknown>) => {
-      return fn({ documents, audit, chunks: {} as never, tickets: {} as never, users: {} as never });
-    }),
+  };
+  const runner: TransactionRunner.Service = {
+    run: ((fn: (ctx: TransactionContext) => Effect.Effect<unknown, unknown, unknown>) =>
+      fn({
+        documents,
+        audit,
+        chunks: {} as never,
+        tickets: {} as never,
+        users: {} as never,
+      })) as unknown as TransactionRunner.Service['run'],
     ...overrides.runner,
-  } as TransactionRunner;
-  return { documents, audit, clock, runner };
+  };
+  return Layer.mergeAll(
+    Layer.succeed(Documents, documents),
+    Layer.succeed(Audit, audit),
+    Layer.succeed(Clock, clock),
+    Layer.succeed(TransactionRunner, runner),
+    Layer.succeed(Chunks, {} as Chunks.Service),
+    Layer.succeed(Tickets, {} as Tickets.Service),
+    Layer.succeed(Users, {} as Users.Service),
+  );
 }
 
 beforeEach(() => {
@@ -47,89 +90,71 @@ beforeEach(() => {
 
 describe('restoreDocument', () => {
   it('returns NotFoundError for missing document', async () => {
-    const deps = makeMockDeps();
-    const result = await restoreDocument(999, 'user_1', deps);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(NotFoundError);
-    }
+    const layer = makeLayers();
+    const exit = await runExit(restoreDocument(999, 'user_1'), layer);
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(NotFoundError);
   });
 
   it('returns ValidationError for non-deleted document', async () => {
-    const deps = makeMockDeps({
-      documents: {
-        findById: vi.fn().mockResolvedValue({
-          id: 1,
-          deletedAt: null,
-        }),
-      },
+    const layer = makeLayers({
+      documents: { findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null }))) },
     });
-    const result = await restoreDocument(1, 'user_1', deps);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(ValidationError);
-    }
+    const exit = await runExit(restoreDocument(1, 'user_1'), layer);
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(ValidationError);
   });
 
   it('returns GoneError when restore window expired', async () => {
     const deletedAt = new Date(Date.now() - RESTORE_WINDOW_MS - 1000);
-    const deps = makeMockDeps({
-      documents: {
-        findById: vi.fn().mockResolvedValue({
-          id: 1,
-          deletedAt,
-        }),
-      },
-      clock: {
-        now: vi.fn(() => new Date()),
-      },
+    const layer = makeLayers({
+      documents: { findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt }))) },
+      clock: { now: vi.fn().mockReturnValue(Effect.succeed(new Date())) },
     });
-    const result = await restoreDocument(1, 'user_1', deps);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(GoneError);
-    }
+    const exit = await runExit(restoreDocument(1, 'user_1'), layer);
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(GoneError);
   });
 
   it('restores within window', async () => {
     const deletedAt = new Date(Date.now() - 1000);
-    const deps = makeMockDeps({
+    const restore = vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null })));
+    const layer = makeLayers({
       documents: {
-        findById: vi.fn().mockResolvedValue({
-          id: 1,
-          deletedAt,
-        }),
+        findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt }))),
+        restore,
       },
-      clock: {
-        now: vi.fn(() => new Date()),
-      },
+      clock: { now: vi.fn().mockReturnValue(Effect.succeed(new Date())) },
     });
-    const result = await restoreDocument(1, 'user_1', deps);
-    expect(result.ok).toBe(true);
-    expect(deps.documents.restore).toHaveBeenCalledWith(1);
+    await runWith(restoreDocument(1, 'user_1'), layer);
+    expect(restore).toHaveBeenCalledWith(1);
   });
 });
 
 describe('softDeleteDocument', () => {
   it('returns NotFoundError for missing document', async () => {
-    const deps = makeMockDeps();
-    const result = await softDeleteDocument({ documentId: 999, actorId: 'user_1' }, deps);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(NotFoundError);
-    }
+    const layer = makeLayers();
+    const exit = await runExit(
+      softDeleteDocument({ documentId: 999, actorId: 'user_1' }),
+      layer,
+    );
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(NotFoundError);
   });
 
   it('soft-deletes existing document', async () => {
-    const deps = makeMockDeps({
+    const softDelete = vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: new Date() })));
+    const logDocumentEvent = vi.fn().mockReturnValue(Effect.void);
+    const layer = makeLayers({
       documents: {
-        findById: vi.fn().mockResolvedValue({ id: 1, deletedAt: null }),
+        findById: vi.fn().mockReturnValue(Effect.succeed(docRow({ deletedAt: null }))),
+        softDelete,
       },
+      audit: { logDocumentEvent },
     });
-    const result = await softDeleteDocument({ documentId: 1, actorId: 'user_1' }, deps);
-    expect(result.ok).toBe(true);
-    expect(deps.documents.softDelete).toHaveBeenCalledOnce();
-    expect(deps.audit.logDocumentEvent).toHaveBeenCalledWith({
+    await runWith(softDeleteDocument({ documentId: 1, actorId: 'user_1' }), layer);
+    expect(softDelete).toHaveBeenCalledOnce();
+    expect(logDocumentEvent).toHaveBeenCalledWith({
       action: 'delete',
       documentId: 1,
       actorId: 'user_1',

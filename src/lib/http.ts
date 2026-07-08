@@ -2,7 +2,6 @@ import {
   ValidationError,
   RateLimitedError,
   type DomainError,
-  type Result,
 } from '@app/domain';
 
 const SAFE_MESSAGES: Record<string, string> = {
@@ -50,13 +49,6 @@ export function toSafeError(err: unknown): SafeErrorBody {
   return { error: 'An unexpected error occurred', code: 'internal_error' };
 }
 
-/** Convert a Result to a server-action-friendly shape.
- *  Returns the value on success, or a safe error body on failure. */
-export function toActionResult<T>(result: Result<T>): T | SafeErrorBody {
-  if (result.ok) return result.value;
-  return toErrorBody(result.error);
-}
-
 /** Type guard: does an action result represent an error? */
 export function isActionError<T>(
   result: T | SafeErrorBody,
@@ -90,12 +82,4 @@ export function respond(err: unknown): Response {
     { error: 'Internal server error', code: 'internal_error' },
     { status: 500 },
   );
-}
-
-/** Respond from a Result<T>: ok → 200 JSON value, err → mapped
- *  error response with the correct status code. This is the
- *  primary helper for API routes that call composition methods. */
-export function respondResult<T>(result: Result<T>): Response {
-  if (result.ok) return Response.json(result.value);
-  return respond(result.error);
 }

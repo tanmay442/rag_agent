@@ -5,7 +5,7 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import type { BlobStorage } from '@app/domain';
+import type { BlobStorageAdapter } from '../adapter-ports';
 
 interface S3CompatibleConfig {
   region: string;
@@ -15,7 +15,7 @@ interface S3CompatibleConfig {
   bucket: string;
 }
 
-function createS3CompatibleBlobStorage(config: S3CompatibleConfig): BlobStorage {
+function createS3CompatibleBlobStorage(config: S3CompatibleConfig): BlobStorageAdapter {
   const client = new S3Client({
     region: config.region,
     ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
@@ -48,7 +48,7 @@ function createS3CompatibleBlobStorage(config: S3CompatibleConfig): BlobStorage 
   };
 }
 
-export function createR2BlobStorage(): BlobStorage {
+export function createR2BlobStorage(): BlobStorageAdapter {
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;

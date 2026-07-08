@@ -1,9 +1,9 @@
-import type { IngestQueue } from '@app/domain';
+import type { IngestQueueAdapter } from '../adapter-ports';
 
 /** No-op `IngestQueue` for local dev when `QSTASH_TOKEN` is unset.
  *  The sync ingest path runs inside the upload request, so there is
  *  nothing to enqueue. `enqueue` resolves immediately. */
-export function createSyncQueue(): IngestQueue {
+export function createSyncQueue(): IngestQueueAdapter {
   return {
     async enqueue() {
       // No-op: sync mode, ingest happens in the request.

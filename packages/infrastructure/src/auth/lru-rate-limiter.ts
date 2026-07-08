@@ -1,7 +1,7 @@
 // In-process sliding-window rate limiter. Good enough for a single
 // Vercel function instance; in production with multiple concurrent
 // instances this is a soft cap.
-import type { RateLimiter } from '@app/domain';
+import type { RateLimiterAdapter } from '../adapter-ports';
 
 const MAX_KEYS = 5_000;
 const EVICT_BATCH = 500;
@@ -22,7 +22,7 @@ function evictStale(now: number, windowMs: number) {
   }
 }
 
-export const lruRateLimiter: RateLimiter = {
+export const lruRateLimiter: RateLimiterAdapter = {
   async check(key, opts) {
     const now = Date.now();
     const cutoff = now - opts.windowMs;

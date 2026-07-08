@@ -1,12 +1,12 @@
 import { Client } from '@upstash/qstash';
-import type { IngestQueue } from '@app/domain';
+import type { IngestQueueAdapter } from '../adapter-ports';
 
 /** QStash-backed `IngestQueue`. Publishes a JSON message pointing at
  *  the public ingest-worker route; QStash calls back over HTTP and
  *  retries on non-2xx responses (up to `retries`). Requires
  *  `QSTASH_TOKEN` and `QSTASH_INGEST_WORKER_URL` (the public
  *  deployment URL — QStash cannot reach `localhost`). */
-export function createQstashQueue(): IngestQueue {
+export function createQstashQueue(): IngestQueueAdapter {
   const token = process.env.QSTASH_TOKEN;
   if (!token) throw new Error('QSTASH_TOKEN is not set.');
   const client = new Client({ token });

@@ -1,50 +1,52 @@
 import { describe, it, expect, vi } from 'vitest';
+import { Effect, Layer } from 'effect';
 import { searchChunks } from '../search';
-import type { SearchDeps } from '../search';
+import { Chunks, Embeddings, ExternalServiceError } from '@app/domain';
+import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
 
-function makeDeps(overrides?: Partial<SearchDeps>): SearchDeps {
-  return {
-    chunks: {
-      insertMany: vi.fn(),
-      searchByVector: vi.fn().mockResolvedValue([{ content: 'test', similarity: 0.9 }]),
-      countForDocuments: vi.fn(),
-      countForAll: vi.fn(),
-      countForDocument: vi.fn(),
-      recountAll: vi.fn(),
-    },
-    embeddings: {
-      embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
-      embedBatch: vi.fn(),
-    },
-    ...overrides,
+function makeLayers(overrides?: {
+  chunks?: Partial<Chunks.Service>;
+  embeddings?: Partial<Embeddings.Service>;
+}) {
+  const chunks: Chunks.Service = {
+    searchByVector: vi
+      .fn()
+      .mockReturnValue(Effect.succeed([{ content: 'test', similarity: 0.9 }])),
+    insertMany: vi.fn().mockReturnValue(Effect.void),
+    countForDocuments: vi.fn().mockReturnValue(Effect.succeed(new Map())),
+    countForAll: vi.fn().mockReturnValue(Effect.succeed(0)),
+    countForDocument: vi.fn().mockReturnValue(Effect.succeed(0)),
+    recountAll: vi.fn().mockReturnValue(Effect.succeed([])),
+    ...overrides?.chunks,
   };
+  const embeddings: Embeddings.Service = {
+    embed: vi.fn().mockReturnValue(Effect.succeed([0.1, 0.2, 0.3])),
+    embedBatch: vi.fn().mockReturnValue(Effect.succeed([[0.1]])),
+    ...overrides?.embeddings,
+  };
+  return Layer.mergeAll(
+    Layer.succeed(Chunks, chunks),
+    Layer.succeed(Embeddings, embeddings),
+  );
 }
 
 describe('searchChunks', () => {
   it('propagates DB errors as ExternalServiceError', async () => {
-    const deps = makeDeps({
+    const layer = makeLayers({
       chunks: {
-        insertMany: vi.fn(),
-        searchByVector: vi.fn().mockRejectedValue(new Error('connection refused')),
-        countForDocuments: vi.fn(),
-        countForAll: vi.fn(),
-        countForDocument: vi.fn(),
-        recountAll: vi.fn(),
+        searchByVector: vi
+          .fn()
+          .mockReturnValue(Effect.fail(new ExternalServiceError('connection refused'))),
       },
     });
-    const result = await searchChunks('test', {}, deps);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toMatch(/Vector search failed/);
-    }
+    const exit = await runExit(searchChunks('test', {}), layer);
+    const err = expectFailure(exit);
+    expect(err.message).toMatch(/connection refused/);
   });
 
   it('returns results on success', async () => {
-    const deps = makeDeps();
-    const result = await searchChunks('test', {}, deps);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value).toEqual([{ content: 'test', similarity: 0.9 }]);
-    }
+    const layer = makeLayers();
+    const result = await runWith(searchChunks('test', {}), layer);
+    expect(result).toEqual([{ content: 'test', similarity: 0.9 }]);
   });
 });

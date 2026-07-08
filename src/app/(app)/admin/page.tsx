@@ -1,4 +1,4 @@
-import { getComposition, unwrap } from '@/composition';
+import { getComposition } from '@/composition';
 import { StatCard } from '@/components/admin/StatCard';
 import { AuditEventList } from '@/components/admin/AuditEventList';
 
@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminOverviewPage() {
   const comp = getComposition();
-  const summary = unwrap(await comp.getAnalyticsSummary());
-  const audit = unwrap(await comp.listAudit({ limit: 10 }));
+  const summary = await comp.getAnalyticsSummary();
+  const audit = await comp.listAudit({ limit: 10 });
   return (
     <section className="flex flex-col gap-6">
       <h2 className="text-xl font-medium">Overview</h2>

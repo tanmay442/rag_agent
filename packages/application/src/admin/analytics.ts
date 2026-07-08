@@ -1,5 +1,5 @@
-import { err, ok, type Result, ExternalServiceError } from '@app/domain';
-import type { DocumentRepository, ChunkRepository, TicketRepository, UserRepository, QueryStats } from '@app/domain';
+import { Effect } from 'effect';
+import { Documents, Chunks, Tickets, Users, QueryStats } from '@app/domain';
 
 export interface AnalyticsSummary {
   documentCount: number;
@@ -11,34 +11,33 @@ export interface AnalyticsSummary {
   coldStart: boolean;
 }
 
-export async function getAnalyticsSummary(
-  deps: {
-    documents: DocumentRepository;
-    chunks: ChunkRepository;
-    tickets: TicketRepository;
-    users: UserRepository;
-    stats: QueryStats;
-  },
-): Promise<Result<AnalyticsSummary>> {
-  try {
-    const [docCount, chunkCount, ticketCount, openTicketCount, usersCount] = await Promise.all([
-      deps.documents.list({ limit: 1, offset: 0 }).then((r) => r.total),
-      deps.chunks.countForAll(),
-      deps.tickets.countAll(),
-      deps.tickets.countOpen(),
-      deps.users.countAll(),
-    ]);
-    const topQueries = await deps.stats.top(10);
-    return ok({
-      documentCount: docCount,
+export const getAnalyticsSummary = Effect.fn('Admin.getAnalyticsSummary')(
+  function* () {
+    const documents = yield* Documents;
+    const chunks = yield* Chunks;
+    const tickets = yield* Tickets;
+    const users = yield* Users;
+    const stats = yield* QueryStats;
+    const docList = yield* documents.list({ limit: 1, offset: 0 });
+    const [chunkCount, ticketCount, openTicketCount, usersCount, topQueries] = yield* Effect.all(
+      [
+        chunks.countForAll(),
+        tickets.countAll(),
+        tickets.countOpen(),
+        users.countAll(),
+        stats.top(10),
+      ],
+      { concurrency: 'unbounded' },
+    );
+    const documentCount = docList.total;
+    return {
+      documentCount,
       chunkCount,
       ticketCount,
       openTicketCount,
       usersCount,
       topQueries,
-      coldStart: docCount === 0,
-    });
-  } catch (e) {
-    return err(new ExternalServiceError('Failed to load analytics', e));
-  }
-}
+      coldStart: documentCount === 0,
+    } satisfies AnalyticsSummary;
+  },
+);

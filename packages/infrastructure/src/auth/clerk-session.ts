@@ -8,9 +8,9 @@ import { auth, currentUser, clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { users } from '../db/schema';
-import type { SessionStore } from '@app/domain';
+import type { SessionStoreAdapter } from '../adapter-ports';
 
-export const clerkSessionStore: SessionStore = {
+export const clerkSessionStore: SessionStoreAdapter = {
   async getSession() {
     const { userId } = await auth();
     if (!userId) return null;

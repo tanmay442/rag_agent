@@ -1,4 +1,4 @@
-import { requireAdminGet, parseQueryPagination, respondResult } from '@/composition';
+import { requireAdminGet, parseQueryPagination, runComp } from '@/composition';
 
 export async function GET(req: Request) {
   const auth = await requireAdminGet(req);
@@ -6,6 +6,5 @@ export async function GET(req: Request) {
   const { comp, url } = auth;
   const search = url.searchParams.get('search') ?? undefined;
   const { limit, offset } = parseQueryPagination(url);
-  const result = await comp.listUsers({ search, limit, offset });
-  return respondResult(result);
+  return runComp(comp.listUsers({ search, limit, offset }));
 }

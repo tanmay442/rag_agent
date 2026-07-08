@@ -10,6 +10,7 @@ import {
 import { NextResponse } from 'next/server';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { ForbiddenError, UnauthorizedError } from '@app/domain';
+import { Effect } from 'effect';
 import { db } from '../db/client';
 import { users } from '../db/schema';
 import { userRepo } from '../db/repositories';
@@ -75,21 +76,21 @@ export async function getAppSession(): Promise<AppSessionFull | null> {
     const clerkRole = parseClerkRole(
       (user.publicMetadata as { role?: unknown } | null)?.role,
     );
-    local = await userRepo.upsertFromClerk({
+    local = await Effect.runPromise(userRepo.upsertFromClerk({
       clerkUserId: userId,
       email,
       name: user.fullName ?? user.firstName ?? user.username ?? null,
       imageUrl: user.imageUrl ?? null,
       role: clerkRole ?? (isAdminEmail(email) ? 'admin' : 'user'),
-    });
+    }));
   } else if (isAdminEmail(email) && local.role !== 'admin') {
-    local = await userRepo.upsertFromClerk({
+    local = await Effect.runPromise(userRepo.upsertFromClerk({
       clerkUserId: userId,
       email,
       name: local.name,
       imageUrl: local.imageUrl,
       role: 'admin',
-    });
+    }));
     // Sync the promoted role back to Clerk so the JWT carries the correct role.
     const client = await clerkClient();
     client.users.updateUserMetadata(userId, { publicMetadata: { role: 'admin' } }).catch(() => {});

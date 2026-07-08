@@ -1,7 +1,7 @@
 // In-process LRU map of (userId -> query -> count). The
 // counter resets on cold start and is per-deployment, not
 // per-user-end-of-day, so analytics are best-effort.
-import type { QueryStats } from '@app/domain';
+import type { QueryStatsAdapter } from '../adapter-ports';
 
 const MAX_USERS = 5_000;
 const MAX_QUERIES_PER_USER = 1_000;
@@ -61,7 +61,7 @@ function evictIfNeeded() {
   cachedTop = null;
 }
 
-export const inMemoryQueryStats: QueryStats = {
+export const inMemoryQueryStats: QueryStatsAdapter = {
   async record(userId, query) {
     const text = query.trim().toLowerCase();
     if (!text) return;

@@ -1,9 +1,14 @@
-import { err, ok, type Result, ValidationError, ExternalServiceError } from '@app/domain';
-import type { DocumentRepository, ChunkRepository } from '@app/domain';
-import type { EmbeddingService } from '@app/domain';
-import type { Hasher } from '@app/domain';
-import type { PdfParser } from '@app/domain';
-import type { TextSplitter } from '@app/domain';
+import { Effect } from 'effect';
+import {
+  Documents,
+  Chunks,
+  Embeddings,
+  Hasher,
+  PdfParser,
+  TextSplitter,
+  ValidationError,
+  ExternalServiceError,
+} from '@app/domain';
 
 interface IngestFileInput {
   fileName: string;
@@ -17,76 +22,56 @@ export interface IngestResult {
   status: 'inserted' | 'updated' | 'unchanged' | 'queued';
 }
 
-/** Dependencies required by the ingest pipeline. Each property
- *  maps to a port interface from the application layer. */
-export interface IngestDeps {
-  documents: DocumentRepository;
-  chunks: ChunkRepository;
-  embeddings: EmbeddingService;
-  hasher: Hasher;
-  pdfParser: PdfParser;
-  textSplitter: TextSplitter;
-}
+export const ingestFile = Effect.fn('Ingest.ingestFile')(
+  function* (input: IngestFileInput) {
+    const documents = yield* Documents;
+    const chunks = yield* Chunks;
+    const embeddings = yield* Embeddings;
+    const hasher = yield* Hasher;
+    const pdfParser = yield* PdfParser;
+    const textSplitter = yield* TextSplitter;
 
-export async function ingestFile(
-  input: IngestFileInput,
-  deps: IngestDeps,
-): Promise<Result<IngestResult>> {
-  const { fileName, buffer, uploadedBy } = input;
-  const fileHash = deps.hasher.sha256(buffer);
+    const fileHash = yield* hasher.sha256(input.buffer);
+    const existing = yield* documents.findByName(input.fileName);
+    if (existing && existing.fileHash === fileHash) {
+      return { documentId: existing.id, chunks: 0, status: 'unchanged' as const };
+    }
 
-  const existing = await deps.documents.findByName(fileName);
-  if (existing && existing.fileHash === fileHash) {
-    return ok({ documentId: existing.id, chunks: 0, status: 'unchanged' });
-  }
+    const text = yield* pdfParser.extractText(input.buffer);
+    const texts = yield* textSplitter.splitText(text);
+    if (texts.length === 0) {
+      return yield* new ValidationError(`No extractable text in ${input.fileName}`);
+    }
+    const vectors = yield* embeddings.embedBatch(texts);
+    if (vectors.length !== texts.length) {
+      return yield* new ExternalServiceError('Embedding count mismatch');
+    }
 
-  let text: string;
-  try {
-    text = await deps.pdfParser.extractText(buffer);
-  } catch (cause) {
-    return err(new ExternalServiceError('PDF parsing failed', cause));
-  }
-  const texts = await deps.textSplitter.splitText(text);
-  if (texts.length === 0) {
-    return err(new ValidationError(`No extractable text in ${fileName}`));
-  }
-  let embeddings: number[][];
-  try {
-    embeddings = await deps.embeddings.embedBatch(texts);
-  } catch (cause) {
-    return err(new ExternalServiceError('Embedding API failed', cause));
-  }
+    // Callers should wrap these operations in a database transaction
+    // when atomicity is required (see TransactionRunner).
+    if (existing) {
+      yield* documents.deleteById(existing.id);
+    }
+    const inserted = yield* documents.insert({
+      fileName: input.fileName,
+      fileHash,
+      uploadedBy: input.uploadedBy,
+    });
+    yield* chunks.insertMany(
+      texts.map((t, i) => ({
+        documentId: inserted.id,
+        content: t,
+        embedding: vectors[i]!,
+      })),
+    );
 
-  if (embeddings.length !== texts.length) {
-    return err(new ExternalServiceError('Embedding count mismatch'));
-  }
-
-  // NOTE: Callers should wrap these operations in a database transaction
-  // when atomicity is required (see TransactionRunner).
-  if (existing) {
-    await deps.documents.deleteById(existing.id);
-  }
-
-  const inserted = await deps.documents.insert({
-    fileName,
-    fileHash,
-    uploadedBy,
-  });
-
-  await deps.chunks.insertMany(
-    texts.map((t, i) => ({
+    return {
       documentId: inserted.id,
-      content: t,
-      embedding: embeddings[i],
-    })),
-  );
-
-  return ok({
-    documentId: inserted.id,
-    chunks: texts.length,
-    status: existing ? 'updated' : 'inserted',
-  });
-}
+      chunks: texts.length,
+      status: existing ? ('updated' as const) : ('inserted' as const),
+    };
+  },
+);
 
 export interface PreparedChunk {
   documentId: number;
@@ -102,33 +87,26 @@ export interface PreparedChunk {
  *  the caller inserts them, typically inside a transaction together
  *  with the `done` status flip so the chunk insert and status update
  *  are atomic (and a QStash retry that sees `done` is a no-op). */
-export async function prepareIngest(
-  input: { documentId: number; fileName: string; buffer: Buffer },
-  deps: { embeddings: EmbeddingService; pdfParser: PdfParser; textSplitter: TextSplitter },
-): Promise<Result<{ chunks: number; rows: PreparedChunk[] }>> {
-  let text: string;
-  try {
-    text = await deps.pdfParser.extractText(input.buffer);
-  } catch (cause) {
-    return err(new ExternalServiceError('PDF parsing failed', cause));
-  }
-  const texts = await deps.textSplitter.splitText(text);
-  if (texts.length === 0) {
-    return err(new ValidationError(`No extractable text in ${input.fileName}`));
-  }
-  let embeddings: number[][];
-  try {
-    embeddings = await deps.embeddings.embedBatch(texts);
-  } catch (cause) {
-    return err(new ExternalServiceError('Embedding API failed', cause));
-  }
-  if (embeddings.length !== texts.length) {
-    return err(new ExternalServiceError('Embedding count mismatch'));
-  }
-  const rows = texts.map((t, i) => ({
-    documentId: input.documentId,
-    content: t,
-    embedding: embeddings[i],
-  }));
-  return ok({ chunks: texts.length, rows });
-}
+export const prepareIngest = Effect.fn('Ingest.prepareIngest')(
+  function* (input: { documentId: number; fileName: string; buffer: Buffer }) {
+    const embeddings = yield* Embeddings;
+    const pdfParser = yield* PdfParser;
+    const textSplitter = yield* TextSplitter;
+
+    const text = yield* pdfParser.extractText(input.buffer);
+    const texts = yield* textSplitter.splitText(text);
+    if (texts.length === 0) {
+      return yield* new ValidationError(`No extractable text in ${input.fileName}`);
+    }
+    const vectors = yield* embeddings.embedBatch(texts);
+    if (vectors.length !== texts.length) {
+      return yield* new ExternalServiceError('Embedding count mismatch');
+    }
+    const rows = texts.map((t, i) => ({
+      documentId: input.documentId,
+      content: t,
+      embedding: vectors[i]!,
+    }));
+    return { chunks: texts.length, rows };
+  },
+);

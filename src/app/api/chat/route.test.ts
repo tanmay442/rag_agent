@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ok, err } from '@app/domain';
+import { RateLimitedError, ExternalServiceError } from '@app/domain';
 
 // Mocks for the route's deps. We control:
 const { searchValue, ticketInsertedValues, streamTextImpl, createTicketMock } = vi.hoisted(() => ({
@@ -12,9 +12,9 @@ const { searchValue, ticketInsertedValues, streamTextImpl, createTicketMock } = 
   createTicketMock: vi.fn(),
 }));
 
-const { authMock, rateLimitResult } = vi.hoisted(() => ({
+const { authMock, rateLimitMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
-  rateLimitResult: { ok: true, remaining: 29, resetMs: 60_000 } as { ok: boolean; remaining?: number; resetMs?: number; retryAfterMs?: number },
+  rateLimitMock: vi.fn(),
 }));
 
 const { currentUserMock } = vi.hoisted(() => ({
@@ -50,8 +50,8 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 const { compositionMock } = vi.hoisted(() => ({
   compositionMock: {
-    rateLimit: () => rateLimitResult,
-    searchChunks: vi.fn(async () => ok(searchValue) as never),
+    rateLimit: rateLimitMock,
+    searchChunks: vi.fn(async () => searchValue),
     createTicket: createTicketMock,
     recordQuery: vi.fn(() => Promise.resolve()),
     getChatModel: vi.fn(() => ({ modelId: 'mock' })),
@@ -118,7 +118,7 @@ beforeEach(() => {
   createTicketMock.mockReset();
   ticketInsertedValues.length = 0;
   // Default: createTicket succeeds with a TKT-prefixed id.
-  createTicketMock.mockResolvedValue(ok({ ticketId: 'TKT-abcd1234', status: 'created' }) as never);
+  createTicketMock.mockResolvedValue({ ticketId: 'TKT-abcd1234', status: 'created' });
   // Default Clerk identity: every test gets a known user unless it
   // explicitly overrides the mock.
   currentUserMock.mockResolvedValue({
@@ -128,9 +128,8 @@ beforeEach(() => {
     firstName: 'Real',
     username: 'realperson',
   });
-  rateLimitResult.ok = true;
-  rateLimitResult.remaining = 29;
-  rateLimitResult.resetMs = 60_000;
+  rateLimitMock.mockReset();
+  rateLimitMock.mockResolvedValue({ remaining: 29, resetMs: 60_000 });
   // Reset the toggle to the default.
   appConfigMock.prefetchFirstTurn = false;
 });
@@ -154,8 +153,7 @@ describe('/api/chat', () => {
 
   it('returns 429 when the rate limiter says so', async () => {
     authMock.mockResolvedValue({ userId: 'user_1' });
-    rateLimitResult.ok = false;
-    (rateLimitResult as unknown as { retryAfterMs: number }).retryAfterMs = 5_000;
+    rateLimitMock.mockRejectedValue(new RateLimitedError('Too fast', 5_000));
     const res = await appHandler.POST(
       new Request('http://localhost/api/chat', {
         method: 'POST',
@@ -188,7 +186,7 @@ describe('/api/chat createSupportTicket tool', () => {
   }
 
   it('creates a ticket with a TKT- prefixed id, ignoring LLM-supplied name/email', async () => {
-    createTicketMock.mockResolvedValueOnce(ok({ ticketId: 'TKT-abcd1234', status: 'created' }) as never);
+    createTicketMock.mockResolvedValueOnce({ ticketId: 'TKT-abcd1234', status: 'created' });
     const out = await invokeToolFromStreamText({
       name: 'Hallucinated Name',
       email: 'hallucinated@example.com',
@@ -209,8 +207,8 @@ describe('/api/chat createSupportTicket tool', () => {
 
   it('generates unique ticket ids (UUID-based, no collision retry needed)', async () => {
     createTicketMock
-      .mockResolvedValueOnce(ok({ ticketId: 'TKT-aaaaaaaa', status: 'created' }) as never)
-      .mockResolvedValueOnce(ok({ ticketId: 'TKT-bbbbbbbb', status: 'created' }) as never);
+      .mockResolvedValueOnce({ ticketId: 'TKT-aaaaaaaa', status: 'created' })
+      .mockResolvedValueOnce({ ticketId: 'TKT-bbbbbbbb', status: 'created' });
     const out1 = await invokeToolFromStreamText({
       name: 'A',
       email: 'a@a.com',
@@ -225,8 +223,7 @@ describe('/api/chat createSupportTicket tool', () => {
   });
 
   it('returns an error status when createTicket fails', async () => {
-    const { ExternalServiceError } = await import('@app/domain');
-    createTicketMock.mockResolvedValueOnce(err(new ExternalServiceError('db down')) as never);
+    createTicketMock.mockRejectedValueOnce(new ExternalServiceError('db down'));
     const out = await invokeToolFromStreamText({
       name: 'A',
       email: 'a@a.com',
@@ -251,7 +248,7 @@ describe('/api/chat searchDocumentation tool', () => {
     const longContent = 'x'.repeat(2000);
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
-      .mockResolvedValueOnce(ok([{ content: longContent, similarity: 0.8 }]) as never);
+      .mockResolvedValueOnce([{ content: longContent, similarity: 0.8 }]);
     const { tools } = await captureTools();
     const result = (await tools?.searchDocumentation?.execute({ query: 'q' })) as Array<{
       content: string;
@@ -264,7 +261,7 @@ describe('/api/chat searchDocumentation tool', () => {
   it('passes a user-supplied limit through to searchChunks', async () => {
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
-      .mockResolvedValueOnce(ok([]) as never);
+      .mockResolvedValueOnce([]);
     const { tools } = await captureTools();
     await tools?.searchDocumentation?.execute({ query: 'q', limit: 5 });
     expect(searchChunksSpy).toHaveBeenCalledWith('q', { limit: 5 });

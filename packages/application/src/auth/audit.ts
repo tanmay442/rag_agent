@@ -1,24 +1,25 @@
 // Use-case: log document / ticket audit events.
-// Source: src/lib/auth/audit.ts (logDocumentEvent, logTicketEvent).
-import { ok, type Result } from '@app/domain';
-import type { AuditLog } from '@app/domain';
+import { Effect } from 'effect';
+import { Audit } from '@app/domain';
 
-export async function logDocumentEvent(
-  input: { action: 'upload' | 'replace' | 'delete' | 'restore'; documentId: number; actorId: string },
-  deps: { audit: AuditLog },
-): Promise<Result<void>> {
-  await deps.audit.logDocumentEvent(input);
-  return ok(undefined);
-}
+export const logDocumentEvent = Effect.fn('Auth.logDocumentEvent')(
+  function* (input: {
+    action: 'upload' | 'replace' | 'delete' | 'restore';
+    documentId: number;
+    actorId: string;
+  }) {
+    const audit = yield* Audit;
+    yield* audit.logDocumentEvent(input);
+  },
+);
 
-export async function logTicketEvent(
-  input: {
+export const logTicketEvent = Effect.fn('Auth.logTicketEvent')(
+  function* (input: {
     action: 'create' | 'assign' | 'status_change' | 'note' | 'role_change';
     ticketId: string;
     actorId: string;
+  }) {
+    const audit = yield* Audit;
+    yield* audit.logTicketEvent(input);
   },
-  deps: { audit: AuditLog },
-): Promise<Result<void>> {
-  await deps.audit.logTicketEvent(input);
-  return ok(undefined);
-}
+);

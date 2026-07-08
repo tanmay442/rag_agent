@@ -1,9 +1,9 @@
-import type { BlobStorage } from '@app/domain';
+import type { BlobStorageAdapter } from '../adapter-ports';
 import { createFilesystemBlobStorage } from './blob-storage-fs';
 import { createR2BlobStorage } from './blob-storage-r2';
 import { createS3BlobStorage } from './blob-storage-s3';
 
-export function createBlobStorage(): BlobStorage {
+export function createBlobStorage(): BlobStorageAdapter {
   const provider = process.env.BLOB_STORAGE_PROVIDER ?? 'filesystem';
   switch (provider) {
     case 'filesystem':

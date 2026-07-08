@@ -1,4 +1,4 @@
-import { getComposition, unwrap, parsePageParam } from '@/composition';
+import { getComposition, parsePageParam } from '@/composition';
 import { Pagination } from '@/components/admin/Pagination';
 
 export const dynamic = 'force-dynamic';
@@ -16,12 +16,12 @@ export default async function AuditPage({
   const documentIdRaw = params.documentId ? Number(params.documentId) : undefined;
   const documentId = Number.isFinite(documentIdRaw) ? documentIdRaw : undefined;
   const ticketId = params.ticketId;
-  const result = unwrap(await getComposition().listAudit({
+  const result = await getComposition().listAudit({
     documentId,
     ticketId,
     limit: PAGE_SIZE,
     offset,
-  }));
+  });
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">

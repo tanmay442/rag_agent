@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ok, err, NotFoundError, ExternalServiceError } from '@app/domain';
+import { NotFoundError, ExternalServiceError } from '@app/domain';
 
 const { verifyMock, ingestQueuedDocumentMock } = vi.hoisted(() => ({
   verifyMock: vi.fn(),
@@ -78,7 +78,7 @@ describe('POST /api/admin/ingest-worker', () => {
 
   it('returns 200 on a happy-path ingest (status done)', async () => {
     verifyMock.mockResolvedValue(true);
-    ingestQueuedDocumentMock.mockResolvedValue(ok({ status: 'done', chunks: 7 }));
+    ingestQueuedDocumentMock.mockResolvedValue({ status: 'done', chunks: 7 });
     const res = await route.POST(signedPost(JSON.stringify({ documentId: 5 })));
     expect(res.status).toBe(200);
     expect(ingestQueuedDocumentMock).toHaveBeenCalledWith(5);
@@ -88,28 +88,28 @@ describe('POST /api/admin/ingest-worker', () => {
 
   it('returns 200 without re-processing an already-done doc (idempotent)', async () => {
     verifyMock.mockResolvedValue(true);
-    ingestQueuedDocumentMock.mockResolvedValue(ok({ status: 'already-done', chunks: 0 }));
+    ingestQueuedDocumentMock.mockResolvedValue({ status: 'already-done', chunks: 0 });
     const res = await route.POST(signedPost(JSON.stringify({ documentId: 5 })));
     expect(res.status).toBe(200);
   });
 
   it('returns 409 when the doc is already being ingested (busy)', async () => {
     verifyMock.mockResolvedValue(true);
-    ingestQueuedDocumentMock.mockResolvedValue(ok({ status: 'busy', chunks: 0 }));
+    ingestQueuedDocumentMock.mockResolvedValue({ status: 'busy', chunks: 0 });
     const res = await route.POST(signedPost(JSON.stringify({ documentId: 5 })));
     expect(res.status).toBe(409);
   });
 
   it('returns 404 when the document is not found', async () => {
     verifyMock.mockResolvedValue(true);
-    ingestQueuedDocumentMock.mockResolvedValue(err(new NotFoundError('missing')));
+    ingestQueuedDocumentMock.mockRejectedValue(new NotFoundError('missing'));
     const res = await route.POST(signedPost(JSON.stringify({ documentId: 99 })));
     expect(res.status).toBe(404);
   });
 
   it('returns 500 on an embed/ingest failure so QStash retries', async () => {
     verifyMock.mockResolvedValue(true);
-    ingestQueuedDocumentMock.mockResolvedValue(err(new ExternalServiceError('embed down')));
+    ingestQueuedDocumentMock.mockRejectedValue(new ExternalServiceError('embed down'));
     const res = await route.POST(signedPost(JSON.stringify({ documentId: 5 })));
     expect(res.status).toBe(500);
   });

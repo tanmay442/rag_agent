@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getComposition, TICKET_STATUSES, unwrap, parsePageParam } from '@/composition';
+import { getComposition, TICKET_STATUSES, parsePageParam } from '@/composition';
 import { TicketOverlay, type TicketRow } from './ticket-overlay';
 import { Pagination } from '@/components/admin/Pagination';
 
@@ -36,7 +36,7 @@ export default async function TicketsPage({
     // the users needed for the current page's assignee dropdown, rather
     // than loading up to 100 users upfront.
     comp.listUsers({ limit: 100 }),
-  ]).then(([t, u]) => [unwrap(t), unwrap(u)] as const);
+  ]).then(([t, u]) => [t, u] as const);
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   // Index by clerkUserId; fall back to userList for tickets with placeholder identity fields.
   const userByClerkId = new Map<

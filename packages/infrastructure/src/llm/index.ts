@@ -1,4 +1,4 @@
-import type { EmbeddingService } from '@app/domain';
+import type { EmbeddingService } from '../adapter-ports';
 import type { LanguageModelV3 } from '@ai-sdk/provider';
 import { googleEmbeddingService } from './google-embedding-service-port';
 import { openAIEmbeddingService } from './openai-embedding-service';

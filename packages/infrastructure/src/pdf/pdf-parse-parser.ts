@@ -8,9 +8,9 @@
 // `lib/pdf-parse.js`; importing the lib entry directly
 // bypasses the debug branch.
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
-import type { PdfParser } from '@app/domain';
+import type { PdfParserAdapter } from '../adapter-ports';
 
-export const pdfParseParser: PdfParser = {
+export const pdfParseParser: PdfParserAdapter = {
   async extractText(buffer: Buffer): Promise<string> {
     const result = await pdfParse(buffer);
     return result.text;

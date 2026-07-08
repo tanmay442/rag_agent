@@ -1,4 +1,4 @@
-import { requireAdminRoute, respond } from '@/composition';
+import { requireAdminRoute, respond, runCompVoid } from '@/composition';
 import { ValidationError } from '@app/domain';
 
 export async function POST(
@@ -13,7 +13,5 @@ export async function POST(
   if (!Number.isInteger(docId)) {
     return respond(new ValidationError('Invalid id'));
   }
-  const result = await comp.restoreDocument(docId, session.user.id);
-  if (!result.ok) return respond(result.error);
-  return Response.json({ ok: true });
+  return runCompVoid(comp.restoreDocument(docId, session.user.id));
 }

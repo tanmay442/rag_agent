@@ -29,13 +29,16 @@ export async function PATCH(
       }),
     );
   }
-  const result = await comp.updateTicket({
-    ticketId,
-    status: parsed.status,
-    assignedTo: parsed.assignedTo,
-    note: parsed.note,
-    actorId: session.user.id,
-  });
-  if (!result.ok) return respond(result.error);
-  return Response.json({ ticket: result.value });
+  try {
+    const ticket = await comp.updateTicket({
+      ticketId,
+      status: parsed.status,
+      assignedTo: parsed.assignedTo,
+      note: parsed.note,
+      actorId: session.user.id,
+    });
+    return Response.json({ ticket });
+  } catch (e) {
+    return respond(e);
+  }
 }

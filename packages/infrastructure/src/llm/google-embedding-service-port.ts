@@ -3,7 +3,7 @@
 // concurrency to balance throughput against rate limits.
 import { embed } from 'ai';
 import { getEmbeddingModel, EMBEDDING_OPTIONS } from './google-embedding-service';
-import type { EmbeddingService } from '@app/domain';
+import type { EmbeddingService } from '../adapter-ports';
 import { embedBatchWithModel } from './embedding-batch-helper';
 
 export const googleEmbeddingService: EmbeddingService = {

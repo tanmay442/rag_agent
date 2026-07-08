@@ -1,4 +1,4 @@
-import { requireAdminGet, isTicketStatus, parseQueryPagination, respondResult } from '@/composition';
+import { requireAdminGet, isTicketStatus, parseQueryPagination, runComp } from '@/composition';
 
 export async function GET(req: Request) {
   const auth = await requireAdminGet(req);
@@ -8,12 +8,13 @@ export async function GET(req: Request) {
   const assignee = url.searchParams.get('assignee');
   const search = url.searchParams.get('search') ?? undefined;
   const { limit, offset } = parseQueryPagination(url);
-  const result = await comp.listTickets({
-    status: status && isTicketStatus(status) ? status : undefined,
-    assignee: assignee || undefined,
-    search,
-    limit,
-    offset,
-  });
-  return respondResult(result);
+  return runComp(
+    comp.listTickets({
+      status: status && isTicketStatus(status) ? status : undefined,
+      assignee: assignee || undefined,
+      search,
+      limit,
+      offset,
+    }),
+  );
 }

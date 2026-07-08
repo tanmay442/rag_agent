@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { respond, respondResult, toSafeError, isActionError, toActionResult } from '../http';
+import { respond, toSafeError, isActionError } from '../http';
 import {
   ValidationError,
   NotFoundError,
@@ -8,9 +8,6 @@ import {
   ConflictError,
   ExternalServiceError,
   RateLimitedError,
-  ok,
-  err,
-  type DomainError,
 } from '@app/domain';
 
 describe('respond', () => {
@@ -76,22 +73,6 @@ describe('respond', () => {
     const original = new Response('ok', { status: 200 });
     const res = respond(original);
     expect(res).toBe(original);
-  });
-});
-
-describe('respondResult', () => {
-  it('returns 200 with the value on ok', async () => {
-    const res = respondResult(ok({ data: 'hello' }));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({ data: 'hello' });
-  });
-
-  it('maps an err Result to the correct error status', async () => {
-    const res = respondResult(err(new NotFoundError('missing') as DomainError));
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.code).toBe('not_found');
   });
 });
 
@@ -171,18 +152,5 @@ describe('isActionError', () => {
 
   it('returns false for object missing error', () => {
     expect(isActionError({ code: 'x' })).toBe(false);
-  });
-});
-
-describe('toActionResult', () => {
-  it('returns value on ok', () => {
-    const result = ok({ id: 1 });
-    expect(toActionResult(result)).toEqual({ id: 1 });
-  });
-
-  it('returns error body on err', () => {
-    const result = err(new NotFoundError('missing'));
-    const body = toActionResult(result);
-    expect(body).toEqual({ error: 'The requested resource was not found', code: 'not_found' });
   });
 });

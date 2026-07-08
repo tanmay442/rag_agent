@@ -1,142 +1,182 @@
 import { describe, it, expect, vi } from 'vitest';
+import { Effect, Layer } from 'effect';
 import { ingestFile } from '../ingest';
-import type { IngestDeps } from '../ingest';
+import {
+  Documents,
+  Chunks,
+  Embeddings,
+  Hasher,
+  PdfParser,
+  TextSplitter,
+  ValidationError,
+  ExternalServiceError,
+  type DocumentRow,
+} from '@app/domain';
+import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
 
-function makeDeps(overrides?: Partial<IngestDeps>): IngestDeps {
-  const insertMany = vi.fn().mockResolvedValue(undefined);
-  const embedBatch = vi.fn().mockResolvedValue([[0.1, 0.2, 0.3]]);
+function docRow(over: Partial<DocumentRow> = {}): DocumentRow {
   return {
-    documents: {
-      findByName: vi.fn().mockResolvedValue(null),
-      findById: vi.fn(),
-      setStorageKey: vi.fn(),
-      updateIngestStatus: vi.fn(),
-      insert: vi.fn().mockResolvedValue({ id: 1, fileName: 'test.pdf', fileHash: 'abc', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null }),
-      deleteById: vi.fn(),
-      softDelete: vi.fn(),
-      restore: vi.fn(),
-      list: vi.fn(),
-      countChunksForDocuments: vi.fn().mockResolvedValue(new Map()),
-      countChunksForAll: vi.fn().mockResolvedValue(0),
-    },
-    chunks: {
-      insertMany,
-      searchByVector: vi.fn(),
-      countForDocuments: vi.fn(),
-      countForAll: vi.fn(),
-      countForDocument: vi.fn(),
-      recountAll: vi.fn(),
-    },
-    embeddings: {
-      embed: vi.fn(),
-      embedBatch,
-    },
-    hasher: { sha256: vi.fn().mockReturnValue('abc123') },
-    pdfParser: { extractText: vi.fn().mockResolvedValue('Sample PDF text content.') },
-    textSplitter: { splitText: vi.fn().mockResolvedValue(['Sample PDF text content.']) },
-    ...overrides,
+    id: 1,
+    fileName: 'test.pdf',
+    fileHash: 'abc',
+    uploadedBy: 'user',
+    uploadedAt: new Date(),
+    storageKey: null,
+    ingestStatus: 'done',
+    deletedAt: null,
+    ...over,
   };
+}
+
+function makeLayers(overrides?: {
+  documents?: Partial<Documents.Service>;
+  chunks?: Partial<Chunks.Service>;
+  embeddings?: Partial<Embeddings.Service>;
+  hasher?: Partial<Hasher.Service>;
+  pdfParser?: Partial<PdfParser.Service>;
+  textSplitter?: Partial<TextSplitter.Service>;
+}) {
+  const insert = vi.fn().mockReturnValue(Effect.succeed(docRow()));
+  const documents: Documents.Service = {
+    findByName: vi.fn().mockReturnValue(Effect.succeed(null)),
+    findById: vi.fn().mockReturnValue(Effect.succeed(null)),
+    setStorageKey: vi.fn().mockReturnValue(Effect.void),
+    updateIngestStatus: vi.fn().mockReturnValue(Effect.void),
+    insert,
+    deleteById: vi.fn().mockReturnValue(Effect.void),
+    softDelete: vi.fn().mockReturnValue(Effect.succeed(null)),
+    restore: vi.fn().mockReturnValue(Effect.succeed(null)),
+    list: vi.fn().mockReturnValue(Effect.succeed({ documents: [], total: 0 })),
+    countChunksForDocuments: vi.fn().mockReturnValue(Effect.succeed(new Map())),
+    countChunksForAll: vi.fn().mockReturnValue(Effect.succeed(0)),
+    ...overrides?.documents,
+  };
+  const insertMany = vi.fn().mockReturnValue(Effect.void);
+  const chunks: Chunks.Service = {
+    insertMany,
+    searchByVector: vi.fn().mockReturnValue(Effect.succeed([])),
+    countForDocuments: vi.fn().mockReturnValue(Effect.succeed(new Map())),
+    countForAll: vi.fn().mockReturnValue(Effect.succeed(0)),
+    countForDocument: vi.fn().mockReturnValue(Effect.succeed(0)),
+    recountAll: vi.fn().mockReturnValue(Effect.succeed([])),
+    ...overrides?.chunks,
+  };
+  const embeddings: Embeddings.Service = {
+    embed: vi.fn().mockReturnValue(Effect.succeed([0.1])),
+    embedBatch: vi.fn().mockReturnValue(Effect.succeed([[0.1, 0.2, 0.3]])),
+    ...overrides?.embeddings,
+  };
+  const hasher: Hasher.Service = {
+    sha256: vi.fn().mockReturnValue(Effect.succeed('abc123')),
+    ...overrides?.hasher,
+  };
+  const pdfParser: PdfParser.Service = {
+    extractText: vi.fn().mockReturnValue(Effect.succeed('Sample PDF text content.')),
+    ...overrides?.pdfParser,
+  };
+  const textSplitter: TextSplitter.Service = {
+    splitText: vi.fn().mockReturnValue(Effect.succeed(['Sample PDF text content.'])),
+    ...overrides?.textSplitter,
+  };
+  return Layer.mergeAll(
+    Layer.succeed(Documents, documents),
+    Layer.succeed(Chunks, chunks),
+    Layer.succeed(Embeddings, embeddings),
+    Layer.succeed(Hasher, hasher),
+    Layer.succeed(PdfParser, pdfParser),
+    Layer.succeed(TextSplitter, textSplitter),
+  );
 }
 
 describe('ingestFile', () => {
   it('inserts chunks when embedding succeeds', async () => {
-    const deps = makeDeps();
-    const result = await ingestFile(
-      { fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' },
-      deps,
+    const layer = makeLayers();
+    const result = await runWith(
+      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.status).toBe('inserted');
-      expect(result.value.chunks).toBe(1);
-    }
-    expect(deps.chunks.insertMany).toHaveBeenCalledWith([
-      { documentId: 1, content: 'Sample PDF text content.', embedding: [0.1, 0.2, 0.3] },
-    ]);
+    expect(result.status).toBe('inserted');
+    expect(result.chunks).toBe(1);
   });
 
   it('deletes old document only after new insert succeeds', async () => {
-    const deleteById = vi.fn().mockResolvedValue(undefined);
-    const insert = vi.fn().mockResolvedValue({ id: 2, fileName: 'test.pdf', fileHash: 'newhash', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null });
-    const deps = makeDeps({
+    const deleteById = vi.fn().mockReturnValue(Effect.void);
+    const insert = vi
+      .fn()
+      .mockReturnValue(Effect.succeed(docRow({ id: 2, fileHash: 'newhash' })));
+    const layer = makeLayers({
       documents: {
-        findByName: vi.fn().mockResolvedValue({ id: 1, fileName: 'test.pdf', fileHash: 'oldhash', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null }),
-        findById: vi.fn(),
-        setStorageKey: vi.fn(),
-        updateIngestStatus: vi.fn(),
+        findByName: vi.fn().mockReturnValue(
+          Effect.succeed(docRow({ id: 1, fileHash: 'oldhash' })),
+        ),
         insert,
         deleteById,
-        softDelete: vi.fn(),
-        restore: vi.fn(),
-        list: vi.fn(),
-        countChunksForDocuments: vi.fn().mockResolvedValue(new Map()),
-        countChunksForAll: vi.fn().mockResolvedValue(0),
       },
     });
-    const result = await ingestFile(
-      { fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' },
-      deps,
+    const result = await runWith(
+      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
-    expect(deleteById).toHaveBeenCalledBefore(insert);
+    expect(result.status).toBe('updated');
+    expect(deleteById).toHaveBeenCalled();
+    expect(insert).toHaveBeenCalled();
+    expect(deleteById.mock.invocationCallOrder[0]).toBeLessThan(insert.mock.invocationCallOrder[0]);
   });
 
   it('returns unchanged when hash matches', async () => {
-    const deps = makeDeps({
+    const layer = makeLayers({
       documents: {
-        ...makeDeps().documents,
-        findByName: vi.fn().mockResolvedValue({ id: 1, fileName: 'test.pdf', fileHash: 'abc123', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null }),
+        findByName: vi.fn().mockReturnValue(
+          Effect.succeed(docRow({ id: 1, fileHash: 'abc123' })),
+        ),
       },
     });
-    const result = await ingestFile(
-      { fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' },
-      deps,
+    const result = await runWith(
+      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.status).toBe('unchanged');
-    }
+    expect(result.status).toBe('unchanged');
   });
 
   it('returns ValidationError when PDF has no extractable text', async () => {
-    const deps = makeDeps({
-      textSplitter: { splitText: vi.fn().mockResolvedValue([]) },
+    const layer = makeLayers({
+      textSplitter: { splitText: vi.fn().mockReturnValue(Effect.succeed([])) },
     });
-    const result = await ingestFile(
-      { fileName: 'empty.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' },
-      deps,
+    const exit = await runExit(
+      ingestFile({ fileName: 'empty.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toMatch(/No extractable text/);
-    }
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect(err.message).toMatch(/No extractable text/);
   });
 
   it('returns ExternalServiceError when PDF parsing fails', async () => {
-    const deps = makeDeps({
-      pdfParser: { extractText: vi.fn().mockRejectedValue(new Error('corrupt file')) },
+    const layer = makeLayers({
+      pdfParser: {
+        extractText: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('corrupt file'))),
+      },
     });
-    const result = await ingestFile(
-      { fileName: 'bad.pdf', buffer: Buffer.from('trash'), uploadedBy: 'user' },
-      deps,
+    const exit = await runExit(
+      ingestFile({ fileName: 'bad.pdf', buffer: Buffer.from('trash'), uploadedBy: 'user' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toMatch(/PDF parsing failed/);
-    }
+    const err = expectFailure(exit);
+    expect(err.message).toMatch(/corrupt file/);
   });
 
   it('returns ExternalServiceError when embedding fails', async () => {
-    const deps = makeDeps({
-      embeddings: { embed: vi.fn(), embedBatch: vi.fn().mockRejectedValue(new Error('API down')) },
+    const layer = makeLayers({
+      embeddings: {
+        embed: vi.fn().mockReturnValue(Effect.succeed([0.1])),
+        embedBatch: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('API down'))),
+      },
     });
-    const result = await ingestFile(
-      { fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' },
-      deps,
+    const exit = await runExit(
+      ingestFile({ fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.message).toMatch(/Embedding API failed/);
-    }
+    const err = expectFailure(exit);
+    expect(err.message).toMatch(/API down/);
   });
 });

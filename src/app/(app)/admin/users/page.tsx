@@ -1,4 +1,4 @@
-import { getComposition, unwrap, parsePageParam } from '@/composition';
+import { getComposition, parsePageParam } from '@/composition';
 import { UserRowActions } from './user-row-actions';
 import { Pagination } from '@/components/admin/Pagination';
 
@@ -15,11 +15,11 @@ export default async function UsersPage({
   const search = params.search?.trim() ?? '';
   const page = parsePageParam(params.page);
   const offset = (page - 1) * PAGE_SIZE;
-  const result = unwrap(await getComposition().listUsers({
+  const result = await getComposition().listUsers({
     search: search || undefined,
     limit: PAGE_SIZE,
     offset,
-  }));
+  });
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">

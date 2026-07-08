@@ -1,4 +1,4 @@
-import { requireAdminGet, parseQueryPagination, respondResult, respond } from '@/composition';
+import { requireAdminGet, parseQueryPagination, runComp, respond } from '@/composition';
 import { ValidationError } from '@app/domain';
 
 export async function GET(req: Request) {
@@ -14,11 +14,7 @@ export async function GET(req: Request) {
     documentId = n;
   }
   const { limit, offset } = parseQueryPagination(url, { limit: 50 });
-  const result = await comp.listAudit({
-    documentId,
-    ticketId: ticketId ?? undefined,
-    limit,
-    offset,
-  });
-  return respondResult(result);
+  return runComp(
+    comp.listAudit({ documentId, ticketId: ticketId ?? undefined, limit, offset }),
+  );
 }

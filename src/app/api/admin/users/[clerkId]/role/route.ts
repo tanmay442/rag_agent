@@ -25,11 +25,14 @@ export async function POST(
       }),
     );
   }
-  const result = await comp.setUserRole({
-    clerkUserId: clerkId,
-    role: parsed.role as 'admin' | 'user',
-    actorId: session.user.id,
-  });
-  if (!result.ok) return respond(result.error);
-  return Response.json({ user: result.value });
+  try {
+    const user = await comp.setUserRole({
+      clerkUserId: clerkId,
+      role: parsed.role as 'admin' | 'user',
+      actorId: session.user.id,
+    });
+    return Response.json({ user });
+  } catch (e) {
+    return respond(e);
+  }
 }

@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getComposition, requireAdmin, ForbiddenError } from '@/composition';
-import { UnauthorizedError } from '@app/domain';
+import { getComposition, requireAdmin } from '@/composition';
+import { UnauthorizedError, ForbiddenError } from '@app/domain';
 import type { TicketStatus } from '@app/application/admin/tickets';
 import type { AppRole } from '@app/infrastructure/auth';
 import { toSafeError } from '@/lib/http';
@@ -59,20 +59,19 @@ export async function uploadPdfAction(
     return { error: 'File too large (max 20 MB).' };
   }
   try {
-    const result = await getComposition().uploadPdf({
+    const value = await getComposition().uploadPdf({
       fileName: file.name,
       buffer,
       actorId: session.user.id,
     });
-    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin');
     revalidatePath('/admin/upload');
     revalidatePath('/admin/documents');
     return {
-      status: result.value.status,
-      chunks: result.value.chunks,
+      status: value.status,
+      chunks: value.chunks,
       fileName: file.name,
-      documentId: result.value.documentId,
+      documentId: value.documentId,
     };
   } catch (err) {
     logger.error('uploadPdfAction failed', { error: err });
@@ -86,8 +85,7 @@ export async function deleteDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().softDeleteDocument({ documentId, actorId: session.user.id });
-    if (!result.ok) return toSafeError(result.error);
+    await getComposition().softDeleteDocument({ documentId, actorId: session.user.id });
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
@@ -102,8 +100,7 @@ export async function restoreDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().restoreDocument(documentId, session.user.id);
-    if (!result.ok) return toSafeError(result.error);
+    await getComposition().restoreDocument(documentId, session.user.id);
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
@@ -118,8 +115,7 @@ export async function hardDeleteDocumentAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().hardDeleteDocument({ documentId, actorId: session.user.id });
-    if (!result.ok) return toSafeError(result.error);
+    await getComposition().hardDeleteDocument({ documentId, actorId: session.user.id });
     revalidatePath('/admin/documents');
     return {};
   } catch (err) {
@@ -139,8 +135,7 @@ export async function setRoleAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().setUserRole({ clerkUserId, role, actorId: session.user.id });
-    if (!result.ok) return toSafeError(result.error);
+    await getComposition().setUserRole({ clerkUserId, role, actorId: session.user.id });
     revalidatePath('/admin/users');
     return {};
   } catch (err) {
@@ -162,14 +157,13 @@ export async function updateTicketAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().updateTicket({
+    await getComposition().updateTicket({
       ticketId,
       status: patch.status,
       assignedTo: patch.assignedTo,
       note: patch.note ? sanitizeText(patch.note) : undefined,
       actorId: session.user.id,
     });
-    if (!result.ok) return toSafeError(result.error);
     revalidatePath('/admin/tickets');
     return {};
   } catch (err) {
@@ -189,10 +183,9 @@ export async function recountChunksAction(
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().recountChunksForDocument(documentId);
-    if (!result.ok) return toSafeError(result.error);
+    const value = await getComposition().recountChunksForDocument(documentId);
     revalidatePath('/admin/documents');
-    return { count: result.value.count };
+    return { count: value.count };
   } catch (err) {
     logger.error('recountChunksAction failed', { error: err });
     return toSafeError(err);
@@ -209,11 +202,10 @@ export async function recountAllChunksAction(): Promise<RecountAllChunksResult> 
   const session = await requireAdminOrError();
   if ('error' in session) return session;
   try {
-    const result = await getComposition().recountChunksForAllDocuments();
-    if (!result.ok) return toSafeError(result.error);
-    const total = result.value.reduce((acc, r) => acc + r.count, 0);
+    const value = await getComposition().recountChunksForAllDocuments();
+    const total = value.reduce((acc, r) => acc + r.count, 0);
     revalidatePath('/admin/documents');
-    return { documents: result.value.length, total };
+    return { documents: value.length, total };
   } catch (err) {
     logger.error('recountAllChunksAction failed', { error: err });
     return toSafeError(err);

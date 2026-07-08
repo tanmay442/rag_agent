@@ -1,25 +1,56 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotFoundError, ConflictError } from '@app/domain';
-import type { TicketRepository, AuditLog } from '@app/domain';
+import { Effect, Layer } from 'effect';
+import {
+  Tickets,
+  Audit,
+  NotFoundError,
+  ConflictError,
+  ExternalServiceError,
+  type TicketRow,
+} from '@app/domain';
 import { updateTicket, createTicket, VALID_TRANSITIONS, isTicketStatus } from '../tickets';
+import { expectFailure, runWith, runExit } from '../../__tests__/effect-test-utils';
 
-function makeMockRepos(overrides: { tickets?: Partial<TicketRepository>; audit?: Partial<AuditLog> } = {}) {
-  const tickets = {
-    findByTicketId: vi.fn().mockResolvedValue(null),
-    insert: vi.fn().mockResolvedValue({ ticketId: 'TKT-12345678', status: 'created' }),
-    update: vi.fn().mockResolvedValue(null),
-    list: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
-    latest: vi.fn().mockResolvedValue(null),
-    countAll: vi.fn().mockResolvedValue(0),
-    countOpen: vi.fn().mockResolvedValue(0),
+function ticket(over: Partial<TicketRow> = {}): TicketRow {
+  return {
+    id: 1,
+    ticketId: 'TKT-1001',
+    userId: 'u',
+    name: 'n',
+    email: 'e',
+    issue: 'i',
+    status: 'created',
+    createdAt: new Date(),
+    assignedTo: null,
+    notes: null,
+    ...over,
+  };
+}
+
+function makeLayers(overrides: {
+  tickets?: Partial<Tickets.Service>;
+  audit?: Partial<Audit.Service>;
+} = {}) {
+  const tickets: Tickets.Service = {
+    findByTicketId: vi.fn().mockReturnValue(Effect.succeed(null)),
+    insert: vi.fn().mockReturnValue(Effect.succeed(ticket({ ticketId: 'TKT-12345678', status: 'created' }))),
+    update: vi.fn().mockReturnValue(Effect.succeed(null)),
+    list: vi.fn().mockReturnValue(Effect.succeed({ rows: [], total: 0 })),
+    latest: vi.fn().mockReturnValue(Effect.succeed(null)),
+    countAll: vi.fn().mockReturnValue(Effect.succeed(0)),
+    countOpen: vi.fn().mockReturnValue(Effect.succeed(0)),
     ...overrides.tickets,
-  } as TicketRepository;
-  const audit = {
-    logTicketEvent: vi.fn().mockResolvedValue(undefined),
-    logDocumentEvent: vi.fn().mockResolvedValue(undefined),
+  };
+  const audit: Audit.Service = {
+    logTicketEvent: vi.fn().mockReturnValue(Effect.void),
+    logDocumentEvent: vi.fn().mockReturnValue(Effect.void),
+    list: vi.fn().mockReturnValue(Effect.succeed({ events: [], total: 0 })),
     ...overrides.audit,
-  } as AuditLog;
-  return { tickets, audit };
+  };
+  return Layer.mergeAll(
+    Layer.succeed(Tickets, tickets),
+    Layer.succeed(Audit, audit),
+  );
 }
 
 beforeEach(() => {
@@ -28,145 +59,110 @@ beforeEach(() => {
 
 describe('updateTicket', () => {
   it('returns NotFoundError for missing ticket', async () => {
-    const deps = makeMockRepos();
-    const result = await updateTicket(
-      { ticketId: 'TKT-MISSING', status: 'closed', actorId: 'user_1' },
-      deps,
+    const layer = makeLayers();
+    const exit = await runExit(
+      updateTicket({ ticketId: 'TKT-MISSING', status: 'closed', actorId: 'user_1' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(NotFoundError);
-    }
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(NotFoundError);
   });
 
   it('returns ConflictError for invalid status transition', async () => {
-    const deps = makeMockRepos({
+    const layer = makeLayers({
       tickets: {
-        findByTicketId: vi.fn().mockResolvedValue({
-          ticketId: 'TKT-1001',
-          status: 'closed',
-          notes: null,
-        }),
+        findByTicketId: vi.fn().mockReturnValue(Effect.succeed(ticket({ status: 'closed' }))),
       },
     });
-    const result = await updateTicket(
-      { ticketId: 'TKT-1001', status: 'created', actorId: 'user_1' },
-      deps,
+    const exit = await runExit(
+      updateTicket({ ticketId: 'TKT-1001', status: 'created', actorId: 'user_1' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(ConflictError);
-    }
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(ConflictError);
   });
 
   it('returns NotFoundError when update returns null (race condition)', async () => {
-    const deps = makeMockRepos({
+    const layer = makeLayers({
       tickets: {
-        findByTicketId: vi.fn().mockResolvedValue({
-          ticketId: 'TKT-1001',
-          status: 'created',
-          notes: null,
-        }),
-        update: vi.fn().mockResolvedValue(null),
+        findByTicketId: vi.fn().mockReturnValue(Effect.succeed(ticket({ status: 'created' }))),
+        update: vi.fn().mockReturnValue(Effect.succeed(null)),
       },
     });
-    const result = await updateTicket(
-      { ticketId: 'TKT-1001', status: 'in_progress', actorId: 'user_1' },
-      deps,
+    const exit = await runExit(
+      updateTicket({ ticketId: 'TKT-1001', status: 'in_progress', actorId: 'user_1' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(NotFoundError);
-    }
+    const err = expectFailure(exit);
+    expect(err).toBeInstanceOf(NotFoundError);
   });
 
   it('updates notes without status change', async () => {
-    const existing = {
-      ticketId: 'TKT-1001',
-      status: 'created' as const,
-      notes: 'old note',
-    };
-    const updated = { ...existing, notes: 'new note' };
-    const deps = makeMockRepos({
+    const existing = ticket({ status: 'created', notes: 'old note' });
+    const updated = ticket({ status: 'created', notes: 'new note' });
+    const layer = makeLayers({
       tickets: {
-        findByTicketId: vi.fn().mockResolvedValue(existing),
-        update: vi.fn().mockResolvedValue(updated),
+        findByTicketId: vi.fn().mockReturnValue(Effect.succeed(existing)),
+        update: vi.fn().mockReturnValue(Effect.succeed(updated)),
       },
     });
-    const result = await updateTicket(
-      { ticketId: 'TKT-1001', note: 'new note', actorId: 'user_1' },
-      deps,
+    const result = await runWith(
+      updateTicket({ ticketId: 'TKT-1001', note: 'new note', actorId: 'user_1' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value).toEqual(updated);
-    }
+    expect(result).toEqual(updated);
   });
 
-  it('allows valid transition: created → in_progress', async () => {
-    const existing = {
-      ticketId: 'TKT-1001',
-      status: 'created' as const,
-      notes: null,
-    };
-    const updated = { ...existing, status: 'in_progress' as const };
-    const deps = makeMockRepos({
+  it('allows valid transition: created -> in_progress', async () => {
+    const existing = ticket({ status: 'created' });
+    const updated = ticket({ status: 'in_progress' });
+    const layer = makeLayers({
       tickets: {
-        findByTicketId: vi.fn().mockResolvedValue(existing),
-        update: vi.fn().mockResolvedValue(updated),
+        findByTicketId: vi.fn().mockReturnValue(Effect.succeed(existing)),
+        update: vi.fn().mockReturnValue(Effect.succeed(updated)),
       },
     });
-    const result = await updateTicket(
-      { ticketId: 'TKT-1001', status: 'in_progress', actorId: 'user_1' },
-      deps,
+    await runWith(
+      updateTicket({ ticketId: 'TKT-1001', status: 'in_progress', actorId: 'user_1' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
   });
 
-  it('allows valid transition: created → closed', async () => {
-    const existing = {
-      ticketId: 'TKT-1001',
-      status: 'created' as const,
-      notes: null,
-    };
-    const updated = { ...existing, status: 'closed' as const };
-    const deps = makeMockRepos({
+  it('allows valid transition: created -> closed', async () => {
+    const existing = ticket({ status: 'created' });
+    const updated = ticket({ status: 'closed' });
+    const layer = makeLayers({
       tickets: {
-        findByTicketId: vi.fn().mockResolvedValue(existing),
-        update: vi.fn().mockResolvedValue(updated),
+        findByTicketId: vi.fn().mockReturnValue(Effect.succeed(existing)),
+        update: vi.fn().mockReturnValue(Effect.succeed(updated)),
       },
     });
-    const result = await updateTicket(
-      { ticketId: 'TKT-1001', status: 'closed', actorId: 'user_1' },
-      deps,
+    await runWith(
+      updateTicket({ ticketId: 'TKT-1001', status: 'closed', actorId: 'user_1' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
   });
 });
 
 describe('createTicket', () => {
   it('creates a ticket with generated ID', async () => {
-    const deps = makeMockRepos();
-    const result = await createTicket(
-      { userId: 'user_1', name: 'Test', email: 't@x.com', issue: 'help' },
-      deps,
+    const layer = makeLayers();
+    const result = await runWith(
+      createTicket({ userId: 'user_1', name: 'Test', email: 't@x.com', issue: 'help' }),
+      layer,
     );
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
-      expect(result.value.status).toBe('created');
-    }
-    expect(deps.tickets.insert).toHaveBeenCalledOnce();
-    expect(deps.audit.logTicketEvent).toHaveBeenCalledOnce();
+    expect(result.ticketId).toMatch(/^TKT-[a-f0-9]{8}$/);
+    expect(result.status).toBe('created');
   });
 
   it('logs audit with create action', async () => {
-    const deps = makeMockRepos();
-    await createTicket(
-      { userId: 'user_1', name: 'Test', email: 't@x.com', issue: 'help' },
-      deps,
+    const logTicketEvent = vi.fn().mockReturnValue(Effect.void);
+    const layer = makeLayers({ audit: { logTicketEvent } });
+    await runWith(
+      createTicket({ userId: 'user_1', name: 'Test', email: 't@x.com', issue: 'help' }),
+      layer,
     );
-    expect(deps.audit.logTicketEvent).toHaveBeenCalledWith({
+    expect(logTicketEvent).toHaveBeenCalledWith({
       action: 'create',
       ticketId: 'TKT-12345678',
       actorId: 'user_1',
@@ -174,19 +170,17 @@ describe('createTicket', () => {
   });
 
   it('returns ExternalServiceError when insert fails', async () => {
-    const deps = makeMockRepos({
+    const layer = makeLayers({
       tickets: {
-        insert: vi.fn().mockRejectedValue(new Error('DB down')),
+        insert: vi.fn().mockReturnValue(Effect.fail(new ExternalServiceError('DB down'))),
       },
     });
-    const result = await createTicket(
-      { userId: 'user_1', name: 'Test', email: 't@x.com', issue: 'help' },
-      deps,
+    const exit = await runExit(
+      createTicket({ userId: 'user_1', name: 'Test', email: 't@x.com', issue: 'help' }),
+      layer,
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.code).toBe('external_service');
-    }
+    const err = expectFailure(exit);
+    expect(err.code).toBe('external_service');
   });
 });
 

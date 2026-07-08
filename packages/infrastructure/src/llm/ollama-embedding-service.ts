@@ -3,7 +3,7 @@
 // nomic-embed-text produces 768-dim embeddings, matching the pgvector column.
 import { createOpenAI } from '@ai-sdk/openai';
 import type { EmbeddingModelV3 } from '@ai-sdk/provider';
-import type { EmbeddingService } from '@app/domain';
+import type { EmbeddingService } from '../adapter-ports';
 import { embedBatchWithModel } from './embedding-batch-helper';
 
 export function getOllamaEmbeddingModel(): EmbeddingModelV3 {
