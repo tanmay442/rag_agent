@@ -26,6 +26,7 @@ import {
   ExternalServiceError,
   type DocumentRow,
   type SessionUser,
+  type Session,
 } from '@app/domain';
 import {
   DbServicesLayer,
@@ -70,7 +71,16 @@ import { respond } from './lib/http';
 import { MAX_LIST_LIMIT } from '../config/constants';
 
 // Layer assembly: DB-backed + infrastructure services in one layer.
-const appLayer = Layer.mergeAll(DbServicesLayer, InfraServicesLayer);
+export const appLayer = Layer.mergeAll(DbServicesLayer, InfraServicesLayer);
+
+/** Run an Effect program with all services provided.
+ *  This is the single canonical `Effect.runPromise` call site used by
+ *  route handlers and server actions. */
+export function runEffect<A, E, R>(effect: Effect.Effect<A, E, R>): Promise<A> {
+  return Effect.runPromise(
+    effect.pipe(Effect.provide(appLayer as Layer.Layer<AppServices>)) as Effect.Effect<A, E, never>,
+  );
+}
 
 type AppServices =
   | Documents
@@ -373,7 +383,39 @@ export async function requireAdminDocument(
       return { ok: false, response: respond(new GoneError('Document was deleted')) };
     if (!doc.storageKey) return { ok: false, response: respond(new NotFoundError('File unavailable')) };
     return { ok: true, session: auth.session, comp: auth.comp, document: doc };
-  } catch (e) {
+   } catch (e) {
     return { ok: false, response: respond(e) };
   }
+}
+
+// ---- Effect-returning auth helpers (compose inside Effect.gen) ----
+
+/** Require an admin session. Returns the session or fails with
+ *  UnauthorizedError / ForbiddenError. Compose inside Effect.gen. */
+export function requireAdminEffect(): Effect.Effect<
+  Session,
+  UnauthorizedError | ForbiddenError | ExternalServiceError,
+  SessionStore
+> {
+  return Effect.gen(function* () {
+    const sessionStore = yield* SessionStore;
+    const session = yield* sessionStore.getSession();
+    if (!session) return yield* new UnauthorizedError();
+    if (session.user.role !== 'admin') return yield* new ForbiddenError();
+    return session;
+  });
+}
+
+/** Require a signed-in session (any role). */
+export function requireSessionEffect(): Effect.Effect<
+  Session,
+  UnauthorizedError | ExternalServiceError,
+  SessionStore
+> {
+  return Effect.gen(function* () {
+    const sessionStore = yield* SessionStore;
+    const session = yield* sessionStore.getSession();
+    if (!session) return yield* new UnauthorizedError();
+    return session;
+  });
 }
