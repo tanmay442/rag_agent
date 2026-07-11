@@ -91,7 +91,7 @@ export async function runSeed(opts: SeedOptions = {}): Promise<void> {
           },
           embeddings: Llm.getEmbeddingService(),
           hasher: { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') },
-          pdfParser: Pdf.pdfParseParser,
+          pdfParser: Pdf.unpdfParser,
           textSplitter: Pdf.langchainSplitter,
         };
         return {

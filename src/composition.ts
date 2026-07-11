@@ -62,7 +62,7 @@ const ingestQueue: IngestQueue = Queue.createIngestQueue();
 const ingestDeps: IngestDeps = {
   documents: documentRepo, chunks: chunkRepo,
   embeddings: embeddingService, hasher: systemHasher,
-  pdfParser: Pdf.pdfParseParser, textSplitter: Pdf.langchainSplitter,
+  pdfParser: Pdf.unpdfParser, textSplitter: Pdf.langchainSplitter,
 };
 const searchDeps: SearchDeps = { chunks: chunkRepo, embeddings: embeddingService };
 function createRateLimiter(): RateLimiter {
@@ -141,7 +141,7 @@ function createComposition() {
       }
       const prepared = await prepareIngest(
         { documentId, fileName: doc.fileName, buffer },
-        { embeddings: embeddingService, pdfParser: Pdf.pdfParseParser, textSplitter: Pdf.langchainSplitter },
+        { embeddings: embeddingService, pdfParser: Pdf.unpdfParser, textSplitter: Pdf.langchainSplitter },
       );
       if (!prepared.ok) {
         await documentRepo.updateIngestStatus(documentId, 'failed').catch(() => {});

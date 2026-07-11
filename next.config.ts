@@ -74,8 +74,9 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // pdf-parse pinned to pure-Node 1.1.1; nothing to externalise
-  serverExternalPackages: [],
+  // unpdf pulls in pdfjs-dist (ESM worker code) — keep it external to the
+  // Next server bundle so it isn't mis-transformed at build time.
+  serverExternalPackages: ['unpdf', 'pdfjs-dist'],
 };
 
 export default nextConfig;

@@ -69,6 +69,7 @@ export async function uploadPdfAction(
         code: result.error.code,
         message: result.error.message,
         fileName: file.name,
+        cause: result.error.cause,
       });
       return toSafeError(result.error);
     }
