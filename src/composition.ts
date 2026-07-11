@@ -107,7 +107,7 @@ function createComposition() {
       bind(updateTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
     createTicket: (input: Parameters<typeof createTicket>[0]) =>
       bind(createTicket, input, { tickets: Db.ticketRepo, ...auditDeps }),
-    getDocumentById: (id: number) => getDocumentById(id, { documents: documentRepo }),
+    getDocumentById: (id: number, opts?: { includeDeleted?: boolean }) => getDocumentById(id, { documents: documentRepo }, opts),
     hardDeleteDocument: (input: { documentId: number; actorId: string }) =>
       bind(hardDeleteDocument, input, { documents: documentRepo, ...auditDeps, runner: txRunner, blobStorage }),
     replacePdf: (input: { documentId: number; fileName: string; buffer: Buffer; actorId: string }) =>
@@ -255,7 +255,7 @@ export async function requireAdminDocument(
   const { id } = await context.params;
   const docId = Number(id);
   if (!Number.isInteger(docId)) return { ok: false, response: new Response('Invalid id', { status: 400 }) };
-  const r = await auth.comp.getDocumentById(docId);
+  const r = await auth.comp.getDocumentById(docId, { includeDeleted: opts.allowDeleted });
   if (!r.ok) return { ok: false, response: respond(r.error) };
   const doc = r.value.document;
   if (!doc) return { ok: false, response: new Response('Not found', { status: 404 }) };

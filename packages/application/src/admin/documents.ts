@@ -233,7 +233,7 @@ export async function restoreDocument(
   deps: { documents: DocumentRepository; audit: AuditLog; clock: Clock; runner: TransactionRunner },
 ): Promise<Result<void>> {
   try {
-    const doc = await deps.documents.findById(documentId);
+    const doc = await deps.documents.findById(documentId, { includeDeleted: true });
     if (!doc) return err(new NotFoundError('Document not found'));
     if (!doc.deletedAt) return err(new ValidationError('Document is not deleted'));
     if (deps.clock.now().getTime() - doc.deletedAt.getTime() > RESTORE_WINDOW_MS) {
@@ -255,9 +255,10 @@ export async function restoreDocument(
 export async function getDocumentById(
   documentId: number,
   deps: { documents: DocumentRepository },
+  opts: { includeDeleted?: boolean } = {},
 ): Promise<Result<{ document: import('@app/domain').DocumentRow | null }>> {
   return serviceResult(
-    () => deps.documents.findById(documentId).then((doc) => ({ document: doc })),
+    () => deps.documents.findById(documentId, opts).then((doc) => ({ document: doc })),
     'Failed to get document',
   );
 }
@@ -267,7 +268,7 @@ export async function hardDeleteDocument(
   deps: { documents: DocumentRepository; audit: AuditLog; runner: TransactionRunner; blobStorage: BlobStorage },
 ): Promise<Result<void>> {
   return wrapServiceCall(async () => {
-    const existing = await deps.documents.findById(input.documentId);
+    const existing = await deps.documents.findById(input.documentId, { includeDeleted: true });
     if (!existing) return err(new NotFoundError(`Document not found: ${input.documentId}`));
     const storageKey = existing.storageKey;
     await deps.runner.run(async (tx) => {
