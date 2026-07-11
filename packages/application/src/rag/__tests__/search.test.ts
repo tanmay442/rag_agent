@@ -6,7 +6,6 @@ function makeDeps(overrides?: Partial<SearchDeps>): SearchDeps {
   return {
     chunks: {
       insertMany: vi.fn(),
-      deleteByDocumentId: vi.fn(),
       searchByVector: vi.fn().mockResolvedValue([{ content: 'test', similarity: 0.9 }]),
       countForDocuments: vi.fn(),
       countForAll: vi.fn(),
@@ -26,7 +25,6 @@ describe('searchChunks', () => {
     const deps = makeDeps({
       chunks: {
         insertMany: vi.fn(),
-        deleteByDocumentId: vi.fn(),
         searchByVector: vi.fn().mockRejectedValue(new Error('connection refused')),
         countForDocuments: vi.fn(),
         countForAll: vi.fn(),

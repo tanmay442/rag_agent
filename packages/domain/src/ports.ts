@@ -38,8 +38,8 @@ export interface UserRow {
 
 
 export interface DocumentRepository {
-  findByName(fileName: string, opts?: { includeDeleted?: boolean }): Promise<DocumentRow | null>;
-  findById(id: number, opts?: { includeDeleted?: boolean }): Promise<DocumentRow | null>;
+  findByName(fileName: string): Promise<DocumentRow | null>;
+  findById(id: number): Promise<DocumentRow | null>;
   setStorageKey(id: number, key: string): Promise<void>;
   updateIngestStatus(id: number, status: IngestStatus): Promise<void>;
   /** Atomically flip `queued`→`ingesting`; returns true iff this caller won the claim. */
@@ -64,7 +64,6 @@ export interface ChunkRepository {
     opts: { threshold: number; limit: number },
   ): Promise<Array<{ content: string; similarity: number }>>;
   insertMany(rows: Array<{ documentId: number; content: string; embedding: number[] }>): Promise<void>;
-  deleteByDocumentId(documentId: number): Promise<void>;
   countForDocuments(documentIds: number[]): Promise<Map<number, number>>;
   countForAll(): Promise<number>;
   countForDocument(documentId: number): Promise<number>;

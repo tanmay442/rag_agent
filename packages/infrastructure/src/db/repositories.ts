@@ -141,10 +141,6 @@ export async function insertChunks(
   }
 }
 
-export async function deleteChunksByDocumentId(documentId: number, client: Client = db): Promise<void> {
-  await client.delete(chunks).where(eq(chunks.documentId, documentId));
-}
-
 export async function countChunksForDocuments(
   documentIds: number[],
   client: Client = db,
@@ -453,8 +449,8 @@ import type { TransactionRunner, TransactionContext, DocumentRepository, ChunkRe
 
 export function createDocumentRepo(client: Client): DocumentRepository {
   return {
-    findByName: (name, opts) => findDocumentByName(name, client, opts),
-    findById: (id, opts) => findDocumentById(id, client, opts),
+    findByName: (name) => findDocumentByName(name, client),
+    findById: (id) => findDocumentById(id, client),
     setStorageKey: (id, key) => setDocumentStorageKey(id, key, client),
     updateIngestStatus: (id, status) => updateDocumentIngestStatus(id, status, client),
     claimIngest: (id) => claimDocumentIngest(id, client),
@@ -472,7 +468,6 @@ export function createChunkRepo(client: Client): ChunkRepository {
   return {
     searchByVector: (embedding, opts) => searchChunksByVector(embedding, opts, client),
     insertMany: (rows) => insertChunks(rows, client),
-    deleteByDocumentId: (documentId) => deleteChunksByDocumentId(documentId, client),
     countForDocuments: (ids) => countChunksForDocuments(ids, client),
     countForAll: () => countChunksForAll(client),
     countForDocument: (id) => countChunksForDocument(id, client),

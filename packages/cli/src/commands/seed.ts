@@ -82,7 +82,6 @@ export async function runSeed(opts: SeedOptions = {}): Promise<void> {
           },
           chunks: {
             insertMany: (rows: Array<{ documentId: number; content: string; embedding: number[] }>) => Db.insertChunks(rows),
-            deleteByDocumentId: (documentId: number) => Db.deleteChunksByDocumentId(documentId),
             countForDocuments: (ids: number[]) => Db.countChunksForDocuments(ids),
             countForAll: () => Db.countChunksForAll(),
             countForDocument: (id: number) => Db.countChunksForDocument(id),
