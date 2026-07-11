@@ -79,22 +79,22 @@ export async function ingestFile(
   const parsed = await parseAndEmbed({ fileName, buffer }, deps);
   if (!parsed.ok) return parsed;
 
-  // Insert the new document + chunks first, then drop the old row, so a failed
-  // write can never leave the only copy of the data deleted.
-  const inserted = await deps.documents.insert({ fileName, fileHash, uploadedBy });
+  // Upsert by unique file_name: an existing (or soft-deleted) same-name row is
+  // updated in place and un-deleted, keeping its id, so we never delete the row
+  // we just wrote (which previously caused an FK violation on the audit insert)
+  // and never lose the only copy. Its chunks are then replaced wholesale.
+  const row = await deps.documents.insert({ fileName, fileHash, uploadedBy });
+  await deps.chunks.deleteByDocumentId(row.id);
   await deps.chunks.insertMany(
     parsed.value.rows.map((r) => ({
-      documentId: inserted.id,
+      documentId: row.id,
       content: r.content,
       embedding: r.embedding,
     })),
   );
-  if (existing) {
-    await deps.documents.deleteById(existing.id);
-  }
 
   return ok({
-    documentId: inserted.id,
+    documentId: row.id,
     chunks: parsed.value.chunks,
     status: existing ? 'updated' : 'inserted',
   });
