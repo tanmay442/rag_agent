@@ -39,6 +39,19 @@ describe('searchChunks', () => {
     }
   });
 
+  it('returns empty array for blank query without embedding', async () => {
+    const embed = vi.fn();
+    const deps = makeDeps({
+      embeddings: { embed, embedBatch: vi.fn() },
+    });
+    const result = await searchChunks('   ', {}, deps);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual([]);
+    }
+    expect(embed).not.toHaveBeenCalled();
+  });
+
   it('returns results on success', async () => {
     const deps = makeDeps();
     const result = await searchChunks('test', {}, deps);

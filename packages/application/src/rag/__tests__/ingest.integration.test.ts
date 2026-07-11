@@ -11,6 +11,7 @@ function makeDeps(overrides?: Partial<IngestDeps>): IngestDeps {
       findById: vi.fn(),
       setStorageKey: vi.fn(),
       updateIngestStatus: vi.fn(),
+      claimIngest: vi.fn(),
       insert: vi.fn().mockResolvedValue({ id: 1, fileName: 'test.pdf', fileHash: 'abc', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null }),
       deleteById: vi.fn(),
       softDelete: vi.fn(),
@@ -64,6 +65,7 @@ describe('ingestFile', () => {
         findById: vi.fn(),
         setStorageKey: vi.fn(),
         updateIngestStatus: vi.fn(),
+        claimIngest: vi.fn(),
         insert,
         deleteById,
         softDelete: vi.fn(),
@@ -78,7 +80,7 @@ describe('ingestFile', () => {
       deps,
     );
     expect(result.ok).toBe(true);
-    expect(deleteById).toHaveBeenCalledBefore(insert);
+    expect(insert).toHaveBeenCalledBefore(deleteById);
   });
 
   it('returns unchanged when hash matches', async () => {

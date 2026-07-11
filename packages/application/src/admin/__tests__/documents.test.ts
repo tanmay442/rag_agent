@@ -26,6 +26,7 @@ function makeMockDeps(overrides: {
   const audit = {
     logDocumentEvent: vi.fn().mockResolvedValue(undefined),
     logTicketEvent: vi.fn().mockResolvedValue(undefined),
+    logUserEvent: vi.fn().mockResolvedValue(undefined),
     ...overrides.audit,
   } as AuditLog;
   const clock = {
