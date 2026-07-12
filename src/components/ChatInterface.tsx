@@ -107,15 +107,21 @@ export function ChatInterface() {
   }, [error]);
 
   return (
-    <Card
+    <div
       data-testid="chat-frame"
-      className="flex h-[600px] md:h-[700px] max-h-full w-full min-h-0 flex-col gap-0 overflow-hidden rounded-2xl border-border-subtle bg-card/40 p-0"
+      className="flex h-full min-h-0 w-full flex-col bg-background"
     >
       <div
         ref={messagesScrollRef}
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-6"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
         data-testid="chat-messages"
       >
+        <div
+          className={cn(
+            'mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6',
+            messages.length === 0 ? 'flex-1 justify-center' : 'flex-1',
+          )}
+        >
         {messages.length === 0 && (
           <div
             className="mx-auto mt-4 flex w-full max-w-xl flex-col gap-8 px-1 py-2"
@@ -138,17 +144,15 @@ export function ChatInterface() {
                   <path d="M4 4h16v12H7l-3 4V4z" />
                 </svg>
               </span>
-              <div className="flex flex-col gap-2 break-words">
-                <p className="text-[15px] font-semibold text-foreground">
+              <div className="flex flex-col gap-1.5 break-words">
+                <p className="text-base font-semibold text-foreground">
                   Hi! I&apos;m the support assistant.
                 </p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Ask a question about your docs and I&apos;ll search the
-                  official documentation and cite the source I used.
-                </p>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  If I can&apos;t find an answer, just ask me to file a support
-                  ticket and I&apos;ll get one started for you.
+                  Ask anything about your docs — I&apos;ll search the official
+                  documentation and cite the source I use. If I can&apos;t find
+                  an answer, just ask me to file a support ticket and I&apos;ll
+                  get one started for you.
                 </p>
               </div>
             </div>
@@ -236,7 +240,7 @@ export function ChatInterface() {
                    return isUser ? (
                     <div
                       key={i}
-                      className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm"
+                      className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm"
                       data-testid="chat-text"
                     >
                       {part.text}
@@ -245,7 +249,7 @@ export function ChatInterface() {
                     <Card
                       key={i}
                       className={cn(
-                        'chat-markdown flex w-fit max-w-[90%] flex-col gap-0 rounded-2xl rounded-bl-md border-border-subtle bg-secondary/80 px-4 py-3 text-[14.5px] leading-relaxed text-foreground shadow-sm',
+                        'chat-markdown flex w-full flex-col gap-0 rounded-2xl rounded-bl-md border-border-subtle bg-secondary/80 px-4 py-3 text-[14.5px] leading-relaxed text-foreground shadow-sm',
                       )}
                       data-testid="chat-text"
                     >
@@ -257,7 +261,7 @@ export function ChatInterface() {
               })}
               {citations.length > 0 && !isUser && (
                 <div
-                  className="-mx-1 flex w-full max-w-[90%] snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1"
+                  className="-mx-1 flex w-full snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1"
                   data-testid="chat-citations"
                 >
                   {citations.map((c, i) => {
@@ -368,60 +372,63 @@ export function ChatInterface() {
             </div>
           </Alert>
         )}
+        </div>
       </div>
 
-      <form
-        onSubmit={onSubmit}
-        className="group/composer flex shrink-0 items-end gap-2 border-t border-border-subtle bg-card/60 p-2 backdrop-blur-md transition-colors duration-150 focus-within:border-primary/60"
-        data-testid="chat-composer"
-      >
-        <Textarea
-          ref={composerRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          disabled={isStreaming}
-          placeholder="Type your question…"
-          rows={1}
-          className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl border-0 bg-transparent px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus-visible:ring-0 disabled:opacity-60"
-          data-testid="chat-input"
-        />
-        <Button
-          type={isStreaming ? 'button' : 'submit'}
-          disabled={!isStreaming && !input.trim()}
-          aria-label={isStreaming ? 'Stop generating' : 'Send message'}
-          onClick={isStreaming ? () => stop() : undefined}
-          className="h-10 w-10 shrink-0 rounded-xl transition-all duration-150 ease-out-quart hover:bg-primary active:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-40"
-          data-testid="chat-send"
+      <div className="shrink-0 border-t border-border-subtle bg-background/80 backdrop-blur">
+        <form
+          onSubmit={onSubmit}
+          className="group/composer mx-auto flex w-full max-w-3xl items-end gap-2 p-3 sm:p-4"
+          data-testid="chat-composer"
         >
-          {isStreaming ? (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <rect x="6" y="6" width="12" height="12" rx="1" />
-            </svg>
-          ) : (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M12 19V5" />
-              <path d="m5 12 7-7 7 7" />
-            </svg>
-          )}
-        </Button>
-      </form>
-    </Card>
+          <Textarea
+            ref={composerRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            disabled={isStreaming}
+            placeholder="Ask a question about your docs…"
+            rows={1}
+            className="min-h-[44px] max-h-[200px] flex-1 resize-none rounded-2xl border border-border-subtle bg-secondary/60 px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-60"
+            data-testid="chat-input"
+          />
+          <Button
+            type={isStreaming ? 'button' : 'submit'}
+            disabled={!isStreaming && !input.trim()}
+            aria-label={isStreaming ? 'Stop generating' : 'Send message'}
+            onClick={isStreaming ? () => stop() : undefined}
+            className="h-11 w-11 shrink-0 rounded-2xl transition-all duration-150 ease-out-quart hover:bg-primary active:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-40"
+            data-testid="chat-send"
+          >
+            {isStreaming ? (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            ) : (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M12 19V5" />
+                <path d="m5 12 7-7 7 7" />
+              </svg>
+            )}
+          </Button>
+        </form>
+      </div>
+    </div>
   );
 }
