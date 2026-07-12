@@ -204,7 +204,13 @@ export function ChatInterface() {
             (p) => p.type === 'data-citation',
           ) as Array<{
             type: 'data-citation';
-            data: { similarity: number; snippet: string };
+            data: {
+              similarity: number;
+              snippet: string;
+              docTitle?: string | null;
+              page?: number | null;
+              section?: string | null;
+            };
           }>;
           return (
             <div
@@ -278,10 +284,22 @@ export function ChatInterface() {
                             </svg>
                             Source {i + 1}
                           </span>
+                          {c.data.docTitle && (
+                            <span className="max-w-[12rem] truncate text-[10px] font-medium text-primary" title={c.data.docTitle}>
+                              {c.data.docTitle}
+                            </span>
+                          )}
                         </div>
                         <p className="line-clamp-4 text-[12.5px] leading-relaxed text-muted-foreground">
                           {c.data.snippet}
                         </p>
+                        {(c.data.section || c.data.page != null) && (
+                          <p className="text-[10px] text-foreground-subtle">
+                            {[c.data.section, c.data.page != null ? `p.${c.data.page}` : null]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        )}
                       </Card>
                     );
                   })}

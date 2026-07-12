@@ -110,6 +110,10 @@ function buildPageChunks(
   return { chunks, nextIndex: chunkIndex };
 }
 
+function normalizeContent(content: string): string {
+  return content.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 export const documentAwareSplitter: SmartTextSplitter = {
   async splitDocument(doc, opts) {
     const chunks: SplitChunk[] = [];
@@ -123,6 +127,12 @@ export const documentAwareSplitter: SmartTextSplitter = {
       chunks.push(...pageChunks);
       index = nextIndex;
     }
-    return chunks;
+    const seen = new Set<string>();
+    return chunks.filter((c) => {
+      const key = normalizeContent(c.content);
+      if (key.length === 0 || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   },
 };

@@ -59,9 +59,15 @@ export async function searchChunks(
     return err(new ExternalServiceError('Re-rank failed', cause));
   }
   const byId = new Map(hybrid.map((c) => [c.id, c]));
-  return ok(
-    ids
-      .map((id) => byId.get(Number(id)))
-      .filter((c): c is RetrievedChunk => Boolean(c)),
-  );
+  const seen = new Set<string>();
+  const results: RetrievedChunk[] = [];
+  for (const id of ids) {
+    const chunk = byId.get(Number(id));
+    if (!chunk) continue;
+    const key = chunk.content.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (key.length > 0 && seen.has(key)) continue;
+    seen.add(key);
+    results.push(chunk);
+  }
+  return ok(results);
 }
