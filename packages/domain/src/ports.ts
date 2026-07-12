@@ -58,17 +58,50 @@ export interface DocumentRepository {
   countChunksForAll(): Promise<number>;
 }
 
+export interface RetrievedChunk {
+  id: number;
+  content: string;
+  similarity: number;
+  page?: number | null;
+  chunkIndex?: number | null;
+  section?: string | null;
+  docTitle?: string | null;
+  meta?: Record<string, unknown> | null;
+}
+
 export interface ChunkRepository {
-  searchByVector(
+  searchHybrid(
+    queryEmbedding: number[],
+    queryText: string,
+    opts: { limit: number; retrieveK: number; vecK: number; ftsK: number },
+  ): Promise<RetrievedChunk[]>;
+  searchByVector?(
     embedding: number[],
     opts: { threshold: number; limit: number },
   ): Promise<Array<{ content: string; similarity: number }>>;
-  insertMany(rows: Array<{ documentId: number; content: string; embedding: number[] }>): Promise<void>;
+  insertMany(rows: Array<{
+    documentId: number;
+    content: string;
+    embedding: number[];
+    page?: number | null;
+    chunkIndex: number;
+    section?: string | null;
+    meta?: Record<string, unknown> | null;
+  }>): Promise<void>;
   deleteByDocumentId(documentId: number): Promise<void>;
   countForDocuments(documentIds: number[]): Promise<Map<number, number>>;
   countForAll(): Promise<number>;
   countForDocument(documentId: number): Promise<number>;
   recountAll(): Promise<Array<{ documentId: number; count: number }>>;
+}
+
+export interface RerankCandidate {
+  id: string;
+  content: string;
+}
+
+export interface Reranker {
+  rerank(query: string, candidates: RerankCandidate[], topK: number): Promise<string[]>;
 }
 
 
@@ -203,12 +236,42 @@ export interface IngestQueue {
 }
 
 
-export interface PdfParser {
-  extractText(buffer: Buffer): Promise<string>;
+export const CHUNKING_STRATEGIES = ['document-aware', 'recursive-adaptive', 'semantic'] as const;
+export type ChunkingStrategy = (typeof CHUNKING_STRATEGIES)[number];
+
+export interface ParsedPage {
+  page: number;
+  text: string;
 }
 
-export interface TextSplitter {
-  splitText(text: string): Promise<string[]>;
+export interface ParsedDocument {
+  text: string;
+  pages: ParsedPage[];
+}
+
+export interface PdfParser {
+  extractText(buffer: Buffer): Promise<string>;
+  extractDocument(buffer: Buffer): Promise<ParsedDocument>;
+}
+
+export interface ChunkMeta {
+  page?: number;
+  chunkIndex: number;
+  section?: string;
+  docTitle?: string;
+}
+
+export interface SplitChunk {
+  content: string;
+  embedding?: number[];
+  metadata: ChunkMeta;
+}
+
+export interface SmartTextSplitter {
+  splitDocument(
+    doc: ParsedDocument,
+    opts: { docTitle?: string; embeddings: EmbeddingService },
+  ): Promise<SplitChunk[]>;
 }
 
 

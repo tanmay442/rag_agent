@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ingestFile } from '../ingest';
 import type { IngestDeps } from '../ingest';
+import type { TransactionContext, TransactionRunner } from '@app/domain';
 
 function makeDeps(overrides?: Partial<IngestDeps>): IngestDeps {
   const insertMany = vi.fn().mockResolvedValue(undefined);
@@ -23,7 +24,7 @@ function makeDeps(overrides?: Partial<IngestDeps>): IngestDeps {
     chunks: {
       insertMany,
       deleteByDocumentId: vi.fn().mockResolvedValue(undefined),
-      searchByVector: vi.fn(),
+      searchHybrid: vi.fn(),
       countForDocuments: vi.fn(),
       countForAll: vi.fn(),
       countForDocument: vi.fn(),
@@ -34,14 +35,17 @@ function makeDeps(overrides?: Partial<IngestDeps>): IngestDeps {
       embedBatch,
     },
     hasher: { sha256: vi.fn().mockReturnValue('abc123') },
-    pdfParser: { extractText: vi.fn().mockResolvedValue('Sample PDF text content.') },
-    textSplitter: { splitText: vi.fn().mockResolvedValue(['Sample PDF text content.']) },
+    pdfParser: {
+      extractDocument: vi.fn().mockResolvedValue({ text: 'Sample PDF text content.', pages: [{ page: 1, text: 'Sample PDF text content.' }] }),
+      extractText: vi.fn(),
+    },
+    textSplitter: { splitDocument: vi.fn().mockResolvedValue([{ content: 'Sample PDF text content.', metadata: { chunkIndex: 0, section: 'Intro', page: 1 } }]) },
     ...overrides,
   };
 }
 
 describe('ingestFile', () => {
-  it('inserts chunks when embedding succeeds', async () => {
+  it('inserts chunks with page/chunkIndex/section/meta when embedding succeeds', async () => {
     const deps = makeDeps();
     const result = await ingestFile(
       { fileName: 'test.pdf', buffer: Buffer.from('%PDF-1.4...'), uploadedBy: 'user' },
@@ -52,16 +56,25 @@ describe('ingestFile', () => {
       expect(result.value.status).toBe('inserted');
       expect(result.value.chunks).toBe(1);
     }
-    expect(deps.chunks.insertMany).toHaveBeenCalledWith([
-      { documentId: 1, content: 'Sample PDF text content.', embedding: [0.1, 0.2, 0.3] },
-    ]);
+    expect(deps.chunks.insertMany).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          documentId: 1,
+          content: 'Sample PDF text content.',
+          embedding: [0.1, 0.2, 0.3],
+          page: 1,
+          chunkIndex: 0,
+          section: 'Intro',
+          meta: { heading: 'Intro' },
+        }),
+      ]),
+    );
   });
 
   it('replaces a same-name document in place without deleting the row', async () => {
     const deleteById = vi.fn().mockResolvedValue(undefined);
     const deleteByDocumentId = vi.fn().mockResolvedValue(undefined);
     const insertMany = vi.fn().mockResolvedValue(undefined);
-    // Upsert-by-name reuses the existing row id (1).
     const insert = vi.fn().mockResolvedValue({ id: 1, fileName: 'test.pdf', fileHash: 'newhash', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null });
     const deps = makeDeps({
       documents: {
@@ -81,7 +94,7 @@ describe('ingestFile', () => {
       chunks: {
         insertMany,
         deleteByDocumentId,
-        searchByVector: vi.fn(),
+        searchHybrid: vi.fn(),
         countForDocuments: vi.fn(),
         countForAll: vi.fn(),
         countForDocument: vi.fn(),
@@ -94,17 +107,54 @@ describe('ingestFile', () => {
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.status).toBe('updated');
-    // Regression: never delete the row we just upserted (previously caused an FK
-    // violation on the audit insert), and replace its chunks wholesale.
     expect(deleteById).not.toHaveBeenCalled();
     expect(deleteByDocumentId).toHaveBeenCalledWith(1);
     expect(deleteByDocumentId).toHaveBeenCalledBefore(insertMany);
-    expect(insertMany).toHaveBeenCalledWith([
-      { documentId: 1, content: 'Sample PDF text content.', embedding: [0.1, 0.2, 0.3] },
-    ]);
+    expect(insertMany).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          documentId: 1,
+          content: 'Sample PDF text content.',
+          page: 1,
+          chunkIndex: 0,
+          section: 'Intro',
+        }),
+      ]),
+    );
   });
 
-  it('returns unchanged when hash matches', async () => {
+  it('re-chunks a same-name doc when force is true even if hash matches', async () => {
+    const deps = makeDeps({
+      documents: {
+        ...makeDeps().documents,
+        findByName: vi.fn().mockResolvedValue({ id: 1, fileName: 'test.pdf', fileHash: 'abc123', uploadedBy: 'user', uploadedAt: new Date(), storageKey: null, ingestStatus: 'done' as const, deletedAt: null }),
+      },
+    });
+    const result = await ingestFile(
+      { fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user', force: true },
+      deps,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.status).toBe('updated');
+    expect(deps.chunks.insertMany).toHaveBeenCalled();
+  });
+
+  it('uses transaction.run when a transaction runner is provided', async () => {
+    const deps = makeDeps();
+    const run = vi.fn(async (fn: (ctx: TransactionContext) => Promise<unknown>) => {
+      return fn({ ...deps, audit: {} as never, tickets: {} as never, users: {} as never });
+    });
+    const result = await ingestFile(
+      { fileName: 'test.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' },
+      { ...deps, transaction: { run } as TransactionRunner },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.status).toBe('inserted');
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(deps.chunks.insertMany).toHaveBeenCalled();
+  });
+
+  it('returns unchanged when hash matches and not forced', async () => {
     const deps = makeDeps({
       documents: {
         ...makeDeps().documents,
@@ -123,7 +173,7 @@ describe('ingestFile', () => {
 
   it('returns ValidationError when PDF has no extractable text', async () => {
     const deps = makeDeps({
-      textSplitter: { splitText: vi.fn().mockResolvedValue([]) },
+      textSplitter: { splitDocument: vi.fn().mockResolvedValue([]) },
     });
     const result = await ingestFile(
       { fileName: 'empty.pdf', buffer: Buffer.from('data'), uploadedBy: 'user' },
@@ -137,7 +187,7 @@ describe('ingestFile', () => {
 
   it('returns ExternalServiceError when PDF parsing fails', async () => {
     const deps = makeDeps({
-      pdfParser: { extractText: vi.fn().mockRejectedValue(new Error('corrupt file')) },
+      pdfParser: { extractDocument: vi.fn().mockRejectedValue(new Error('corrupt file')), extractText: vi.fn() },
     });
     const result = await ingestFile(
       { fileName: 'bad.pdf', buffer: Buffer.from('trash'), uploadedBy: 'user' },

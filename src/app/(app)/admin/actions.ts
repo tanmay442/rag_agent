@@ -230,3 +230,29 @@ export async function recountAllChunksAction(): Promise<RecountAllChunksResult> 
     return toSafeError(err);
   }
 }
+
+export interface ReingestResult {
+  error?: string;
+  processed?: number;
+  chunks?: number;
+  failed?: number;
+}
+
+export async function reingestAction(): Promise<ReingestResult> {
+  const session = await requireAdminOrError();
+  if ('error' in session) return session;
+  try {
+    const result = await getComposition().reingestAll();
+    if (!result.ok) return toSafeError(result.error);
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin/documents');
+    return {
+      processed: result.value.processed,
+      chunks: result.value.chunks,
+      failed: result.value.failed,
+    };
+  } catch (err) {
+    logger.error('reingestAction failed', { error: err });
+    return toSafeError(err);
+  }
+}

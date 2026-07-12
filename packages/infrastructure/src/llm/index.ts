@@ -36,3 +36,6 @@ export function getChatModel(): LanguageModelV3 {
 }
 
 export { getEmbeddingModel, EMBEDDING_OPTIONS } from './google-embedding-service';
+
+export { getReranker } from './rerank';
+export type { RerankerStrategy } from './rerank';

@@ -1,6 +1,7 @@
 import { eq, desc, ilike, or, sql, inArray, isNull, and } from 'drizzle-orm';
 import { db } from './client';
 import { VECTOR_DIM } from './schema-vector';
+import { RRF_K, RRF_WEIGHT_VECTOR, RRF_WEIGHT_FTS } from '../../../../config/constants';
 import {
   documents,
   chunks,
@@ -11,7 +12,7 @@ import {
   userAudit,
   type Document,
 } from './schema';
-import type { TicketRow, UserRow } from '@app/domain';
+import type { TicketRow, UserRow, RetrievedChunk } from '@app/domain';
 
 type Client = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -125,8 +126,81 @@ export async function searchChunksByVector(
   return rows.map((r) => ({ content: r.content, similarity: Number(r.similarity) }));
 }
 
+export async function searchHybrid(
+  queryEmbedding: number[],
+  queryText: string,
+  opts: { limit: number; retrieveK: number; vecK: number; ftsK: number },
+  client: Client = db,
+): Promise<RetrievedChunk[]> {
+  if (
+    !Array.isArray(queryEmbedding) ||
+    queryEmbedding.length === 0 ||
+    !queryEmbedding.every((v) => Number.isFinite(v))
+  ) {
+    throw new Error('Invalid embedding: must be a non-empty array of finite numbers');
+  }
+  if (queryEmbedding.length !== VECTOR_DIM) {
+    throw new Error(`Invalid embedding: expected ${VECTOR_DIM} dimensions, got ${queryEmbedding.length}`);
+  }
+  const vectorLiteral = `[${queryEmbedding.join(',')}]`;
+  const result = await client.execute(sql`
+    WITH vec AS (
+      SELECT id, row_number() OVER (ORDER BY dist) AS rnk FROM (
+        SELECT c.id, (c.embedding <=> ${vectorLiteral}::vector) AS dist
+        FROM chunks c JOIN documents d ON d.id = c.document_id
+        WHERE d.deleted_at IS NULL
+        ORDER BY dist LIMIT ${opts.vecK}
+      ) sub
+    ),
+    fts AS (
+      SELECT c.id,
+             row_number() OVER (ORDER BY ts_rank_cd(c.fts, websearch_to_tsquery('simple', ${queryText})) DESC) AS rnk
+      FROM chunks c JOIN documents d ON d.id = c.document_id
+      WHERE d.deleted_at IS NULL
+        AND c.fts @@ websearch_to_tsquery('simple', ${queryText})
+      ORDER BY ts_rank_cd(c.fts, websearch_to_tsquery('simple', ${queryText})) DESC
+      LIMIT ${opts.ftsK}
+    ),
+    fused AS (
+      SELECT COALESCE(v.id, f.id) AS id,
+             ${RRF_WEIGHT_VECTOR} * COALESCE(1.0 / (${RRF_K} + v.rnk), 0)
+               + ${RRF_WEIGHT_FTS} * COALESCE(1.0 / (${RRF_K} + f.rnk), 0) AS score
+      FROM vec v FULL OUTER JOIN fts f ON v.id = f.id
+    )
+    SELECT c.id, c.content, d.file_name AS "docTitle", c.page, c.chunk_index, c.section, c.meta,
+           fused.score AS similarity
+    FROM fused JOIN chunks c ON c.id = fused.id
+    JOIN documents d ON d.id = c.document_id
+    ORDER BY fused.score DESC
+    LIMIT ${opts.retrieveK}
+  `);
+  const rows = (result as unknown as { rows?: Array<{
+    id: number; content: string; docTitle: string | null; page: number | null;
+    chunk_index: number | null; section: string | null; meta: Record<string, unknown> | null;
+    similarity: number;
+  }> }).rows ?? [];
+  return rows.map((r) => ({
+    id: Number(r.id),
+    content: r.content,
+    similarity: Number(r.similarity),
+    docTitle: r.docTitle ?? null,
+    page: r.page ?? null,
+    chunkIndex: r.chunk_index ?? null,
+    section: r.section ?? null,
+    meta: r.meta ?? null,
+  }));
+}
+
 export async function insertChunks(
-  rows: Array<{ documentId: number; content: string; embedding: number[] }>,
+  rows: Array<{
+    documentId: number;
+    content: string;
+    embedding: number[];
+    page?: number | null;
+    chunkIndex: number;
+    section?: string | null;
+    meta?: Record<string, unknown> | null;
+  }>,
   client: Client = db,
 ): Promise<void> {
   if (rows.length === 0) return;
@@ -137,7 +211,17 @@ export async function insertChunks(
   }
   const BATCH_SIZE = 500;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    await client.insert(chunks).values(rows.slice(i, i + BATCH_SIZE));
+    await client.insert(chunks).values(
+      rows.slice(i, i + BATCH_SIZE).map((r) => ({
+        documentId: r.documentId,
+        content: r.content,
+        embedding: r.embedding,
+        page: r.page ?? null,
+        chunkIndex: r.chunkIndex,
+        section: r.section ?? null,
+        meta: r.meta ?? null,
+      })),
+    );
   }
 }
 
@@ -471,6 +555,8 @@ export function createDocumentRepo(client: Client): DocumentRepository {
 export function createChunkRepo(client: Client): ChunkRepository {
   return {
     searchByVector: (embedding, opts) => searchChunksByVector(embedding, opts, client),
+    searchHybrid: (queryEmbedding, queryText, opts) =>
+      searchHybrid(queryEmbedding, queryText, opts, client),
     insertMany: (rows) => insertChunks(rows, client),
     deleteByDocumentId: (documentId) => deleteChunksByDocumentId(documentId, client),
     countForDocuments: (ids) => countChunksForDocuments(ids, client),

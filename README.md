@@ -156,6 +156,13 @@ for detailed sign-up links and per-service walkthroughs.
 - **`/admin/audit`** — Full audit log filterable by document id or
   ticket id. Document audit events: upload, replace, delete, restore.
   Ticket audit events: create, assign, status_change, note, impersonation, role_change.
+- **`/admin/settings`** — Read-only view of the active **chunking
+  strategy** (`document-aware` by default) and **reranking strategy**
+  (`rrf` by default), plus a **"Re-ingest all documents"** action that
+  re-chunks and re-embeds the entire corpus atomically (force-able,
+  bypasses the file-hash short-circuit). Run this after changing the
+  chunking strategy in `config/app.config.ts` so existing documents are
+  re-chunked with the new strategy.
 
 ### Rate limit
 
@@ -199,6 +206,31 @@ this for an Upstash hash; the call sites do not need to change.
 | `pnpm cli seed` | Ingest every PDF in `./documents/` (overridable via `SEED_DOCS_DIR` or `--dir`) |
 | `pnpm cli db-migrate` | Apply the Drizzle schema + enable pgvector + add-column migrations. Prompts for confirmation before the destructive `drizzle-kit push`; pass `--force` to skip the prompt |
 | `pnpm arch` | Architecture boundary check via dependency-cruiser |
+
+> **Note:** `pnpm arch` is recommended as a CI gate between `lint` and
+> `test` (per the RAG chunking plan) to catch dependency-boundary drift
+> early. Run it locally after any change that touches the import graph.
+
+### Chunking & retrieval
+
+- **Chunking strategies (pluggable):** selected by `chunkingStrategy`
+  in `config/app.config.ts`. Built-in strategies: `document-aware`
+  (default), `recursive-adaptive`, and `semantic` (opt-in, reuses
+  sentence embeddings). The active strategy is shown read-only in
+  `/admin/settings`.
+- **Hybrid retrieval:** Postgres FTS over a `GENERATED … STORED`
+  `tsvector` column (backed by a GIN index) is fused with `pgvector`
+  cosine search via **RRF** in a single SQL CTE (`ChunkRepository.searchHybrid`).
+- **Re-ranking:** default `rrf` (free, local). Switch to an external
+  API reranker via `reranking.strategy` in `config/app.config.ts`
+  (`cohere` or `gemini`); the factory falls back to `rrf` when the
+  matching key is missing. Env: `RERANKER_STRATEGY`, `COHERE_API_KEY`,
+  `AI_STUDIO_KEY`, `RERANKER_MODEL`.
+- **Tuning constants** live in `config/constants.ts`: `TOOL_CONTENT_CAP=1100`,
+  `RETRIEVE_K`/`VEC_K`/`FTS_K=20`, `RRF_K=60`, `RRF_WEIGHT_VECTOR=0.6`,
+  `RRF_WEIGHT_FTS=0.4`, `RRF_FLOOR=1e-4`.
+- **Changing the chunking strategy requires a re-ingest:** Admin →
+  Settings → "Re-ingest all documents".
 
 ### Tests
 

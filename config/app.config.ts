@@ -102,6 +102,17 @@ const config: AppConfig = {
   // itself. Set false to disable the pre-fetch and rely on the
   // model to call the tool every turn.
   prefetchFirstTurn: false,
+
+  // Chunking strategy used at ingest time. Changing this requires a
+  // re-ingest (Admin → Settings → "Re-ingest all") to re-chunk existing
+  // documents with the new strategy.
+  chunkingStrategy: 'document-aware',
+
+  // Re-ranking of the hybrid-retrieved candidate set. Default `rrf` is
+  // free and runs locally. Switch to `cohere` or `gemini` to use an
+  // external API reranker (needs COHERE_API_KEY / AI_STUDIO_KEY); if the
+  // key is missing the app falls back to `rrf` and logs a warning.
+  reranking: { strategy: 'rrf', rerankTopK: 20 },
 };
 
 export default config;

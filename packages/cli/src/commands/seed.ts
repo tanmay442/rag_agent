@@ -80,19 +80,11 @@ export async function runSeed(opts: SeedOptions = {}): Promise<void> {
             countChunksForDocuments: Db.countChunksForDocuments,
             countChunksForAll: Db.countChunksForAll,
           },
-          chunks: {
-            insertMany: (rows: Array<{ documentId: number; content: string; embedding: number[] }>) => Db.insertChunks(rows),
-            deleteByDocumentId: (documentId: number) => Db.deleteChunksByDocumentId(documentId),
-            countForDocuments: (ids: number[]) => Db.countChunksForDocuments(ids),
-            countForAll: () => Db.countChunksForAll(),
-            countForDocument: (id: number) => Db.countChunksForDocument(id),
-            recountAll: () => Db.recountChunksForAll(),
-            searchByVector: (embedding: number[], opts: { threshold: number; limit: number }) => Db.searchChunksByVector(embedding, opts),
-          },
+          chunks: Db.createChunkRepo(Db.db),
           embeddings: Llm.getEmbeddingService(),
           hasher: { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') },
           pdfParser: Pdf.unpdfParser,
-          textSplitter: Pdf.langchainSplitter,
+          textSplitter: Pdf.getChunkingStrategy('document-aware', { embeddings: Llm.getEmbeddingService() }),
         };
         return {
           ingestFile: (input: { fileName: string; buffer: Buffer; uploadedBy: string }) =>

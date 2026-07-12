@@ -1,2 +1,7 @@
 export { unpdfParser } from './unpdf-parser';
-export { langchainSplitter } from './langchain-splitter';
+export {
+  getChunkingStrategy,
+  documentAwareSplitter,
+  adaptiveRecursiveSplitter,
+  makeSemanticSplitter,
+} from './strategies';

@@ -249,7 +249,7 @@ describe('/api/chat searchDocumentation tool', () => {
     return { tools: tools ?? null };
   }
 
-  it('returns up to 800 chars per chunk and a 150-char snippet per citation', async () => {
+  it('returns up to TOOL_CONTENT_CAP (1100) chars per chunk and a 150-char snippet per citation', async () => {
     const longContent = 'x'.repeat(2000);
     const searchChunksSpy = vi
       .spyOn(compositionMock, 'searchChunks')
@@ -258,7 +258,7 @@ describe('/api/chat searchDocumentation tool', () => {
     const result = (await tools?.searchDocumentation?.execute({ query: 'q' })) as Array<{
       content: string;
     }>;
-    expect(result?.[0]?.content.length).toBe(800 + 1); // 800 chars + ellipsis
+    expect(result?.[0]?.content.length).toBe(1100 + 1); // TOOL_CONTENT_CAP chars + ellipsis
     expect(result?.[0]?.content.endsWith('\u2026')).toBe(true);
     searchChunksSpy.mockRestore();
   });

@@ -50,7 +50,7 @@ module.exports = {
       from: { path: '^packages/application' },
       to: {
         dependencyTypes: ['npm'],
-        path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-lib|pg|@neondatabase|drizzle-kit|unpdf/)',
+        path: 'node_modules/(drizzle-orm|@ai-sdk|@clerk|next|pdf-lib|pg|@neondatabase|drizzle-kit|unpdf|@langchain/)',
       },
     },
     {

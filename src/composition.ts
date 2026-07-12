@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { appConfig } from './lib/config';
 import { logger } from './lib/logger';
 import { respond, respondResult } from './lib/http';
-import { MAX_LIST_LIMIT } from '../config/constants';
+import { MAX_LIST_LIMIT, RETRIEVE_K, VEC_K, FTS_K } from '../config/constants';
 
 const systemClock = { now: () => new Date() };
 const systemHasher = { sha256: (b: Buffer) => createHash('sha256').update(b).digest('hex') };
@@ -62,9 +62,18 @@ const ingestQueue: IngestQueue = Queue.createIngestQueue();
 const ingestDeps: IngestDeps = {
   documents: documentRepo, chunks: chunkRepo,
   embeddings: embeddingService, hasher: systemHasher,
-  pdfParser: Pdf.unpdfParser, textSplitter: Pdf.langchainSplitter,
+  pdfParser: Pdf.unpdfParser,
+  textSplitter: Pdf.getChunkingStrategy(appConfig.chunkingStrategy, { embeddings: embeddingService }),
+  transaction: Db.transactionRunner,
 };
-const searchDeps: SearchDeps = { chunks: chunkRepo, embeddings: embeddingService };
+const searchDeps: SearchDeps = {
+  chunks: chunkRepo,
+  embeddings: embeddingService,
+  reranker: Llm.getReranker(appConfig.reranking.strategy, process.env),
+  retrieveK: RETRIEVE_K,
+  vecK: VEC_K,
+  ftsK: FTS_K,
+};
 function createRateLimiter(): RateLimiter {
   if (process.env.UPSTASH_REDIS_REST_URL) return Auth.createUpstashRateLimiter();
   return Auth.lruRateLimiter;
@@ -141,7 +150,7 @@ function createComposition() {
       }
       const prepared = await prepareIngest(
         { documentId, fileName: doc.fileName, buffer },
-        { embeddings: embeddingService, pdfParser: Pdf.unpdfParser, textSplitter: Pdf.langchainSplitter },
+        { embeddings: embeddingService, pdfParser: Pdf.unpdfParser, textSplitter: Pdf.getChunkingStrategy(appConfig.chunkingStrategy, { embeddings: embeddingService }) },
       );
       if (!prepared.ok) {
         await documentRepo.updateIngestStatus(documentId, 'failed').catch(() => {});
@@ -166,6 +175,45 @@ function createComposition() {
     },
     recountChunksForDocument: (id: number) => bind(recountChunksForDocument, id, { chunks: chunkRepo }),
     recountChunksForAllDocuments: () => bind(recountChunksForAllDocuments, { chunks: chunkRepo }),
+    /** Re-embed every non-deleted document from its stored blob via the
+      * current chunking strategy + embeddings, replacing chunks atomically. */
+    reingestAll: async (): Promise<Result<{ processed: number; chunks: number; failed: number }>> => {
+      let processed = 0;
+      let chunks = 0;
+      let failed = 0;
+      try {
+        const { documents } = await documentRepo.list({
+          search: undefined,
+          includeDeleted: false,
+          limit: 1000,
+          offset: 0,
+        });
+        for (const doc of documents) {
+          try {
+            if (!doc.storageKey) {
+              failed++;
+              continue;
+            }
+            const buffer = await blobStorage.get(doc.storageKey);
+            const result = await ingestFile(
+              { fileName: doc.fileName, buffer, uploadedBy: doc.uploadedBy, force: true },
+              ingestDeps,
+            );
+            if (!result.ok) {
+              failed++;
+              continue;
+            }
+            processed++;
+            chunks += result.value.chunks;
+          } catch {
+            failed++;
+          }
+        }
+        return ok({ processed, chunks, failed });
+      } catch (e) {
+        return err(new ExternalServiceError('Failed to list documents for re-ingest', e));
+      }
+    },
     getAnalyticsSummary: () =>
       bind(getAnalyticsSummary, { documents: documentRepo, chunks: chunkRepo, tickets: Db.ticketRepo, ...userDeps, stats: createQueryStats() }),
     listAudit: (input: Parameters<typeof listAudit>[0]) => bind(listAudit, input, auditDeps),

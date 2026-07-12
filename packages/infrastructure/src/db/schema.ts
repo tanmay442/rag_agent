@@ -1,12 +1,21 @@
 // `blob` bytea retained until backfill moves binaries to `storage_key`.
 import {
-  pgTable, serial, text, timestamp, integer,
-  index, check,
+  pgTable, serial, text, timestamp, integer, jsonb,
+  customType, index, check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { vector } from './schema-vector';
 import { byteaBlob } from '../storage/bytea-blob';
 import type { IngestStatus } from '@app/domain';
+
+const tsvector = customType<{ data: unknown; driverData: string }>({
+  dataType() {
+    return 'tsvector';
+  },
+  fromDriver(value) {
+    return value;
+  },
+});
 
 export const documents = pgTable('documents', {
   id: serial('id').primaryKey(),
@@ -28,9 +37,18 @@ export const chunks = pgTable('chunks', {
   documentId: integer('document_id').references(() => documents.id, { onDelete: 'cascade' }).notNull(),
   content: text('content').notNull(),
   embedding: vector('embedding').notNull(),
+  page: integer('page'),
+  chunkIndex: integer('chunk_index').notNull().default(0),
+  section: text('section'),
+  meta: jsonb('meta'),
+  fts: (tsvector('fts') as unknown as {
+    generatedAlwaysAs(e: unknown, c?: { mode: 'stored' }): { notNull(): unknown };
+  }).generatedAlwaysAs(sql`to_tsvector('simple', content)`, { mode: 'stored' }).notNull() as unknown as ReturnType<typeof tsvector>,
 }, (table) => [
   index('embedding_idx').using('hnsw', sql`${table.embedding} vector_cosine_ops`),
   index('chunks_document_id_idx').on(table.documentId),
+  index('chunks_page_idx').on(table.page),
+  index('chunks_fts_idx').using('gin', sql`${table.fts}`),
 ]);
 
 export const tickets = pgTable('tickets', {

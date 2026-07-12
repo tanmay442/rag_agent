@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CHUNKING_STRATEGIES } from './ports';
 
 const toneSchema = z.enum(['friendly', 'formal', 'casual', 'concise']);
 
@@ -78,6 +79,13 @@ export const appConfigSchema = z.object({
     }),
   seedDocsDir: z.string().min(1).default('./documents'),
   prefetchFirstTurn: z.boolean().default(false),
+  chunkingStrategy: z.enum(CHUNKING_STRATEGIES).default('document-aware'),
+  reranking: z
+    .object({
+      strategy: z.enum(['rrf', 'cohere', 'gemini']).default('rrf'),
+      rerankTopK: z.number().int().min(1).max(100).default(20),
+    })
+    .default({ strategy: 'rrf', rerankTopK: 20 }),
 });
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
