@@ -15,7 +15,6 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import type { MyUIMessage } from '@/composition';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -256,14 +255,6 @@ export function ChatInterface() {
                   data-testid="chat-citations"
                 >
                   {citations.map((c, i) => {
-                    const sim = c.data.similarity;
-                    const simPct = Math.round(sim * 100);
-                    const simTone =
-                      sim >= 0.8
-                        ? 'var(--success)'
-                        : sim >= 0.6
-                          ? 'var(--primary)'
-                          : 'var(--warning)';
                     return (
                       <Card
                         key={i}
@@ -287,29 +278,6 @@ export function ChatInterface() {
                             </svg>
                             Source {i + 1}
                           </span>
-                          <Badge
-                            variant="outline"
-                            className="rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums"
-                            style={{
-                              color: simTone,
-                              background: `color-mix(in oklch, ${simTone} 14%, transparent)`,
-                            }}
-                            title="Cosine similarity to your question"
-                          >
-                            {simPct}% match
-                          </Badge>
-                        </div>
-                        <div
-                          className="h-1 w-full overflow-hidden rounded-full bg-surface-elevated"
-                          aria-hidden
-                        >
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${simPct}%`,
-                              background: 'var(--success)',
-                            }}
-                          />
                         </div>
                         <p className="line-clamp-4 text-[12.5px] leading-relaxed text-muted-foreground">
                           {c.data.snippet}

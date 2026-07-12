@@ -76,8 +76,8 @@ describe('ChatInterface', () => {
     render(<ChatInterface />);
     const citation = screen.getByTestId('chat-citation');
     expect(citation).toBeInTheDocument();
-    // Similarity rendered as a percentage match.
-    expect(within(citation).getByText(/92% match/i)).toBeInTheDocument();
+    // Citation no longer claims a misleading cosine "% match" (scores are RRF-fused).
+    expect(within(citation).queryByText(/% match/i)).not.toBeInTheDocument();
     expect(
       within(citation).getByText(/dental plan covers two cleanings/i),
     ).toBeInTheDocument();
