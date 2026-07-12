@@ -1,6 +1,7 @@
 import { getComposition, unwrap } from '@/composition';
 import { StatCard } from '@/components/admin/StatCard';
 import { AuditEventList } from '@/components/admin/AuditEventList';
+import { PageHeader } from '@/components/admin/PageHeader';
 import {
   Card,
   CardHeader,
@@ -62,8 +63,11 @@ export default async function AnalyticsPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h2 className="text-xl font-medium">Analytics</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <PageHeader
+        title="Analytics"
+        description="Administrative activity across documents and tickets."
+      />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Documents" value={summary.documentCount} />
         <StatCard label="Chunks" value={summary.chunkCount} />
         <StatCard label="Tickets" value={summary.ticketCount} />
@@ -80,20 +84,20 @@ export default async function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
-            <DonutChart
-              segments={[
-                {
-                  label: 'Document',
-                  value: documentEvents,
-                  stroke: 'stroke-primary',
-                },
-                {
-                  label: 'Ticket',
-                  value: ticketEvents,
-                  stroke: 'stroke-foreground-subtle',
-                },
-              ]}
-            >
+              <DonutChart
+                segments={[
+                  {
+                    label: 'Document',
+                    value: documentEvents,
+                    stroke: 'stroke-foreground',
+                  },
+                  {
+                    label: 'Ticket',
+                    value: ticketEvents,
+                    stroke: 'stroke-foreground/50',
+                  },
+                ]}
+              >
               <span className="text-3xl font-semibold tabular-nums text-foreground">
                 {documentEvents + ticketEvents}
               </span>
@@ -103,10 +107,10 @@ export default async function AnalyticsPage() {
             </DonutChart>
             <ChartLegend
               items={[
-                { label: `Documents (${documentEvents})`, className: 'bg-primary' },
+                { label: `Documents (${documentEvents})`, className: 'bg-foreground' },
                 {
                   label: `Tickets (${ticketEvents})`,
-                  className: 'bg-foreground-subtle',
+                  className: 'bg-foreground/50',
                 },
               ]}
             />

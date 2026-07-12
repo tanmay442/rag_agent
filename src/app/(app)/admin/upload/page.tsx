@@ -4,6 +4,7 @@ import { useEffect, useActionState, useRef, useState, type DragEvent } from 'rea
 import { uploadPdfAction, type UploadState } from '../actions';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import { toast } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 
@@ -187,6 +188,14 @@ export default function UploadPage() {
         >
           {pending ? 'Uploading…' : 'Upload'}
         </Button>
+        {state.status ? (
+          <Alert
+            className="border-border-subtle bg-secondary px-3 py-2 text-foreground"
+            role="status"
+          >
+            {state.fileName}: {state.status} ({state.chunks} chunks)
+          </Alert>
+        ) : null}
       </form>
     </section>
   );

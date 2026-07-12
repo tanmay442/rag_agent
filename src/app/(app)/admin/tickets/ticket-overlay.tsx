@@ -66,7 +66,7 @@ export function TicketOverlay({
         showCloseButton={false}
         data-testid="ticket-overlay"
         className={cn(
-          'flex h-full w-full max-w-md flex-col gap-0 border-l border-border bg-card p-0 shadow-2xl sm:max-w-md',
+          'flex h-full w-full max-w-md flex-col gap-0 border-l border-border-subtle bg-card p-0 shadow-2xl sm:max-w-md',
         )}
       >
         <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
@@ -102,10 +102,10 @@ export function TicketOverlay({
               userOptions={userOptions}
             />
           ) : (
-            <div
-              className="flex flex-col gap-3 rounded-xl border border bg-surface-elevated p-4 text-sm text-muted-foreground"
-              data-testid="ticket-overlay-not-in-view"
-            >
+              <div
+                className="flex flex-col gap-3 rounded-xl border-border-subtle bg-surface-elevated p-4 text-sm text-muted-foreground"
+                data-testid="ticket-overlay-not-in-view"
+              >
               <span>
                 Ticket <strong className="text-foreground">{activeId}</strong>{' '}
                 is not in the current filtered view. Clear the filter to see it

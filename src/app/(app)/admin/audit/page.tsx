@@ -1,5 +1,8 @@
 import { getComposition, unwrap, parsePageParam } from '@/composition';
 import { Pagination } from '@/components/admin/Pagination';
+import { PageHeader } from '@/components/admin/PageHeader';
+import { StatusBadge } from '@/components/admin/StatusBadge';
+import { formatTimestamp } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,7 +39,10 @@ export default async function AuditPage({
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-xl font-medium">Audit log</h2>
+      <PageHeader
+        title="Audit log"
+        description="Every document and ticket action, who did it, and when."
+      />
       <form className="flex flex-wrap gap-2" method="get" aria-label="Filter audit log">
         <Label className="sr-only" htmlFor="audit-documentId">
           Document id
@@ -99,11 +105,11 @@ export default async function AuditPage({
                   key={`${e.kind}-${e.id}`}
                   className="border-border-subtle hover:bg-secondary/40"
                 >
-                  <TableCell className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
-                    {e.at.toISOString()}
+                  <TableCell className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground" title={e.at.toISOString()}>
+                    {formatTimestamp(e.at)}
                   </TableCell>
                   <TableCell className="px-3 py-2 text-xs text-foreground">
-                    {e.kind}
+                    <StatusBadge tone="outline">{e.kind}</StatusBadge>
                   </TableCell>
                   <TableCell className="px-3 py-2 text-xs font-medium text-foreground">
                     {e.action}

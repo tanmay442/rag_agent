@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { StatusBadge, statusBadgeProps } from '@/components/admin/StatusBadge';
 import {
   Select,
   SelectContent,
@@ -62,8 +63,11 @@ export function TicketDrawer({
   return (
     <Card
       data-testid={`ticket-drawer-body-${ticketId}`}
-      className="flex flex-col gap-3 rounded-xl border border bg-surface-elevated p-4 text-sm"
+      className="flex flex-col gap-3 rounded-xl border-border-subtle bg-surface-elevated p-4 text-sm"
     >
+      <div className="flex items-center justify-between gap-2">
+        <StatusBadge {...statusBadgeProps(currentStatus)}>{currentStatus}</StatusBadge>
+      </div>
       <div>
         <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Name
@@ -167,7 +171,7 @@ export function TicketDrawer({
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           data-testid={`ticket-note-${ticketId}`}
-          className="rounded-xl border border bg-background p-2 text-sm text-foreground"
+          className="rounded-xl border-border-subtle bg-background p-2 text-sm text-foreground"
         />
         <Button
           type="button"
@@ -192,7 +196,7 @@ export function TicketDrawer({
       </div>
       {notes ? (
         <div
-          className="rounded-xl border border bg-background p-3 text-sm"
+          className="rounded-xl border-border-subtle bg-background p-3 text-sm"
           data-testid={`ticket-notes-${ticketId}`}
         >
           <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

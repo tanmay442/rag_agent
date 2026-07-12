@@ -3,11 +3,13 @@ import { DocumentRowActions } from './document-row-actions';
 import { RecountAllButton } from './recount-all-button';
 import { IngestStatusPoller } from './ingest-status-poller';
 import { Pagination } from '@/components/admin/Pagination';
+import { PageHeader } from '@/components/admin/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
+import { StatusBadge, statusBadgeProps } from '@/components/admin/StatusBadge';
+import { formatTimestamp } from '@/lib/format';
 import {
   Table,
   TableHeader,
@@ -16,25 +18,10 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import type { IngestStatus } from '@app/domain';
 
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 25;
-
-function ingestBadgeClass(status: IngestStatus): string {
-  switch (status) {
-    case 'queued':
-      return 'rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs text-warning';
-    case 'ingesting':
-      return 'rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs text-primary';
-    case 'failed':
-      return 'rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-xs text-destructive';
-    case 'done':
-    default:
-      return 'rounded-full border border-muted-foreground/30 px-2 py-0.5 text-xs text-muted-foreground';
-  }
-}
 
 export default async function DocumentsPage({
   searchParams,
@@ -77,7 +64,10 @@ export default async function DocumentsPage({
   );
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-xl font-medium">Documents</h2>
+      <PageHeader
+        title="Documents"
+        description="Every PDF indexed for RAG search, with chunk counts and ingest status."
+      />
       <div className="flex flex-col gap-2">
         <form className="flex gap-2" method="get" aria-label="Search documents">
           <Label className="sr-only" htmlFor="documents-search">
@@ -155,30 +145,26 @@ export default async function DocumentsPage({
                   <TableCell className="px-3 py-2 text-muted-foreground">
                     {d.uploaderName ?? d.uploadedBy}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground">
-                    {d.uploadedAt.toISOString()}
+                  <TableCell className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground" title={d.uploadedAt.toISOString()}>
+                    {formatTimestamp(d.uploadedAt)}
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-3 py-2 text-right text-foreground">
                     {d.chunkCount}
                   </TableCell>
                   <TableCell className="px-3 py-2">
                     {d.deletedAt ? (
-                      <Badge className="rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
-                        deleted
-                      </Badge>
+                      <StatusBadge {...statusBadgeProps('deleted')}>deleted</StatusBadge>
                     ) : (
-                      <Badge className="rounded-full border border-success/40 bg-success/10 px-2 py-0.5 text-xs text-success">
-                        live
-                      </Badge>
+                      <StatusBadge {...statusBadgeProps('live')}>live</StatusBadge>
                     )}
                   </TableCell>
                   <TableCell className="px-3 py-2">
-                    <Badge
-                      className={ingestBadgeClass(d.ingestStatus)}
+                    <StatusBadge
+                      {...statusBadgeProps(d.ingestStatus)}
                       data-testid={`documents-ingest-status-${d.id}`}
                     >
                       {d.ingestStatus}
-                    </Badge>
+                    </StatusBadge>
                   </TableCell>
                   <TableCell className="px-3 py-2">
                     <DocumentRowActions

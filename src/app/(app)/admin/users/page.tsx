@@ -1,10 +1,12 @@
 import { getComposition, unwrap, parsePageParam } from '@/composition';
 import { UserRowActions } from './user-row-actions';
 import { Pagination } from '@/components/admin/Pagination';
+import { PageHeader } from '@/components/admin/PageHeader';
+import { StatusBadge, statusBadgeProps } from '@/components/admin/StatusBadge';
+import { formatTimestamp } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableHeader,
@@ -35,7 +37,10 @@ export default async function UsersPage({
   const totalPages = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-xl font-medium">Users</h2>
+      <PageHeader
+        title="Users"
+        description="Everyone with access, their role, and last activity."
+      />
       <form className="flex gap-2" method="get" aria-label="Search users">
         <Label className="sr-only" htmlFor="users-search">
           Search users
@@ -99,23 +104,13 @@ export default async function UsersPage({
                     {u.email}
                   </TableCell>
                   <TableCell className="px-3 py-2 text-xs">
-                    {u.role === 'admin' ? (
-                      <Badge className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary">
-                        admin
-                      </Badge>
-                    ) : (
-                      <Badge className="rounded-full border border bg-card px-2 py-0.5 text-muted-foreground">
-                        user
-                      </Badge>
-                    )}
+                    <StatusBadge {...statusBadgeProps(u.role)}>{u.role}</StatusBadge>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground">
-                    {u.lastSeenAt
-                      ? u.lastSeenAt.toISOString()
-                      : '—'}
+                  <TableCell className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground" title={u.lastSeenAt?.toISOString()}>
+                    {u.lastSeenAt ? formatTimestamp(u.lastSeenAt) : '—'}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground">
-                    {u.createdAt.toISOString()}
+                  <TableCell className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground" title={u.createdAt.toISOString()}>
+                    {formatTimestamp(u.createdAt)}
                   </TableCell>
                   <TableCell className="px-3 py-2">
                     <UserRowActions

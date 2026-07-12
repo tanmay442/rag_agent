@@ -128,22 +128,6 @@ export function ChatInterface() {
             data-testid="chat-intro"
           >
             <div className="flex flex-col items-start gap-4">
-              <span
-                aria-hidden
-                className="inline-flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/30"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="size-4"
-                >
-                  <path d="M4 4h16v12H7l-3 4V4z" />
-                </svg>
-              </span>
               <div className="flex flex-col gap-1.5 break-words">
                 <p className="text-base font-semibold text-foreground">
                   Hi! I&apos;m the support assistant.
@@ -375,7 +359,7 @@ export function ChatInterface() {
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border-subtle bg-background/80 backdrop-blur">
+      <div className="shrink-0 bg-background/80 backdrop-blur">
         <form
           onSubmit={onSubmit}
           className="group/composer mx-auto flex w-full max-w-3xl items-end gap-2 p-3 sm:p-4"
@@ -389,7 +373,7 @@ export function ChatInterface() {
             disabled={isStreaming}
             placeholder="Ask a question about your docs…"
             rows={1}
-            className="min-h-[44px] max-h-[200px] flex-1 resize-none rounded-2xl border border-border-subtle bg-secondary/60 px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-60"
+            className="min-h-[44px] max-h-[200px] flex-1 resize-none rounded-2xl border border-border-subtle bg-secondary/60 px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-60 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             data-testid="chat-input"
           />
           <Button

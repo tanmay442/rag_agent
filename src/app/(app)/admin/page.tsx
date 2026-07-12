@@ -1,6 +1,7 @@
 import { getComposition, unwrap } from '@/composition';
 import { StatCard } from '@/components/admin/StatCard';
 import { AuditEventList } from '@/components/admin/AuditEventList';
+import { PageHeader } from '@/components/admin/PageHeader';
 import {
   Card,
   CardHeader,
@@ -30,28 +31,31 @@ export default async function AdminOverviewPage() {
   const hasTickets = summary.ticketCount > 0;
 
   const corpusItems = [
-    { label: 'Chunks', value: summary.chunkCount, barClassName: 'bg-primary' },
+    { label: 'Chunks', value: summary.chunkCount, barClassName: 'bg-foreground' },
     {
       label: 'Documents',
       value: summary.documentCount,
-      barClassName: 'bg-foreground-subtle',
+      barClassName: 'bg-foreground/70',
     },
     {
       label: 'Tickets',
       value: summary.ticketCount,
-      barClassName: 'bg-foreground-faint',
+      barClassName: 'bg-foreground/45',
     },
     {
       label: 'Users',
       value: summary.usersCount,
-      barClassName: 'bg-border-strong',
+      barClassName: 'bg-foreground/25',
     },
   ];
 
   return (
     <section className="flex flex-col gap-6">
-      <h2 className="text-xl font-medium">Overview</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <PageHeader
+        title="Overview"
+        description="Health of the knowledge base and support workload at a glance."
+      />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard
           href="/admin/documents"
           label="Documents"
@@ -93,16 +97,16 @@ export default async function AdminOverviewPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
-            <DonutChart
-              segments={[
-                { label: 'Open', value: openTickets, stroke: 'stroke-primary' },
-                {
-                  label: 'Resolved',
-                  value: resolvedTickets,
-                  stroke: 'stroke-border-strong',
-                },
-              ]}
-            >
+              <DonutChart
+                segments={[
+                  { label: 'Open', value: openTickets, stroke: 'stroke-foreground' },
+                  {
+                    label: 'Resolved',
+                    value: resolvedTickets,
+                    stroke: 'stroke-foreground/50',
+                  },
+                ]}
+              >
               <span className="text-3xl font-semibold tabular-nums text-foreground">
                 {hasTickets
                   ? `${Math.round((openTickets / summary.ticketCount) * 100)}%`
@@ -114,10 +118,10 @@ export default async function AdminOverviewPage() {
             </DonutChart>
             <ChartLegend
               items={[
-                { label: `Open (${openTickets})`, className: 'bg-primary' },
+                { label: `Open (${openTickets})`, className: 'bg-foreground' },
                 {
                   label: `Resolved (${resolvedTickets})`,
-                  className: 'bg-border-strong',
+                  className: 'bg-foreground/50',
                 },
               ]}
             />

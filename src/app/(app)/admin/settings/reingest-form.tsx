@@ -31,7 +31,7 @@ export function ReingestForm() {
       ) : null}
       {state.processed !== undefined ? (
         <Alert
-          className="border-success/40 bg-success/10 px-3 py-2 text-success"
+          className="border-border-subtle bg-secondary px-3 py-2 text-foreground"
           data-testid="reingest-success"
           role="status"
         >

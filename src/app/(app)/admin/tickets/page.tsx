@@ -3,7 +3,9 @@ import { getComposition, TICKET_STATUSES, unwrap, parsePageParam } from '@/compo
 import { TicketOverlay, type TicketRow } from './ticket-overlay';
 import { TicketsFilterForm } from './tickets-filter-form';
 import { Pagination } from '@/components/admin/Pagination';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/admin/PageHeader';
+import { StatusBadge, statusBadgeProps } from '@/components/admin/StatusBadge';
+import { formatTimestamp } from '@/lib/format';
 import {
   Table,
   TableHeader,
@@ -70,7 +72,10 @@ export default async function TicketsPage({
   return (
     <section className="flex flex-col gap-4">
       <TicketOverlay tickets={rows} userOptions={userList.users} />
-      <h2 className="text-xl font-medium">Tickets</h2>
+      <PageHeader
+        title="Tickets"
+        description="Support requests from chat users, with status and assignee."
+      />
       <TicketsFilterForm
         statuses={TICKET_STATUSES}
         users={userList.users}
@@ -165,9 +170,9 @@ export default async function TicketsPage({
                         })()}
                       </span>
                       {t.userId === 'anonymous' ? (
-                        <Badge className="mt-1 bg-warning/10 text-[10px] text-warning">
+                        <StatusBadge tone="outline" className="mt-1 text-[10px]">
                           (anonymous)
-                        </Badge>
+                        </StatusBadge>
                       ) : null}
                     </div>
                   </TableCell>
@@ -175,9 +180,7 @@ export default async function TicketsPage({
                     {t.issue}
                   </TableCell>
                   <TableCell className="whitespace-nowrap px-3 py-2 text-xs">
-                    <Badge className="bg-surface-elevated text-foreground">
-                      {t.status}
-                    </Badge>
+                    <StatusBadge {...statusBadgeProps(t.status)}>{t.status}</StatusBadge>
                   </TableCell>
                   <TableCell
                     className="truncate px-3 py-2 text-xs"
@@ -189,7 +192,7 @@ export default async function TicketsPage({
                     className="whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground"
                     title={t.createdAt.toISOString()}
                   >
-                    {t.createdAt.toISOString().slice(0, 16).replace('T', ' ')}
+                    {formatTimestamp(t.createdAt)}
                   </TableCell>
                 </TableRow>
               ))
